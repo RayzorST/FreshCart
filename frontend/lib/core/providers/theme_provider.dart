@@ -1,32 +1,28 @@
+// lib/providers/theme_provider.dart
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum ThemeMode { system, light, dark }
+class ThemeNotifier extends StateNotifier<bool> {
+  static const String _themeKey = 'dark_theme';
 
-final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>((ref) {
-  return ThemeNotifier();
-});
-
-class ThemeNotifier extends StateNotifier<ThemeMode> {
-  ThemeNotifier() : super(ThemeMode.system) {
+  ThemeNotifier() : super(false) {
     _loadTheme();
-  }
-
-  static const String _themeKey = 'theme_mode';
-
-  void setTheme(ThemeMode mode) {
-    state = mode;
-    _saveTheme(mode);
   }
 
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    final themeIndex = prefs.getInt(_themeKey) ?? 0;
-    state = ThemeMode.values[themeIndex];
+    state = prefs.getBool(_themeKey) ?? false;
   }
 
-  Future<void> _saveTheme(ThemeMode mode) async {
+  Future<void> toggleTheme(bool isDark) async {
+    state = isDark;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_themeKey, mode.index);
+    await prefs.setBool(_themeKey, isDark);
   }
 }
+
+// Создаем провайдер
+final themeProvider = StateNotifierProvider<ThemeNotifier, bool>((ref) {
+  return ThemeNotifier();
+});

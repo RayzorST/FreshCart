@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/theme/app_theme.dart';
+import 'package:client/core/providers/theme_provider.dart'; // ← Добавить импорт
 import 'package:client/features/auth/screens/login_screen.dart';
 import 'package:client/features/auth/screens/register_screen.dart';
 import 'package:client/features/main/screens/main_screen.dart';
@@ -88,11 +89,13 @@ class FreshCartApp extends StatelessWidget {
       child: Consumer(
         builder: (context, ref, child) {
           final router = ref.watch(goRouterProvider);
+          final isDarkTheme = ref.watch(themeProvider); // ← Получаем состояние темы
+          
           return MaterialApp.router(
             title: 'FreshCart',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system, // Системная тема по умолчанию
+            themeMode: isDarkTheme ? ThemeMode.dark : ThemeMode.light, // ← Используем нашу тему
             routerConfig: router,
             debugShowCheckedModeBanner: false,
           );

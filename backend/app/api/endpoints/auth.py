@@ -182,8 +182,7 @@ async def get_notification_settings(
 async def update_notification_settings(
     settings_data: NotificationSettings,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
+    db: Session = Depends(get_db)):
     """Обновить настройки уведомлений"""
     settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
     

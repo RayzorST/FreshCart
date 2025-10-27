@@ -62,7 +62,7 @@ class ApiClient {
   // Notifications settings
   static Future<Map<String, dynamic>> getNotificationSettings() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/settings/notifications'),
+      Uri.parse('$baseUrl/auth/settings/notifications'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -70,7 +70,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> updateNotificationSettings(Map<String, dynamic> settings) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/settings/notifications'),
+      Uri.parse('$baseUrl/auth/settings/notifications'),
       headers: _headers,
       body: json.encode(settings),
     );

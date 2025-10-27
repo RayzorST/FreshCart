@@ -1,86 +1,123 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/providers/theme_provider.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _orderNotifications = true;
   bool _promoNotifications = true;
-  bool _darkTheme = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationSettings();
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    try {
+      final settings = await ApiClient.getNotificationSettings();
+      setState(() {
+        _orderNotifications = settings['order_notifications'] ?? true;
+        _promoNotifications = settings['promo_notifications'] ?? true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading notification settings: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updateNotificationSettings() async {
+    try {
+      await ApiClient.updateNotificationSettings({
+        'order_notifications': _orderNotifications,
+        'promo_notifications': _promoNotifications,
+      });
+    } catch (e) {
+      print('Error updating notification settings: $e');
+      // Откатываем изменения в случае ошибки
+      setState(() {
+        _orderNotifications = !_orderNotifications;
+        _promoNotifications = !_promoNotifications;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка сохранения настроек: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isDarkTheme = ref.watch(themeProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Настройки'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildSectionHeader('Уведомления'),
-          _buildSettingItem(
-            context,
-            title: 'Уведомления о заказах',
-            subtitle: 'Статус заказов и доставки',
-            value: _orderNotifications,
-            onChanged: (value) {
-              setState(() {
-                _orderNotifications = value;
-              });
-              _updateNotificationSettings();
-            },
-          ),
-          _buildSettingItem(
-            context,
-            title: 'Акции и скидки', 
-            subtitle: 'Уведомления о специальных предложениях',
-            value: _promoNotifications,
-            onChanged: (value) {
-              setState(() {
-                _promoNotifications = value;
-              });
-              _updateNotificationSettings();
-            },
-          ),
-          
-          _buildSectionHeader('Профиль'),
-          _buildActionItem(
-            context,
-            title: 'Редактировать профиль',
-            icon: Icons.person_outline,
-            onTap: () {
-              _navigateToEditProfile(context);
-            },
-          ),
-          _buildActionItem(
-            context,
-            title: 'Сменить пароль',
-            icon: Icons.lock_outline,
-            onTap: () {
-              _showChangePasswordDialog(context);
-            },
-          ),
-          
-          _buildSectionHeader('Внешний вид'),
-          _buildSettingItem(
-            context,
-            title: 'Темная тема', 
-            subtitle: 'Автоматическое переключение',
-            value: _darkTheme,
-            onChanged: (value) {
-              setState(() {
-                _darkTheme = value;
-              });
-              // TODO: Применить тему
-            },
-          ),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildSectionHeader('Уведомления'),
+                _buildSettingItem(
+                  title: 'Уведомления о заказах',
+                  subtitle: 'Статус заказов и доставки',
+                  value: _orderNotifications,
+                  onChanged: (value) {
+                    setState(() {
+                      _orderNotifications = value;
+                    });
+                    _updateNotificationSettings();
+                  },
+                ),
+                _buildSettingItem(
+                  title: 'Акции и скидки', 
+                  subtitle: 'Уведомления о специальных предложениях',
+                  value: _promoNotifications,
+                  onChanged: (value) {
+                    setState(() {
+                      _promoNotifications = value;
+                    });
+                    _updateNotificationSettings();
+                  },
+                ),
+                
+                _buildSectionHeader('Профиль'),
+                _buildActionItem(
+                  title: 'Редактировать профиль',
+                  icon: Icons.person_outline,
+                  onTap: () {
+                    _navigateToEditProfile(context);
+                  },
+                ),
+                _buildActionItem(
+                  title: 'Сменить пароль',
+                  icon: Icons.lock_outline,
+                  onTap: () {
+                    _showChangePasswordDialog(context);
+                  },
+                ),
+                
+                _buildSectionHeader('Внешний вид'),
+                _buildSettingItem(
+                  title: 'Темная тема', 
+                  subtitle: 'Переключение между светлой и темной темой',
+                  value: isDarkTheme,
+                  onChanged: (value) {
+                    ref.read(themeProvider.notifier).toggleTheme(value);
+                  },
+                ),
+              ],
+            ),
     );
   }
 
@@ -98,7 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSettingItem(BuildContext context, {
+  Widget _buildSettingItem({
     required String title,
     required String subtitle,
     required bool value,
@@ -117,7 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildActionItem(BuildContext context, {
+  Widget _buildActionItem({
     required String title,
     required IconData icon,
     required VoidCallback onTap,
@@ -148,26 +185,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => ChangePasswordDialog(),
     );
   }
-
-    Future<void> _updateNotificationSettings() async {
-    try {
-      // TODO: Раскомментировать когда бэкенд будет готов
-      await ApiClient.updateNotificationSettings({
-        'order_notifications': _orderNotifications,
-        'promo_notifications': _promoNotifications,
-      });
-    } catch (e) {
-      print('Error updating notification settings: $e');
-      // Откатываем изменения в случае ошибки
-      setState(() {
-        _orderNotifications = !_orderNotifications;
-        _promoNotifications = !_promoNotifications;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка сохранения настроек: $e')),
-      );
-    }
-  }
 }
 
 // Экран редактирования профиля
@@ -183,7 +200,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -200,7 +216,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _firstNameController.text = userData['first_name'] ?? '';
         _lastNameController.text = userData['last_name'] ?? '';
         _emailController.text = userData['email'] ?? '';
-        _phoneController.text = userData['phone'] ?? '';
         _isLoading = false;
       });
     } catch (e) {
@@ -221,7 +236,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'first_name': _firstNameController.text,
           'last_name': _lastNameController.text,
           'email': _emailController.text,
-          'phone': _phoneController.text,
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -317,15 +331,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'Телефон',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.phone,
-                    ),
                     const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,
@@ -367,7 +372,6 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
       setState(() => _isLoading = true);
       
       try {
-        // TODO: Добавить API метод для смены пароля
         await ApiClient.changePassword(
           currentPassword: _currentPasswordController.text,
           newPassword: _newPasswordController.text,
