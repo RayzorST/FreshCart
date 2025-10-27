@@ -1,0 +1,103 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:client/core/theme/app_theme.dart';
+import 'package:client/features/auth/screens/login_screen.dart';
+import 'package:client/features/auth/screens/register_screen.dart';
+import 'package:client/features/main/screens/main_screen.dart';
+import 'package:client/features/main/screens/promotion_screen.dart';
+import 'package:client/features/camera/screens/camera_screen.dart';
+import 'package:client/features/analysis/screens/analysis_screen.dart';
+import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/features/profile/screens/addresses_screen.dart';
+import 'package:client/features/profile/screens/help_screen.dart';
+import 'package:client/features/profile/screens/settings_screen.dart';
+import 'package:client/features/profile/screens/order_history_screen.dart';
+
+final goRouterProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: '/login',
+    routes: [
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/',
+        name: 'home',
+        builder: (context, state) => const MainScreen(),
+      ),
+      GoRoute(
+        path: '/camera',
+        name: 'camera',
+        builder: (context, state) => const CameraScreen(),
+      ),
+      GoRoute(
+        path: '/analysis',
+        name: 'analysis',
+        builder: (context, state) => AnalysisScreen(
+          imagePath: state.extra as String,
+        ),
+      ),
+      GoRoute(
+        path: '/product/:id',
+        builder: (context, state) {
+          final product = state.extra as Map<String, dynamic>;
+          return ProductScreen(product: product);
+        },
+      ),
+      GoRoute(
+        path: '/promotion/:id',
+        builder: (context, state) {
+          final promotionId = state.pathParameters['id']!;
+          return PromotionScreen(promotionId: promotionId);
+        },
+      ),
+      GoRoute(
+        path: '/addresses',
+        builder: (context, state) => const AddressesScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/help',
+        builder: (context, state) => const HelpScreen(),
+      ),
+      GoRoute(
+        path: '/order-history',
+        builder: (context, state) => const OrderHistoryScreen(),
+      ),
+    ],
+  );
+});
+
+class FreshCartApp extends StatelessWidget {
+  const FreshCartApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ProviderScope(
+      child: Consumer(
+        builder: (context, ref, child) {
+          final router = ref.watch(goRouterProvider);
+          return MaterialApp.router(
+            title: 'FreshCart',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeMode.system, // Системная тема по умолчанию
+            routerConfig: router,
+            debugShowCheckedModeBanner: false,
+          );
+        },
+      ),
+    );
+  }
+}
