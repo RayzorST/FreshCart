@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/theme/app_theme.dart';
-import 'package:client/core/providers/theme_provider.dart'; // ← Добавить импорт
+import 'package:client/core/providers/theme_provider.dart';
 import 'package:client/features/auth/screens/login_screen.dart';
 import 'package:client/features/auth/screens/register_screen.dart';
 import 'package:client/features/main/screens/main_screen.dart';
@@ -14,10 +14,31 @@ import 'package:client/features/profile/screens/addresses_screen.dart';
 import 'package:client/features/profile/screens/help_screen.dart';
 import 'package:client/features/profile/screens/settings_screen.dart';
 import 'package:client/features/profile/screens/order_history_screen.dart';
+import 'package:client/core/providers/auth_provider.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
+  final authState = ref.watch(authProvider);
+
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: authState != null ? '/' : '/login',
+
+    redirect: (context, state) {
+      final isAuthenticated = authState != null;
+      final isGoingToAuth = state.uri.path == '/login' || state.uri.path == '/register';
+      
+      print("${isAuthenticated} ${!isGoingToAuth}");
+      if (!isAuthenticated && !isGoingToAuth) {
+        return '/login';
+      }
+      
+      // Если авторизован и пытается попасть на страницы логина/регистрации
+      if (isAuthenticated && isGoingToAuth) {
+        return '/';
+      }
+      
+      return null;
+    },
+    
     routes: [
       GoRoute(
         path: '/login',
@@ -49,8 +70,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/product/:id',
         builder: (context, state) {
-          final product = state.extra as Map<String, dynamic>;
-          return ProductScreen(product: product);
+          try {
+            final product = state.extra as Map<String, dynamic>;
+            return ProductScreen(product: product);
+          } catch (e) {
+            print('Error in route: $e');
+            print('Extra type: ${state.extra?.runtimeType}');
+            print('Extra value: ${state.extra}');
+            return const Scaffold(body: Center(child: Text('Ошибка загрузки товара')));
+          }
         },
       ),
       GoRoute(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -72,35 +73,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _isLoading ? null : () async {  // ← ИЗМЕНИ ЭТУ СТРОКУ
-                    if (_formKey.currentState!.validate()) {
-                      setState(() => _isLoading = true);  // ← ДОБАВЬ
-                      try {
-                        final response = await ApiClient.login(
-                          _emailController.text,
-                          _passwordController.text,
-                        );
-                        
-                        // Сохраняем токен
-                        ApiClient.setToken(response['access_token']);
-                        
-                        // Переходим в основное приложение
-                        context.go('/');
-                      } catch (e) {
-                        // Показываем ошибку
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Ошибка: $e')),
-                        );
-                      } finally {
-                        setState(() => _isLoading = false);  // ← ДОБАВЬ
-                      }
-                    }
-                  },
-                  child: _isLoading ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ): const Text('Войти'),
+                  onPressed: _isLoading ? null : _login,
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Войти'),
                 ),
               ),
               const SizedBox(height: 16),
@@ -115,6 +95,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _login() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      try {
+        final response = await ApiClient.login(
+          _emailController.text,
+          _passwordController.text,
+        );
+        
+        // Сохраняем токен через authProvider
+        final authNotifier = ref.read(authProvider.notifier);
+        await authNotifier.setToken(response['access_token']);
+        
+        // Переходим в основное приложение
+        if (mounted) {
+          context.go('/');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: $e')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    }
   }
 
   @override

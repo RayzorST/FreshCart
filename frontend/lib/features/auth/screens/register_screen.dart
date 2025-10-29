@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -175,7 +176,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           _passwordController.text,
         );
         
-        ApiClient.setToken(loginResponse['access_token']);
+        // Сохраняем токен через authProvider
+        final authNotifier = ref.read(authProvider.notifier);
+        await authNotifier.setToken(loginResponse['access_token']);
+        
         context.go('/');
         
       } catch (e) {

@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:client/core/providers/auth_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart'; 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ApiClient {
   static String get baseUrl {
@@ -22,6 +24,10 @@ class ApiClient {
 
   static void setToken(String token) {
     _token = token;
+  }
+
+  static void clearToken() {
+    _token = null;
   }
 
   static Map<String, String> get _headers {
@@ -164,6 +170,18 @@ class ApiClient {
     _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> updateCartItem(int productId, int quantity) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/cart/cart/items/$productId'),
+      headers: _headers,
+      body: json.encode({
+        'quantity': quantity,
+      }),
+    );
+    return _handleResponse(response);
+  }
+
+
   // Orders
   static Future<Map<String, dynamic>> createOrder(
     String shippingAddress, String notes, List<Map<String, dynamic>> items) async {
@@ -228,6 +246,42 @@ class ApiClient {
       headers: _headers,
     );
     _handleResponse(response);
+  }
+
+  // Favorites
+  static Future<List<dynamic>> getFavorites() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/favorites/favorites'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> addToFavorites(int productId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/favorites/favorites'),
+      headers: _headers,
+      body: json.encode({
+        'product_id': productId,
+      }),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<void> removeFromFavorites(int productId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/favorites/favorites/$productId'),
+      headers: _headers,
+    );
+    _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> checkFavorite(int productId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/favorites/favorites/check/$productId'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
   }
 
   static dynamic _handleResponse(http.Response response) {

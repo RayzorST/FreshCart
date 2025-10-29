@@ -1,3 +1,4 @@
+import 'package:client/core/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -329,8 +330,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             TextButton(
               onPressed: () {
+                final authNotifier = ref.read(authProvider.notifier);
                 // Очищаем токен и переходим на логин
-                ApiClient.setToken("");
+                authNotifier.clearToken();
                 Navigator.of(context).pop();
                 context.go('/login');
               },
