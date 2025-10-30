@@ -15,14 +15,16 @@ class ProductScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductScreenState extends ConsumerState<ProductScreen> {
-  int _quantity = 1;
+  int _quantity = 0;
   bool _isFavorite = false;
   bool _isLoadingFavorite = false;
+  bool _isLoadingCart = false;
 
   @override
   void initState() {
     super.initState();
     _checkFavoriteStatus();
+    _loadCartQuantity();
   }
 
   Future<void> _checkFavoriteStatus() async {
@@ -34,6 +36,24 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
       print('Error checking favorite: $e');
     } finally {
       setState(() => _isLoadingFavorite = false);
+    }
+  }
+
+  Future<void> _loadCartQuantity() async {
+    try {
+      final cartResponse = await ApiClient.getCart();
+      final cartItems = cartResponse['items'] ?? [];
+      
+      final cartItem = cartItems.firstWhere(
+        (item) => item['product_id'] == widget.product['id'],
+        orElse: () => null,
+      );
+      
+      if (cartItem != null) {
+        setState(() => _quantity = cartItem['quantity'] ?? 0);
+      }
+    } catch (e) {
+      print('Error loading cart quantity: $e');
     }
   }
 
@@ -72,32 +92,31 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
     }
   }
 
-  Future<void> _addToCart() async {
+  Future<void> _updateCartQuantity(int newQuantity) async {
+    if (_isLoadingCart) return;
+    
     try {
-      await ApiClient.addToCart(widget.product['id'], _quantity);
+      setState(() => _isLoadingCart = true);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${widget.product['name']} (${_quantity} шт.) добавлен в корзину'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          action: SnackBarAction(
-            label: 'Корзина',
-            onPressed: () {
-              // Можно добавить переход в корзину
-            },
-          ),
-        ),
-      );
+      if (newQuantity == 0) {
+        await ApiClient.removeFromCart(widget.product['id']);
+      } else if (_quantity == 0) {
+        await ApiClient.addToCart(widget.product['id'], newQuantity);
+      } else {
+        await ApiClient.updateCartItem(widget.product['id'], newQuantity);
+      }
+      
+      setState(() => _quantity = newQuantity);
+      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ошибка при добавлении в корзину: $e'),
+          content: Text('Ошибка при обновлении корзины: $e'),
           behavior: SnackBarBehavior.floating,
         ),
       );
+    } finally {
+      setState(() => _isLoadingCart = false);
     }
   }
 
@@ -109,6 +128,7 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
     
     final stockQuantity = widget.product['stock_quantity'] ?? 0;
     final isAvailable = stockQuantity > 0;
+    final maxQuantity = stockQuantity;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
@@ -387,7 +407,7 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
             ),
           ),
           
-          // Нижняя панель с кнопкой
+          // Нижняя панель с управлением корзиной
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -401,95 +421,79 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
             ),
             child: SafeArea(
               top: false,
-              child: Row(
-                children: [
-                  // Счетчик количества
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).dividerColor,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: isAvailable && _quantity > 1 ? () {
-                            setState(() => _quantity--);
-                          } : null,
-                          icon: Icon(
-                            Icons.remove,
-                            size: 20,
-                            color: isAvailable && _quantity > 1
-                                ? Theme.of(context).colorScheme.onSurface
-                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                        SizedBox(
-                          width: 20,
-                          child: Text(
-                            '$_quantity',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: isAvailable 
-                                  ? Theme.of(context).colorScheme.onSurface
-                                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: isAvailable && _quantity < stockQuantity ? () {
-                            setState(() => _quantity++);
-                          } : null,
-                          icon: Icon(
-                            Icons.add,
-                            size: 20,
-                            color: isAvailable && _quantity < stockQuantity
-                                ? Theme.of(context).colorScheme.onSurface
-                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                      ],
-                    ),
+              child: Container(
+                width: double.infinity, // ← Занимает всю ширину
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    width: 2,
+                    color: Theme.of(context).dividerColor,
                   ),
-                  
-                  const SizedBox(width: 12),
-                  
-                  // Кнопка добавления в корзину
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: isAvailable ? _addToCart : null,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Кнопка уменьшения
+                    IconButton(
+                      onPressed: _isLoadingCart || _quantity == 0 ? null : () {
+                        _updateCartQuantity(_quantity - 1);
+                      },
+                      icon: Icon(
+                        Icons.remove,
+                        size: 24,
+                        color: _isLoadingCart || _quantity == 0
+                            ? Theme.of(context).colorScheme.onSurface.withOpacity(0.3)
+                            : Theme.of(context).colorScheme.onSurface,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.shopping_cart_outlined,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isAvailable 
-                                ? 'Добавить в корзину' 
-                                : 'Нет в наличии',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                      padding: const EdgeInsets.all(16),
                     ),
-                  ),
-                ],
+                    
+                    // Количество
+                    _isLoadingCart
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$_quantity',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: _quantity > 0
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                ),
+                              ),
+                              Text(
+                                'в корзине',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                    
+                    // Кнопка увеличения
+                    IconButton(
+                      onPressed: _isLoadingCart || !isAvailable || _quantity >= maxQuantity ? null : () {
+                        _updateCartQuantity(_quantity + 1);
+                      },
+                      icon: Icon(
+                        Icons.add,
+                        size: 24,
+                        color: _isLoadingCart || !isAvailable || _quantity >= maxQuantity
+                            ? Theme.of(context).colorScheme.onSurface.withOpacity(0.3)
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

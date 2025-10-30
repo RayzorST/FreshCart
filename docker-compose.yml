@@ -63,6 +63,18 @@ services:
     networks:
       - app-network
 
+  cloudpub:
+    image: cloudpub/cloudpub:latest
+    restart: unless-stopped
+    environment:
+      - TOKEN=-- -0L6vtm0RiABK6n1k0OpXpBqGblNONwID-7L1Mm8Ha4
+      - HTTP=backend:8000
+    command: run
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
 volumes:
   postgres_data:
   rabbitmq_data:

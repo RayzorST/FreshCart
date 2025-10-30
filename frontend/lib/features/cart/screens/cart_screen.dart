@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
 import 'package:client/core/providers/cart_provider.dart';
+import 'package:client/core/widgets/bottom_navigation_bar.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -306,8 +307,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
           ),
           const SizedBox(height: 24),
+          
           ElevatedButton.icon(
-            onPressed: () => context.go('/'),
+            onPressed: () => ref.read(currentIndexProvider.notifier).state = 0,
             icon: const Icon(Icons.shopping_bag),
             label: const Text('Перейти к покупкам'),
           ),

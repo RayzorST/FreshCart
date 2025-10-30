@@ -6,20 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ApiClient {
-  static String get baseUrl {
-    if (kIsWeb) {
-      // Для Flutter Web
-      return 'http://localhost:8000';
-    } else if (Platform.isAndroid) {
-      // Для Android
-      return 'http://10.0.2.2:8000';
-    } else if (Platform.isIOS) {
-      // Для iOS
-      return 'http://localhost:8000';
-    } else {
-      return 'http://localhost:8000';
-    }
-  }
+  static String baseUrl = "https://touchingly-confirmed-bass.cloudpub.ru";
   static String? _token;
 
   static void setToken(String token) {

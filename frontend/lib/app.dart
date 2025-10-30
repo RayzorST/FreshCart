@@ -26,7 +26,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final isAuthenticated = authState != null;
       final isGoingToAuth = state.uri.path == '/login' || state.uri.path == '/register';
       
-      print("${isAuthenticated} ${!isGoingToAuth}");
       if (!isAuthenticated && !isGoingToAuth) {
         return '/login';
       }
