@@ -39,7 +39,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         final items = await _enrichCartItems(cartData['items']);
         setState(() {
           _cartItems = items;
-          _totalAmount = (cartData['total_price'] as num?)?.toDouble() ?? 0.0;
+          _totalAmount = (cartData['final_price'] as num?)?.toDouble() ?? 0.0;
         });
       } else {
         setState(() {

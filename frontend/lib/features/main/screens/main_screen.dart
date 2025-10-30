@@ -9,6 +9,7 @@ import 'package:client/core/widgets/camera_fab.dart';
 import 'package:client/core/providers/products_provider.dart';
 import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/providers/favorites_provider.dart';
+import 'package:client/core/providers/promotions_provider.dart'; // Добавляем импорт
 import 'package:client/api/client.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -19,33 +20,16 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
-  final List<Map<String, dynamic>> _promotions = [
-    {
-      'id': '1',
-      'title': 'Скидка 20%',
-      'color': Colors.green,
-    },
-    {
-      'id': '2', 
-      'title': 'Акция на мясо',
-      'color': Colors.red,
-    },
-    {
-      'id': '3',
-      'title': 'Фруктовая неделя',
-      'color': Colors.orange,
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(currentIndexProvider);
     final productsAsync = ref.watch(productsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
+    final promotionsAsync = ref.watch(promotionsProvider); // Добавляем провайдер акций
     
     final List<Widget> screens = [
-      _buildHomeScreen(productsAsync, categoriesAsync, selectedCategory),
+      _buildHomeScreen(productsAsync, categoriesAsync, selectedCategory, promotionsAsync),
       const CartScreen(),
       const FavoritesScreen(),
       const ProfileScreen(),
@@ -63,6 +47,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     AsyncValue<List<dynamic>> productsAsync,
     AsyncValue<List<dynamic>> categoriesAsync,
     String selectedCategory,
+    AsyncValue<List<dynamic>> promotionsAsync, // Добавляем параметр
   ) {
     return CustomScrollView(
       slivers: [
@@ -89,71 +74,301 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
         // Акции
         SliverToBoxAdapter(
-          child: SizedBox(
-            height: 140,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Акции',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${_promotions.length}',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _promotions.length,
-                    itemBuilder: (context, index) {
-                      final promotion = _promotions[index];
-                      return _buildPromotionCard(promotion, context);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: _buildPromotionsSection(promotionsAsync),
         ),
 
-        // Фильтр по категориям
+        // Остальные секции без изменений...
         SliverToBoxAdapter(
           child: _buildCategoryFilter(categoriesAsync, selectedCategory),
         ),
 
-        // Заголовок продуктов
         SliverToBoxAdapter(
           child: _buildProductsHeader(productsAsync, selectedCategory),
         ),
 
-        // Сетка продуктов
         _buildProductsGrid(productsAsync, selectedCategory),
       ],
     );
   }
 
+  Widget _buildPromotionsSection(AsyncValue<List<dynamic>> promotionsAsync) {
+    return SizedBox(
+      height: 140,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Text(
+                  'Акции',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(width: 8),
+                promotionsAsync.when(
+                  loading: () => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '...',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                  error: (error, stack) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '0',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                  data: (promotions) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${promotions.length}',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: promotionsAsync.when(
+              loading: () => _buildPromotionsLoading(),
+              error: (error, stack) => _buildPromotionsError(error),
+              data: (promotions) => _buildPromotionsList(promotions),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPromotionsLoading() {
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: 3,
+      itemBuilder: (context, index) {
+        return Container(
+          width: 120,
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPromotionsError(Object error) {
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        Container(
+          width: 200,
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: Colors.red[50],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.red.withOpacity(0.3)),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, color: Colors.red[400], size: 24),
+                const SizedBox(height: 8),
+                Text(
+                  'Ошибка загрузки',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.red[700],
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPromotionsList(List<dynamic> promotions) {
+    if (promotions.isEmpty) {
+      return ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          Container(
+            width: 200,
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.local_offer_outlined, color: Colors.grey[400], size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Нет активных акций',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: promotions.length,
+      itemBuilder: (context, index) {
+        final promotion = promotions[index];
+        return _buildPromotionCard(promotion, context);
+      },
+    );
+  }
+
+  Widget _buildPromotionCard(Map<String, dynamic> promotion, BuildContext context) {
+    // Определяем цвет в зависимости от типа акции
+    Color getPromotionColor(String promotionType) {
+      switch (promotionType) {
+        case 'percentage':
+          return Colors.green;
+        case 'fixed':
+          return Colors.blue;
+        case 'gift':
+          return Colors.orange;
+        default:
+          return Colors.purple;
+      }
+    }
+
+    // Форматируем описание акции
+    String getPromotionDescription() {
+      final type = promotion['promotion_type'];
+      final value = promotion['value'];
+      
+      switch (type) {
+        case 'percentage':
+          return 'Скидка $value%';
+        case 'fixed':
+          final amount = (value / 100).toStringAsFixed(2); // переводим из копеек в рубли
+          return 'Скидка $amount ₽';
+        case 'gift':
+          return 'Подарок';
+        default:
+          return promotion['name'];
+      }
+    }
+
+    final color = getPromotionColor(promotion['promotion_type']);
+    final description = getPromotionDescription();
+
+    return GestureDetector(
+      onTap: () {
+        context.push('/promotion/${promotion['id']}', extra: promotion);
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withOpacity(0.2),
+              color.withOpacity(0.1),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -10,
+              right: -10,
+              child: Icon(
+                Icons.local_offer_outlined,
+                size: 80,
+                color: color.withOpacity(0.2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    promotion['name'],
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: color.withOpacity(0.8),
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   Widget _buildCategoryFilter(
     AsyncValue<List<dynamic>> categoriesAsync,
     String selectedCategory,
@@ -523,61 +738,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 constraints: const BoxConstraints(
                   minWidth: 36,
                   minHeight: 36,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPromotionCard(Map<String, dynamic> promotion, BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        context.push('/promotion/${promotion['id']}');
-      },
-      child: Container(
-        width: 120,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              promotion['color'].withOpacity(0.2),
-              promotion['color'].withOpacity(0.1),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: promotion['color'].withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -10,
-              right: -10,
-              child: Icon(
-                Icons.local_offer_outlined,
-                size: 80,
-                color: promotion['color'].withOpacity(0.2),
-              ),
-            ),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  promotion['title'],
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: promotion['color'],
-                      ),
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),

@@ -47,7 +47,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8000",
         "http://127.0.0.1:8000",
-        "http://10.0.2.2:8000",      # Android эмулятор
+        "http://10.0.2.2:8000",
         "http://192.168.1.100:8000"
     ],
     allow_credentials=True,

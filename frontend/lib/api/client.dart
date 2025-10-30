@@ -1,12 +1,8 @@
 import 'dart:convert';
-import 'package:client/core/providers/auth_provider.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart'; 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ApiClient {
-  static String baseUrl = "https://touchingly-confirmed-bass.cloudpub.ru";
+  static String baseUrl = "https://freshcart.cloudpub.ru";
   static String? _token;
 
   static void setToken(String token) {
@@ -266,6 +262,31 @@ class ApiClient {
   static Future<Map<String, dynamic>> checkFavorite(int productId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/favorites/favorites/check/$productId'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  // Promotions
+  static Future<List<dynamic>> getPromotions() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/promotions/promotions/'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getActivePromotionsForCart() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/promotions/promotions/active/for-cart'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getPromotion(int promotionId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/promotions/promotions/$promotionId'),
       headers: _headers,
     );
     return _handleResponse(response);

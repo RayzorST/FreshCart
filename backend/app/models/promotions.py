@@ -1,13 +1,8 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Enum, ForeignKey, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-import enum
+from app.models.enum.promotions import PromotionType
 from app.models.database import Base
-
-class PromotionType(enum.Enum):
-    PERCENTAGE = "percentage"    # Процентная скидка
-    FIXED = "fixed"              # Фиксированная сумма
-    GIFT = "gift"                # Подарок (1+1=3)
 
 class Promotion(Base):
     __tablename__ = "promotions"

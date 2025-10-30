@@ -83,8 +83,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/promotion/:id',
         builder: (context, state) {
-          final promotionId = state.pathParameters['id']!;
-          return PromotionScreen(promotionId: promotionId);
+          final promotion = state.extra as Map<String, dynamic>;
+          return PromotionScreen(promotion: promotion);
         },
       ),
       GoRoute(

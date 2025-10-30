@@ -1,12 +1,7 @@
 from pydantic import BaseModel, validator
 from datetime import datetime
 from typing import Optional, List
-from enum import Enum
-
-class PromotionType(str, Enum):
-    PERCENTAGE = "percentage"
-    FIXED = "fixed" 
-    GIFT = "gift"
+from app.models.enum.promotions import PromotionType
 
 class PromotionBase(BaseModel):
     name: str
@@ -47,22 +42,10 @@ class PromotionUpdate(BaseModel):
     is_active: Optional[bool] = None
     priority: Optional[int] = None
 
-# УБРАТЬ циклические импорты - использовать простые модели
-class CategorySimple(BaseModel):
-    id: int
-    name: str
-
-class ProductSimple(BaseModel):
-    id: int
-    name: str
-    price: float
-
 class PromotionResponse(PromotionBase):
     id: int
     is_active: bool
     created_at: datetime
-    categories: List[CategorySimple] = []
-    products: List[ProductSimple] = []
 
     class Config:
         from_attributes = True

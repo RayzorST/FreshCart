@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15
@@ -70,6 +68,8 @@ services:
       - TOKEN=-- -0L6vtm0RiABK6n1k0OpXpBqGblNONwID-7L1Mm8Ha4
       - HTTP=backend:8000
     command: run
+    volumes:
+      - cloudpub-config:/home/cloudpub
     depends_on:
       - backend
     networks:
@@ -79,6 +79,7 @@ volumes:
   postgres_data:
   rabbitmq_data:
   minio_data:
+  cloudpub-config:
 
 networks:
   app-network:

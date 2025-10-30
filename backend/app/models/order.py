@@ -18,7 +18,7 @@ class Order(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     items = relationship("OrderItem", back_populates="order")
-    applied_promotions = relationship("OrderPromotion", back_populates="order")
+    promotions = relationship("OrderPromotion", back_populates="order")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -43,7 +43,7 @@ class OrderPromotion(Base):
     discount_amount = Column(Float, default=0.0)        # Сумма скидки от этой акции
     description = Column(String(500))                   # Описание примененной акции
     
-    order = relationship("Order", back_populates="applied_promotions")
+    order = relationship("Order", back_populates="promotions")
     promotion = relationship("Promotion")
 
 class Address(Base):
