@@ -11,7 +11,7 @@ from app.api.endpoints.auth import get_current_user
 
 router = APIRouter()
 
-@router.get("/favorites", response_model=List[FavoriteWithProductResponse])
+@router.get("/", response_model=List[FavoriteWithProductResponse])
 async def get_favorites(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -42,7 +42,7 @@ async def get_favorites(
     
     return result
 
-@router.post("/favorites", response_model=FavoriteResponse)
+@router.post("/", response_model=FavoriteResponse)
 async def add_to_favorites(
     favorite_data: FavoriteCreate,
     current_user: User = Depends(get_current_user),
@@ -81,7 +81,7 @@ async def add_to_favorites(
     
     return favorite
 
-@router.delete("/favorites/{product_id}")
+@router.delete("/items/{product_id}")
 async def remove_from_favorites(
     product_id: int,
     current_user: User = Depends(get_current_user),
@@ -104,7 +104,7 @@ async def remove_from_favorites(
     
     return {"message": "Product removed from favorites"}
 
-@router.get("/favorites/check/{product_id}")
+@router.get("/check/{product_id}")
 async def check_favorite(
     product_id: int,
     current_user: User = Depends(get_current_user),

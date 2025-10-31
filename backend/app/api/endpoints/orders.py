@@ -12,7 +12,7 @@ from app.api.endpoints.auth import get_current_user
 
 router = APIRouter()
 
-@router.post("/orders", response_model=OrderResponse)
+@router.post("/", response_model=OrderResponse)
 async def create_order(
     order_data: OrderCreate,
     db: Session = Depends(get_db),
@@ -83,7 +83,7 @@ async def create_order(
     
     return order
 
-@router.get("/orders", response_model=List[OrderResponse])
+@router.get("/", response_model=List[OrderResponse])
 async def get_my_orders(
     skip: int = 0,
     limit: int = 50,
@@ -99,7 +99,7 @@ async def get_my_orders(
     
     return orders
 
-@router.get("/orders/{order_id}", response_model=OrderResponse)
+@router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(
     order_id: int,
     db: Session = Depends(get_db),
@@ -121,7 +121,7 @@ async def get_order(
     
     return order
 
-@router.put("/orders/{order_id}", response_model=OrderResponse)
+@router.put("/{order_id}", response_model=OrderResponse)
 async def update_order(
     order_id: int,
     order_data: OrderUpdate,
@@ -151,7 +151,7 @@ async def update_order(
     
     return order
 
-@router.delete("/orders/{order_id}")
+@router.delete("/{order_id}")
 async def cancel_order(
     order_id: int,
     db: Session = Depends(get_db),

@@ -8,36 +8,65 @@ from app.models.product import Product
 from app.models.user import User
 from app.schemas.cart import CartItemResponse, CartItemCreate, CartItemUpdate, CartResponse
 from app.api.endpoints.auth import get_current_user
+from app.services.promotion_service import PromotionService
 
 router = APIRouter()
 
-@router.get("/cart", response_model=CartResponse)
+@router.get("/", response_model=CartResponse)
 async def get_cart(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получение корзины пользователя"""
+    """Получение корзины пользователя с учетом скидок"""
     cart_items = db.query(CartItem).filter(
         CartItem.user_id == current_user.id
     ).all()
     
-    # Рассчитываем общую стоимость и количество
-    total_price = 0
-    total_items = 0
-    
+    # Подготавливаем данные для расчета скидок
+    cart_items_data = []
     for item in cart_items:
-        product = db.query(Product).filter(Product.id == item.product_id).first()
-        if product:
-            total_price += product.price * item.quantity
-            total_items += item.quantity
+        cart_items_data.append({
+            'product_id': item.product_id,
+            'quantity': item.quantity
+        })
+    
+    # Рассчитываем скидки
+    promotion_service = PromotionService(db)
+    discount_result = promotion_service.calculate_cart_discounts(cart_items_data, current_user.id)
+    
+    # Формируем ответ с учетом скидок
+    items_with_discounts = []
+    for db_item in cart_items:
+        # Находим соответствующий товар с рассчитанными скидками
+        discounted_item = next(
+            (item for item in discount_result['items'] 
+             if item['product_id'] == db_item.product_id), 
+            None
+        )
+        
+        if discounted_item:
+            items_with_discounts.append(CartItemResponse(
+                id=db_item.id,
+                user_id=db_item.user_id,
+                product_id=db_item.product_id,
+                quantity=db_item.quantity,
+                product=db_item.product,  # Теперь работает благодаря relationship
+                created_at=db_item.created_at,
+                updated_at=db_item.updated_at,
+                discount_price=discounted_item['discount_price'],
+                applied_promotions=discounted_item['applied_promotions']
+            ))
     
     return CartResponse(
-        items=cart_items,
-        total_items=total_items,
-        total_price=total_price
+        items=items_with_discounts,
+        total_items=sum(item.quantity for item in cart_items),
+        total_price=discount_result['total_amount'],
+        discount_amount=discount_result['discount_amount'],
+        final_price=discount_result['final_amount'],
+        applied_promotions=discount_result['applied_promotions']
     )
 
-@router.post("/cart/items", response_model=CartItemResponse)
+@router.post("/", response_model=CartItemResponse)
 async def add_to_cart(
     cart_item_data: CartItemCreate,
     db: Session = Depends(get_db),
@@ -80,7 +109,7 @@ async def add_to_cart(
         db.refresh(cart_item)
         return cart_item
 
-@router.put("/cart/items/{product_id}", response_model=CartItemResponse)
+@router.put("/{product_id}", response_model=CartItemResponse)
 async def update_cart_item(
     product_id: int,
     cart_item_data: CartItemUpdate,
@@ -114,7 +143,7 @@ async def update_cart_item(
     
     return cart_item
 
-@router.delete("/cart/items/{product_id}")
+@router.delete("/{product_id}")
 async def remove_from_cart(
     product_id: int,
     db: Session = Depends(get_db),
@@ -137,7 +166,7 @@ async def remove_from_cart(
     
     return {"message": "Item removed from cart"}
 
-@router.delete("/cart")
+@router.delete("/")
 async def clear_cart(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

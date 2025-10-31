@@ -10,7 +10,7 @@ from app.api.endpoints.auth import get_current_user
 
 router = APIRouter()
 
-@router.get("/addresses", response_model=List[AddressResponse])
+@router.get("/", response_model=List[AddressResponse])
 async def get_my_addresses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -22,7 +22,7 @@ async def get_my_addresses(
     
     return addresses
 
-@router.post("/addresses", response_model=AddressResponse)
+@router.post("/", response_model=AddressResponse)
 async def create_address(
     address_data: AddressCreate,
     db: Session = Depends(get_db),
@@ -48,7 +48,7 @@ async def create_address(
     
     return address
 
-@router.get("/addresses/{address_id}", response_model=AddressResponse)
+@router.get("/{address_id}", response_model=AddressResponse)
 async def get_address(
     address_id: int,
     db: Session = Depends(get_db),
@@ -68,7 +68,7 @@ async def get_address(
     
     return address
 
-@router.put("/addresses/{address_id}", response_model=AddressResponse)
+@router.put("/{address_id}", response_model=AddressResponse)
 async def update_address(
     address_id: int,
     address_data: AddressUpdate,
@@ -104,7 +104,7 @@ async def update_address(
     
     return address
 
-@router.delete("/addresses/{address_id}")
+@router.delete("/{address_id}")
 async def delete_address(
     address_id: int,
     db: Session = Depends(get_db),
@@ -127,7 +127,7 @@ async def delete_address(
     
     return {"message": "Address deleted successfully"}
 
-@router.put("/addresses/{address_id}/set-default")
+@router.put("/{address_id}/set-default")
 async def set_default_address(
     address_id: int,
     db: Session = Depends(get_db),

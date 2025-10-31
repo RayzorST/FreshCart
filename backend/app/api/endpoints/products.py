@@ -40,7 +40,7 @@ async def create_category(
 
 # ===== PRODUCTS =====
 
-@router.get("/products", response_model=List[ProductResponse])
+@router.get("/", response_model=List[ProductResponse])
 async def get_products(
     skip: int = 0,
     limit: int = 100,
@@ -60,7 +60,7 @@ async def get_products(
     products = query.offset(skip).limit(limit).all()
     return products
 
-@router.get("/products/{product_id}", response_model=ProductResponse)
+@router.get("/items/{product_id}", response_model=ProductResponse)
 async def get_product(
     product_id: int,
     db: Session = Depends(get_db)
@@ -74,7 +74,7 @@ async def get_product(
         )
     return product
 
-@router.post("/products", response_model=ProductResponse)
+@router.post("/", response_model=ProductResponse)
 async def create_product(
     product_data: ProductCreate,
     db: Session = Depends(get_db),
@@ -96,7 +96,7 @@ async def create_product(
     db.refresh(product)
     return product
 
-@router.put("/products/{product_id}", response_model=ProductResponse)
+@router.put("/items/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,
     product_data: ProductUpdate,
@@ -120,7 +120,7 @@ async def update_product(
     db.refresh(product)
     return product
 
-@router.delete("/products/{product_id}")
+@router.delete("/items/{product_id}")
 async def delete_product(
     product_id: int,
     db: Session = Depends(get_db),

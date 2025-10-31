@@ -110,7 +110,7 @@ class ApiClient {
     if (search != null && search.isNotEmpty) params['search'] = search;
     
     final response = await http.get(
-      Uri.parse('$baseUrl/products/products').replace(queryParameters: params),
+      Uri.parse('$baseUrl/products/').replace(queryParameters: params),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -118,7 +118,7 @@ class ApiClient {
 
   static Future<List<dynamic>> getCategories() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/products/categories'),
+      Uri.parse('$baseUrl/categories/'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -127,15 +127,31 @@ class ApiClient {
   // Cart
   static Future<Map<String, dynamic>> getCart() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/cart/cart'),
+      Uri.parse('$baseUrl/cart/'),
       headers: _headers,
     );
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> calculateCartDiscounts(List<Map<String, dynamic>> items) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/promotions/active/for-cart'),
+        headers: _headers,
+        body: json.encode({
+          'items': items,
+        }),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('Error calculating discounts: $e');
+      throw e;
+    }
+  }
+
   static Future<Map<String, dynamic>> addToCart(int productId, int quantity) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/cart/cart/items'),
+      Uri.parse('$baseUrl/cart/'),
       headers: _headers,
       body: json.encode({
         'product_id': productId,
@@ -147,7 +163,7 @@ class ApiClient {
 
   static Future<void> removeFromCart(int productId) async {
     final response = await http.delete(
-      Uri.parse('$baseUrl/cart/cart/items/$productId'),
+      Uri.parse('$baseUrl/cart/$productId'),
       headers: _headers,
     );
     _handleResponse(response);
@@ -155,7 +171,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> updateCartItem(int productId, int quantity) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/cart/cart/items/$productId'),
+      Uri.parse('$baseUrl/cart/$productId'),
       headers: _headers,
       body: json.encode({
         'quantity': quantity,
@@ -169,7 +185,7 @@ class ApiClient {
   static Future<Map<String, dynamic>> createOrder(
     String shippingAddress, String notes, List<Map<String, dynamic>> items) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/orders/orders'),
+      Uri.parse('$baseUrl/orders/'),
       headers: _headers,
       body: json.encode({
         'shipping_address': shippingAddress,
@@ -182,7 +198,7 @@ class ApiClient {
 
   static Future<List<dynamic>> getMyOrders() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/orders/orders'),
+      Uri.parse('$baseUrl/orders/'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -191,7 +207,7 @@ class ApiClient {
   // Addresses
   static Future<List<dynamic>> getAddresses() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/addresses/addresses'),
+      Uri.parse('$baseUrl/addresses/'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -199,7 +215,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> createAddress(Map<String, dynamic> addressData) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/addresses/addresses'),
+      Uri.parse('$baseUrl/addresses/'),
       headers: _headers,
       body: json.encode(addressData),
     );
@@ -208,7 +224,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> updateAddress(int addressId, Map<String, dynamic> addressData) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/addresses/addresses/$addressId'),
+      Uri.parse('$baseUrl/addresses/$addressId'),
       headers: _headers,
       body: json.encode(addressData),
     );
@@ -217,7 +233,7 @@ class ApiClient {
 
   static Future<void> deleteAddress(int addressId) async {
     final response = await http.delete(
-      Uri.parse('$baseUrl/addresses/addresses/$addressId'),
+      Uri.parse('$baseUrl/addresses/$addressId'),
       headers: _headers,
     );
     _handleResponse(response);
@@ -225,7 +241,7 @@ class ApiClient {
 
   static Future<void> setDefaultAddress(int addressId) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/addresses/addresses/$addressId/set-default'),
+      Uri.parse('$baseUrl/addresses/$addressId/set-default'),
       headers: _headers,
     );
     _handleResponse(response);
@@ -234,7 +250,7 @@ class ApiClient {
   // Favorites
   static Future<List<dynamic>> getFavorites() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/favorites/favorites'),
+      Uri.parse('$baseUrl/favorites/'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -242,7 +258,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> addToFavorites(int productId) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/favorites/favorites'),
+      Uri.parse('$baseUrl/favorites/'),
       headers: _headers,
       body: json.encode({
         'product_id': productId,
@@ -253,7 +269,7 @@ class ApiClient {
 
   static Future<void> removeFromFavorites(int productId) async {
     final response = await http.delete(
-      Uri.parse('$baseUrl/favorites/favorites/$productId'),
+      Uri.parse('$baseUrl/favorites/items/$productId'),
       headers: _headers,
     );
     _handleResponse(response);
@@ -261,7 +277,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> checkFavorite(int productId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/favorites/favorites/check/$productId'),
+      Uri.parse('$baseUrl/favorites/check/$productId'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -270,7 +286,7 @@ class ApiClient {
   // Promotions
   static Future<List<dynamic>> getPromotions() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/promotions/promotions/'),
+      Uri.parse('$baseUrl/promotions/'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -278,7 +294,7 @@ class ApiClient {
 
   static Future<List<dynamic>> getActivePromotionsForCart() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/promotions/promotions/active/for-cart'),
+      Uri.parse('$baseUrl/promotions/active/for-cart'),
       headers: _headers,
     );
     return _handleResponse(response);
@@ -286,7 +302,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> getPromotion(int promotionId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/promotions/promotions/$promotionId'),
+      Uri.parse('$baseUrl/promotions/$promotionId'),
       headers: _headers,
     );
     return _handleResponse(response);

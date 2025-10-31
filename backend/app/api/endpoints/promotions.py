@@ -11,7 +11,7 @@ from app.api.endpoints.auth import get_current_user
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/promotions", tags=["promotions"])
+router = APIRouter()
 
 @router.get("/", response_model=List[PromotionResponse])
 async def get_promotions(
