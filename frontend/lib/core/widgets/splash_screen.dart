@@ -21,7 +21,7 @@ class SplashScreen extends StatelessWidget {
               child: Icon(
                 Icons.shopping_cart_checkout,
                 size: 60,
-                color: Theme.of(context).colorScheme.primaryContainer,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 32),
@@ -30,7 +30,7 @@ class SplashScreen extends StatelessWidget {
               'FreshCart',
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primaryContainer,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             
@@ -40,7 +40,7 @@ class SplashScreen extends StatelessWidget {
             Text(
               'Свежие продукты с доставкой',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             
