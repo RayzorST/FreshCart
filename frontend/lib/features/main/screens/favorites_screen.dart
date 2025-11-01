@@ -213,7 +213,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          'http://10.0.2.2:8000${product['image_url']}',
+                          '${ApiClient.baseUrl}/images/products/${product['id']}/image',
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return Icon(

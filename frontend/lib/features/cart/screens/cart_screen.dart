@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
 import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/widgets/bottom_navigation_bar.dart';
+import 'package:client/api/client.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -34,7 +35,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       });
 
       final cartData = await ApiClient.getCart();
-      print('Cart data received: $cartData');
 
       if (cartData['items'] != null && cartData['items'] is List) {
         final items = await _enrichCartItems(cartData['items']);
@@ -51,7 +51,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         });
       }
     } catch (e) {
-      print('Error loading cart: $e');
       setState(() {
         _error = 'Ошибка загрузки корзины: $e';
         _cartItems = [];
@@ -99,7 +98,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
       return enrichedItems;
     } catch (e) {
-      print('Error enriching cart items: $e');
       return items.map((item) => _convertToSafeMap(item)).toList();
     }
   }
@@ -120,7 +118,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Future<void> _updateCartItem(int productId, int quantity) async {
     try {
       if (quantity == 0) {
-        // Удаляем товар из корзины
         await ref.read(cartProvider.notifier).removeFromCart(productId);
       } else {
         await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
@@ -128,7 +125,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       await Future.delayed(const Duration(milliseconds: 100));
       await _loadCart();
     } catch (e) {
-      print('Error updating cart item: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка обновления: $e')),
       );
@@ -188,7 +184,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  // Остальные методы (_createOrder, _showAddAddressDialog, _onProductTap) остаются без изменений
   Future<void> _createOrder() async {
     if (_cartItems.isEmpty) return;
 
@@ -224,7 +219,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         orderItems,
       );
 
-      // Очищаем корзину через провайдер
       for (var item in _cartItems) {
         final itemMap = _convertToSafeMap(item);
         await ref.read(cartProvider.notifier).removeFromCart(itemMap['product_id']);
@@ -469,11 +463,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       );
     }
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: Image.network(
-        'http://10.0.2.2:8000$imageUrl',
+        '${ApiClient.baseUrl}/images/products/${product['id']}/image',
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           return Icon(

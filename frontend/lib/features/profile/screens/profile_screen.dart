@@ -84,15 +84,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Шапка профиля
                 _buildProfileHeader(context),
                 
-                // Основной контент
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      // История заказов
                       _buildSectionCard(
                         context,
                         title: 'Мои заказы',
@@ -103,7 +100,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         },
                       ),
                       
-                      // Адреса доставки
                       _buildSectionCard(
                         context,
                         title: 'Адреса доставки',
@@ -114,7 +110,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         },
                       ),
                       
-                      // Настройки
                       _buildSectionCard(
                         context,
                         title: 'Настройки',
@@ -125,7 +120,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         },
                       ),
                       
-                      // Помощь
                       _buildSectionCard(
                         context,
                         title: 'Помощь и поддержка',
@@ -136,7 +130,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         },
                       ),
                       
-                      // Выйти
                       const SizedBox(height: 16),
                       Card(
                         child: ListTile(

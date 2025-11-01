@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/bottom_navigation_bar.dart';
 
 class OrderHistoryScreen extends ConsumerStatefulWidget {
   const OrderHistoryScreen({super.key});
@@ -127,10 +128,7 @@ class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () {
-              // Переход к товарам для создания заказа
-              // context.go('/products');
-            },
+            onPressed: () => ref.read(currentIndexProvider.notifier).state = 0,
             icon: const Icon(Icons.shopping_cart),
             label: const Text('Сделать первый заказ'),
           ),
@@ -188,7 +186,6 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
           ),
           const SizedBox(height: 12),
           
-          // Визуальный индикатор статуса
           _buildStatusIndicator(status),
           const SizedBox(height: 12),
           
@@ -234,7 +231,6 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
 }
 
   Widget _buildStatusIndicator(String status) {
-    // Определяем этапы в зависимости от статуса
     final List<StatusStep> steps;
     
     if (status == 'cancelled') {
@@ -260,7 +256,6 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
 
     return Column(
       children: [
-        // Иконки и соединительные линии
         Row(
           children: [
             for (int i = 0; i < steps.length; i++) ...[
@@ -277,7 +272,6 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
             ],
           ],
         ),
-        // Подписи
       ],
     );
   }
@@ -433,7 +427,7 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
-                      'http://10.0.2.2:8000${item['product']['image_url']}',
+                      '${ApiClient.baseUrl}/images/products/${item['product']['id']}/image',
                       fit: BoxFit.cover,
                     ),
                   )

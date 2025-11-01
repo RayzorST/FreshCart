@@ -30,8 +30,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
       
-      // Если авторизован и пытается попасть на страницы логина/регистрации
-      if (isAuthenticated && isGoingToAuth) {
+      if (isAuthenticated && isGoingToAuth) {   
         return '/';
       }
       
@@ -40,7 +39,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     
     routes: [
       GoRoute(
-        path: '/login',
+        path: '/login',   
         name: 'login',
         builder: (context, state) => const LoginScreen(),
       ),
@@ -116,13 +115,13 @@ class FreshCartApp extends StatelessWidget {
       child: Consumer(
         builder: (context, ref, child) {
           final router = ref.watch(goRouterProvider);
-          final isDarkTheme = ref.watch(themeProvider); // ← Получаем состояние темы
+          final isDarkTheme = ref.watch(themeProvider); 
           
           return MaterialApp.router(
             title: 'FreshCart',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: isDarkTheme ? ThemeMode.dark : ThemeMode.light, // ← Используем нашу тему
+            themeMode: isDarkTheme ? ThemeMode.dark : ThemeMode.light,
             routerConfig: router,
             debugShowCheckedModeBanner: false,
           );

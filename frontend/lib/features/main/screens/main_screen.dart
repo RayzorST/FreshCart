@@ -9,7 +9,7 @@ import 'package:client/core/widgets/camera_fab.dart';
 import 'package:client/core/providers/products_provider.dart';
 import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/providers/favorites_provider.dart';
-import 'package:client/core/providers/promotions_provider.dart'; // Добавляем импорт
+import 'package:client/core/providers/promotions_provider.dart'; 
 import 'package:client/api/client.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -26,7 +26,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final productsAsync = ref.watch(productsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
-    final promotionsAsync = ref.watch(promotionsProvider); // Добавляем провайдер акций
+    final promotionsAsync = ref.watch(promotionsProvider);
     
     final List<Widget> screens = [
       _buildHomeScreen(productsAsync, categoriesAsync, selectedCategory, promotionsAsync),
@@ -611,7 +611,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(
-                              'http://10.0.2.2:8000${product['image_url']}',
+                              '${ApiClient.baseUrl}/images/products/${product['id']}/image',
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Icon(

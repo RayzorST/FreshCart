@@ -5,7 +5,7 @@ class Product {
   final double price;
   final int stockQuantity;
   final String? imageUrl;
-  final Map<String, dynamic>? category; // Изменили с categoryId на category
+  final Map<String, dynamic>? category;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -25,7 +25,7 @@ class Product {
 
   String get fullImageUrl {
     if (imageUrl == null) return '';
-    // Используем правильный базовый URL
+
     if (imageUrl!.startsWith('http')) {
       return imageUrl!;
     } else if (imageUrl!.startsWith('/')) {
@@ -35,10 +35,8 @@ class Product {
     }
   }
 
-  // Геттер для удобного получения categoryId
   int? get categoryId => category?['id'];
 
-  // Геттер для удобного получения имени категории
   String? get categoryName => category?['name'];
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -73,7 +71,6 @@ class Product {
     };
   }
 
-  // Метод для копирования с изменениями
   Product copyWith({
     int? id,
     String? name,
