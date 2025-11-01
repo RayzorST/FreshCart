@@ -11,8 +11,13 @@ class CustomBottomNavigationBar extends ConsumerWidget {
     final currentIndex = ref.watch(currentIndexProvider);
 
     return Container(
+      height: 77,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
         border: Border(
           top: BorderSide(
             color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
@@ -23,6 +28,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _buildNavItem(

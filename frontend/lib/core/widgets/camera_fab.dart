@@ -7,14 +7,21 @@ class CameraFAB extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Transform.translate(
-      offset: const Offset(0, 0),
+      offset: const Offset(0, 15),
       child: FloatingActionButton(
         backgroundColor: Theme.of(context).colorScheme.primary,
         onPressed: () {
           context.push('/camera');
         },
         elevation: 4,
-        child: const Icon(Icons.camera_alt, size: 28),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Icon(
+          Icons.camera_alt, 
+          size: 28,
+          color: Theme.of(context).colorScheme.onSurface,
+          ),
       ),
     );
   }

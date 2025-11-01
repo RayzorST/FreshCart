@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
 import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/widgets/bottom_navigation_bar.dart';
-import 'package:client/api/client.dart';
+import 'package:client/core/widgets/quantity_controls.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -122,7 +122,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       } else {
         await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
       }
-      await Future.delayed(const Duration(milliseconds: 100));
+      //await Future.delayed(const Duration(milliseconds: 100));
       await _loadCart();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -131,49 +131,65 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
   }
 
-  void _showPromotionsDialog(List<dynamic> promotions, String productName) {
+  void _navigateToPromotionScreen(List<dynamic> appliedPromotions, BuildContext context) {
+    if (appliedPromotions.isEmpty) return;
+
+    if (appliedPromotions.length > 1) {
+      _showPromotionsDialog(appliedPromotions, 'Примененные акции');
+    } else {
+      final promotion = appliedPromotions.first;
+      print(promotion);
+      context.push('/promotion/${promotion['promotion_id']}', extra: promotion);
+    }
+  }
+
+  void _showPromotionsDialog(List<dynamic> promotions, String title) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Акции для $productName'),
-        content: promotions.isEmpty
-            ? const Text('Нет примененных акций')
-            : SizedBox(
-                width: double.maxFinite,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: promotions.length,
-                  itemBuilder: (context, index) {
-                    final promotion = _convertToSafeMap(promotions[index]);
-                    return ListTile(
-                      leading: Icon(
-                        Icons.local_offer_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      title: Text(promotion['name'] ?? 'Акция'),
-                      subtitle: promotion['description'] != null 
-                          ? Text(promotion['description'])
-                          : null,
-                      trailing: promotion['value'] != null
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '-${promotion['value']}%',
-                                style: const TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            )
-                          : null,
-                    );
-                  },
+        title: Text(title),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: promotions.length,
+            itemBuilder: (context, index) {
+              final promotion = _convertToSafeMap(promotions[index]);
+              return ListTile(
+                leading: Icon(
+                  Icons.local_offer_outlined,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-              ),
+                title: Text(promotion['name'] ?? 'Акция'),
+                subtitle: promotion['description'] != null 
+                    ? Text(promotion['description'])
+                    : null,
+                trailing: promotion['value'] != null
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          promotion['promotion_type'] == 'percentage' 
+                              ? '-${promotion['value']}%'
+                              : '-${promotion['value']}₽',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    : null,
+                onTap: () {
+                  Navigator.pop(context); // Закрываем диалог
+                  context.push('/promotion', extra: promotion);
+                },
+              );
+            },
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -276,7 +292,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Корзина'),
+        title: Text(
+          'Корзина',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: [
           if (_cartItems.isNotEmpty)
             Padding(
@@ -285,7 +306,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -432,7 +453,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             Expanded(
               child: _buildProductInfo(product, price, productId, quantity, appliedPromotions),
             ),
-            _buildDeleteButton(productId),
           ],
         ),
       ),
@@ -481,10 +501,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
   Widget _buildProductInfo(Map<String, dynamic> product, double price, int productId, int quantity, List<dynamic> appliedPromotions) {
     final item = _convertToSafeMap(product);
-    final hasDiscount = item['has_discount'] == true;
-    final originalPrice = (item['original_price'] as num?)?.toDouble() ?? price;
+    final hasDiscount = item['price'] != price;
+    final originalPrice = (item['price'] as num?)?.toDouble() ?? price;
     final discountedPrice = price;
-    final discountAmount = (item['discount_amount'] as num?)?.toDouble() ?? 0.0;
     final hasPromotions = appliedPromotions.isNotEmpty;
 
     return Column(
@@ -518,31 +537,32 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
               ),
             ),
-            if (hasPromotions)
+            if (hasPromotions) 
               IconButton(
                 icon: Icon(
                   Icons.local_offer_outlined,
                   size: 20,
                   color: Colors.orange,
                 ),
-                onPressed: () => _showPromotionsDialog(appliedPromotions, product['name'] ?? 'Товар'),
+                onPressed: () => _navigateToPromotionScreen(appliedPromotions, context),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(
                   minWidth: 36,
                   minHeight: 36,
                 ),
               ),
+            _buildDeleteButton(productId),
           ],
         ),
         const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Цены за единицу
-                Row(
+                Column(
                   children: [
                     if (hasDiscount) ...[
                       Text(
@@ -563,110 +583,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                // Итоговая цена за количество
-                Row(
-                  children: [
-                    if (hasDiscount) ...[
-                      Text(
-                        '${(originalPrice * quantity).toStringAsFixed(2)} ₽',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      '${(discountedPrice * quantity).toStringAsFixed(2)} ₽',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: hasDiscount ? Colors.green : null,
-                          ),
-                    ),
-                  ],
-                ),
-                if (hasDiscount && discountAmount > 0) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Экономия ${(discountAmount * quantity).toStringAsFixed(2)} ₽',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                  ),
-                ],
               ],
             ),
-            _buildQuantityControls(productId, quantity),
+            QuantityControls(
+              productId: productId,
+              quantity: quantity,
+              onQuantityChanged: _updateCartItem,
+            ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildQuantityControls(int productId, int quantity) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(
-              Icons.remove,
-              size: 18,
-              color: quantity > 0 
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-            ),
-            onPressed: () {
-              final newQuantity = quantity - 1;
-              _updateCartItem(productId, newQuantity);
-            },
-            padding: const EdgeInsets.all(6),
-            constraints: const BoxConstraints(
-              minWidth: 32,
-              minHeight: 32,
-            ),
-          ),
-          Container(
-            width: 28,
-            alignment: Alignment.center,
-            child: Text(
-              quantity.toString(),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.add,
-              size: 18,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            onPressed: () {
-              _updateCartItem(productId, quantity + 1);
-            },
-            padding: const EdgeInsets.all(6),
-            constraints: const BoxConstraints(
-              minWidth: 32,
-              minHeight: 32,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -725,7 +651,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               onPressed: _isCreatingOrder ? null : _createOrder,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: hasDiscount ? Colors.green : Theme.of(context).colorScheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),

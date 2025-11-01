@@ -1,12 +1,20 @@
-// core/providers/promotions_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
 
-final promotionsProvider = FutureProvider<List<dynamic>>((ref) async {
+final promotionProvider = FutureProvider.family<Map<String, dynamic>, int>((ref, promotionId) async {
   try {
-    // TODO: Добавить endpoint для получения акций в API клиент
-    final response = await ApiClient.getPromotions();
-    return response;
+    final promotion = await ApiClient.getPromotion(promotionId);
+    return promotion;
+  } catch (e) {
+    print('Error loading promotion: $e');
+    throw e;
+  }
+});
+
+final promotionsListProvider = FutureProvider<List<dynamic>>((ref) async {
+  try {
+    final promotions = await ApiClient.getPromotions();
+    return promotions;
   } catch (e) {
     print('Error loading promotions: $e');
     throw e;

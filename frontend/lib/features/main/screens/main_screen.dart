@@ -11,6 +11,7 @@ import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/providers/favorites_provider.dart';
 import 'package:client/core/providers/promotions_provider.dart'; 
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/quantity_controls.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -26,7 +27,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final productsAsync = ref.watch(productsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
-    final promotionsAsync = ref.watch(promotionsProvider);
+    final promotionsAsync = ref.watch(promotionsListProvider);
     
     final List<Widget> screens = [
       _buildHomeScreen(productsAsync, categoriesAsync, selectedCategory, promotionsAsync),
@@ -47,7 +48,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     AsyncValue<List<dynamic>> productsAsync,
     AsyncValue<List<dynamic>> categoriesAsync,
     String selectedCategory,
-    AsyncValue<List<dynamic>> promotionsAsync, // Добавляем параметр
+    AsyncValue<List<dynamic>> promotionsAsync,
   ) {
     return CustomScrollView(
       slivers: [
@@ -56,7 +57,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             'Продуктовый маркет',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                ),
+            ),
           ),
           backgroundColor: Theme.of(context).colorScheme.background,
           elevation: 0,
@@ -269,7 +270,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   Widget _buildPromotionCard(Map<String, dynamic> promotion, BuildContext context) {
-    // Определяем цвет в зависимости от типа акции
     Color getPromotionColor(String promotionType) {
       switch (promotionType) {
         case 'percentage':
@@ -283,7 +283,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       }
     }
 
-    // Форматируем описание акции
     String getPromotionDescription() {
       final type = promotion['promotion_type'];
       final value = promotion['value'];
@@ -292,7 +291,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         case 'percentage':
           return 'Скидка $value%';
         case 'fixed':
-          final amount = (value / 100).toStringAsFixed(2); // переводим из копеек в рубли
+          final amount = (value / 100).toStringAsFixed(2);
           return 'Скидка $amount ₽';
         case 'gift':
           return 'Подарок';
@@ -306,6 +305,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     return GestureDetector(
       onTap: () {
+        print(promotion);
         context.push('/promotion/${promotion['id']}', extra: promotion);
       },
       child: Container(
@@ -564,7 +564,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.65,
             ),
             delegate: SliverChildBuilderDelegate(
               (context, index) {
@@ -597,11 +597,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Изображение продукта
                   Container(
-                    height: 100,
+                    height: 150,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
@@ -630,7 +630,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   ),
                   const SizedBox(height: 8),
                   
-                  // Название и цена
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -658,64 +657,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   
                   const Spacer(),
                   
-                  // Кнопки добавления в корзину
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    height: 35,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.remove,
-                            size: 18,
-                            color: quantity > 0 
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-                          ),
-                          onPressed: quantity > 0 ? () {
-                            _updateCartQuantity(productId, quantity - 1);
-                          } : null,
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                        ),
-                        
-                        Container(
-                          width: 30,
-                          alignment: Alignment.center,
-                          child: Text(
-                            quantity.toString(),
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                        ),
-                        
-                        IconButton(
-                          icon: Icon(
-                            Icons.add,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          onPressed: () {
-                            _addToCart(productId);
-                          },
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                        ),
-                      ],
-                    ),
+                  QuantityControls(
+                    productId: productId,
+                    quantity: quantity,
+                    onQuantityChanged: _updateCartQuantity,
+                    fullWidth: true,
                   ),
                 ],
               ),
@@ -751,22 +697,16 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     context.push('/product/${product['id']}', extra: product);
   }
 
-  Future<void> _addToCart(int productId) async {
-    try {
-      await ref.read(cartProvider.notifier).addToCart(productId);
-    } catch (e) {
-      print('Error adding to cart: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка добавления в корзину: $e')),
-      );
-    }
-  }
-
   Future<void> _updateCartQuantity(int productId, int quantity) async {
     try {
-      await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
+      final currentQuantity = ref.read(cartProvider)[productId] ?? 0;
+      
+      if (currentQuantity == 0 && quantity > 0) {
+        await ref.read(cartProvider.notifier).addToCart(productId);
+      } else {
+        await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
+      }
     } catch (e) {
-      print('Error updating cart: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка обновления корзины: $e')),
       );

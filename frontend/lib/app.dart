@@ -72,18 +72,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             final product = state.extra as Map<String, dynamic>;
             return ProductScreen(product: product);
           } catch (e) {
-            print('Error in route: $e');
-            print('Extra type: ${state.extra?.runtimeType}');
-            print('Extra value: ${state.extra}');
             return const Scaffold(body: Center(child: Text('Ошибка загрузки товара')));
           }
         },
       ),
       GoRoute(
-        path: '/promotion/:id',
+        path: '/promotion/:promotionId',
+        name: 'promotion',
         builder: (context, state) {
-          final promotion = state.extra as Map<String, dynamic>;
-          return PromotionScreen(promotion: promotion);
+          final promotionId = int.tryParse(state.pathParameters['promotionId'] ?? '');
+          return PromotionScreen(promotionId: promotionId);
         },
       ),
       GoRoute(

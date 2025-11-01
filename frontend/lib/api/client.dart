@@ -118,7 +118,7 @@ class ApiClient {
 
   static Future<List<dynamic>> getCategories() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/categories/'),
+      Uri.parse('$baseUrl/products/categories'),
       headers: _headers,
     );
     return _handleResponse(response);

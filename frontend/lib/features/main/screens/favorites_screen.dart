@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
 import 'package:client/core/providers/favorites_provider.dart';
 import 'package:client/core/providers/cart_provider.dart';
+import 'package:client/core/widgets/quantity_controls.dart';
 
 class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
@@ -60,22 +61,16 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     }
   }
 
-  Future<void> _addToCart(int productId) async {
-    try {
-      await ref.read(cartProvider.notifier).addToCart(productId);
-    } catch (e) {
-      print('Error adding to cart: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка добавления в корзину: $e')),
-      );
-    }
-  }
-
   Future<void> _updateCartQuantity(int productId, int quantity) async {
     try {
-      await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
+      final currentQuantity = ref.read(cartProvider)[productId] ?? 0;
+      
+      if (currentQuantity == 0 && quantity > 0) {
+        await ref.read(cartProvider.notifier).addToCart(productId);
+      } else {
+        await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
+      }
     } catch (e) {
-      print('Error updating cart: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка обновления корзины: $e')),
       );
@@ -274,78 +269,43 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                               color: Theme.of(context).colorScheme.primary,
                             ),
                       ),
-                      
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        height: 32,
-                        child: Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                Icons.remove,
-                                size: 16,
-                                color: quantity > 0 
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-                              ),
-                              onPressed: quantity > 0 ? () {
-                                _updateCartQuantity(productId, quantity - 1);
-                              } : null,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: 28,
-                              ),
-                            ),
-                            
-                            Container(
-                              width: 24,
-                              alignment: Alignment.center,
-                              child: Text(
-                                quantity.toString(),
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                            ),
-                            
-                            IconButton(
-                              icon: Icon(
-                                Icons.add,
-                                size: 16,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              onPressed: () {
-                                _addToCart(productId);
-                              },
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: 28,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ],
               ),
             ),
             
-            IconButton(
-              icon: const Icon(
-                Icons.favorite,
-                color: Colors.red,
-                size: 20,
-              ),
-              onPressed: () => _removeFromFavorites(productId),
-              padding: const EdgeInsets.all(4),
+            const SizedBox(width: 8),
+            
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.favorite,
+                    color: Colors.red,
+                    size: 20,
+                  ),
+                  onPressed: () => _removeFromFavorites(productId),
+                  padding: const EdgeInsets.all(4),
+                  alignment: Alignment.topRight,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  height: 32,
+                  child: QuantityControls(                 
+                    productId: productId,
+                    quantity: quantity,
+                    onQuantityChanged: _updateCartQuantity
+                  ),
+                ),
+              ],
             ),
           ],
         ),

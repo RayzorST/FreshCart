@@ -20,9 +20,8 @@ async def get_cart(
     """Получение корзины пользователя с учетом скидок"""
     cart_items = db.query(CartItem).filter(
         CartItem.user_id == current_user.id
-    ).all()
+    ).order_by(CartItem.created_at.desc()).all()
     
-    # Подготавливаем данные для расчета скидок
     cart_items_data = []
     for item in cart_items:
         cart_items_data.append({
@@ -30,14 +29,11 @@ async def get_cart(
             'quantity': item.quantity
         })
     
-    # Рассчитываем скидки
     promotion_service = PromotionService(db)
     discount_result = promotion_service.calculate_cart_discounts(cart_items_data, current_user.id)
     
-    # Формируем ответ с учетом скидок
     items_with_discounts = []
     for db_item in cart_items:
-        # Находим соответствующий товар с рассчитанными скидками
         discounted_item = next(
             (item for item in discount_result['items'] 
              if item['product_id'] == db_item.product_id), 
@@ -50,7 +46,7 @@ async def get_cart(
                 user_id=db_item.user_id,
                 product_id=db_item.product_id,
                 quantity=db_item.quantity,
-                product=db_item.product,  # Теперь работает благодаря relationship
+                product=db_item.product, 
                 created_at=db_item.created_at,
                 updated_at=db_item.updated_at,
                 discount_price=discounted_item['discount_price'],
@@ -129,7 +125,6 @@ async def update_cart_item(
         )
     
     if cart_item_data.quantity <= 0:
-        # Удаляем если количество 0 или меньше
         db.delete(cart_item)
         db.commit()
         raise HTTPException(
