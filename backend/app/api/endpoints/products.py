@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 
 from app.models.database import get_db
-from app.models.product import Product, Category
+from app.models.product import Product, Category, ProductTag, Tag
 from app.schemas.product import (
     ProductResponse, ProductCreate, ProductUpdate,
-    CategoryResponse, CategoryCreate
+    CategoryResponse, CategoryCreate,
+    TagResponse, TagCreate, ProductTagsUpdate,
+    ProductResponse, ProductTagLinkResponse
 )
 from app.api.endpoints.auth import get_current_user
 from app.models.user import User
@@ -139,3 +142,266 @@ async def delete_product(
     db.commit()
     
     return {"message": "Product deleted successfully"}
+
+@router.get("/tags", response_model=List[TagResponse])
+async def get_tags(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = Query(None, description="Поиск по названию тега"),
+    db: Session = Depends(get_db)
+):
+    """Получение списка тегов с количеством продуктов"""
+    query = db.query(Tag)
+    
+    if search:
+        query = query.filter(Tag.name.ilike(f"%{search}%"))
+    
+    # Получаем теги с количеством продуктов
+    tags = query.offset(skip).limit(limit).all()
+    
+    # Добавляем количество продуктов для каждого тега
+    result = []
+    for tag in tags:
+        tag_data = TagResponse.from_orm(tag)
+        tag_data.products_count = db.query(ProductTag).filter(ProductTag.tag_id == tag.id).count()
+        result.append(tag_data)
+    
+    return result
+
+@router.get("/tags/{tag_id}", response_model=TagResponse)
+async def get_tag(
+    tag_id: int,
+    db: Session = Depends(get_db)
+):
+    """Получение тега по ID"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found"
+        )
+    
+    tag_data = TagResponse.from_orm(tag)
+    tag_data.products_count = db.query(ProductTag).filter(ProductTag.tag_id == tag.id).count()
+    return tag_data
+
+@router.post("/tags", response_model=TagResponse)
+async def create_tag(
+    tag_data: TagCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Создание тега (требует аутентификации)"""
+    # Проверяем уникальность тега
+    existing_tag = db.query(Tag).filter(func.lower(Tag.name) == func.lower(tag_data.name)).first()
+    if existing_tag:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tag with this name already exists"
+        )
+    
+    tag = Tag(**tag_data.dict())
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    return tag
+
+@router.delete("/tags/{tag_id}")
+async def delete_tag(
+    tag_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Удаление тега (требует аутентификации)"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found"
+        )
+    
+    # Удаляем связи с продуктами
+    db.query(ProductTag).filter(ProductTag.tag_id == tag_id).delete()
+    
+    # Удаляем сам тег
+    db.delete(tag)
+    db.commit()
+    
+    return {"message": "Tag deleted successfully"}
+
+# ===== УПРАВЛЕНИЕ ТЕГАМИ ПРОДУКТОВ =====
+
+@router.get("/items/{product_id}/tags", response_model=List[TagResponse])
+async def get_product_tags(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    """Получение тегов конкретного продукта"""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+    
+    return [product_tag.tag for product_tag in product.product_tags]
+
+@router.post("/items/{product_id}/tags", response_model=List[TagResponse])
+async def add_tags_to_product(
+    product_id: int,
+    tags_data: ProductTagsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Добавление тегов к продукту (требует аутентификации)"""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+    
+    added_tags = []
+    for tag_name in tags_data.tag_names:
+        # Находим или создаем тег
+        tag = db.query(Tag).filter(func.lower(Tag.name) == func.lower(tag_name)).first()
+        if not tag:
+            tag = Tag(name=tag_name.strip())
+            db.add(tag)
+            db.commit()
+            db.refresh(tag)
+        
+        # Проверяем, нет ли уже такой связи
+        existing_link = db.query(ProductTag).filter(
+            ProductTag.product_id == product_id,
+            ProductTag.tag_id == tag.id
+        ).first()
+        
+        if not existing_link:
+            product_tag = ProductTag(product_id=product_id, tag_id=tag.id)
+            db.add(product_tag)
+            added_tags.append(tag)
+    
+    db.commit()
+    return added_tags
+
+@router.delete("/items/{product_id}/tags/{tag_id}")
+async def remove_tag_from_product(
+    product_id: int,
+    tag_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Удаление тега у продукта (требует аутентификации)"""
+    product_tag = db.query(ProductTag).filter(
+        ProductTag.product_id == product_id,
+        ProductTag.tag_id == tag_id
+    ).first()
+    
+    if not product_tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found for this product"
+        )
+    
+    db.delete(product_tag)
+    db.commit()
+    
+    return {"message": "Tag removed from product successfully"}
+
+@router.put("/items/{product_id}/tags", response_model=List[TagResponse])
+async def set_product_tags(
+    product_id: int,
+    tags_data: ProductTagsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Установка тегов продукта (замена всех текущих тегов)"""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+    
+    # Удаляем все текущие теги продукта
+    db.query(ProductTag).filter(ProductTag.product_id == product_id).delete()
+    
+    # Добавляем новые теги
+    new_tags = []
+    for tag_name in tags_data.tag_names:
+        tag = db.query(Tag).filter(func.lower(Tag.name) == func.lower(tag_name)).first()
+        if not tag:
+            tag = Tag(name=tag_name.strip())
+            db.add(tag)
+            db.commit()
+            db.refresh(tag)
+        
+        product_tag = ProductTag(product_id=product_id, tag_id=tag.id)
+        db.add(product_tag)
+        new_tags.append(tag)
+    
+    db.commit()
+    return new_tags
+
+# ===== ПОИСК ПРОДУКТОВ ПО ТЕГАМ =====
+
+@router.get("/search/by-tags", response_model=List[ProductResponse])
+async def search_products_by_tags(
+    tags: List[str] = Query(..., description="Список тегов для поиска"),
+    category_id: Optional[int] = Query(None, description="Фильтр по категории"),
+    min_price: Optional[float] = Query(None, description="Минимальная цена"),
+    max_price: Optional[float] = Query(None, description="Максимальная цена"),
+    in_stock: Optional[bool] = Query(None, description="Только в наличии"),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Поиск продуктов по тегам"""
+    query = db.query(Product).join(Product.product_tags).join(Tag)
+    
+    # Фильтр по тегам
+    query = query.filter(Tag.name.in_(tags))
+    
+    # Дополнительные фильтры
+    if category_id:
+        query = query.filter(Product.category_id == category_id)
+    
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+    
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
+    
+    if in_stock:
+        query = query.filter(Product.stock_quantity > 0)
+    
+    query = query.filter(Product.is_active == True)
+    
+    # Группируем и считаем совпадения
+    query = query.group_by(Product.id).having(func.count(Tag.id) >= len(tags))
+    
+    products = query.offset(skip).limit(limit).all()
+    return products
+
+@router.get("/tags/{tag_id}/products", response_model=List[ProductResponse])
+async def get_products_by_tag(
+    tag_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Получение всех продуктов с определенным тегом"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found"
+        )
+    
+    products = db.query(Product).join(Product.product_tags).filter(
+        ProductTag.tag_id == tag_id,
+        Product.is_active == True
+    ).offset(skip).limit(limit).all()
+    
+    return products

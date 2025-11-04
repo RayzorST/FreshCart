@@ -166,6 +166,7 @@ class PromotionService:
                 product = products.get(item['product_id'])
                 if product:
                     print(f"Product {product.id}: category {product.category_id}, in promotion categories: {product.category_id in promotion_category_ids}")
+                    print(f"Product {product.id} : {promotion.gift_product_id} | {product.id == promotion.gift_product_id}")
                     if product.category_id in promotion_category_ids:
                         applicable_items.append(item)
         
@@ -175,8 +176,8 @@ class PromotionService:
             print(f"Promotion product IDs: {promotion_product_ids}")
             
             for item in items:
-                print(f"Product {item['product_id']} in promotion products: {item['product_id'] in promotion_product_ids}")
-                if item['product_id'] in promotion_product_ids:
+                print(f"Product {item['product_id']} in promotion products: {item['product_id'] in promotion_product_ids or item['product_id'] == promotion.gift_product_id}")
+                if item['product_id'] in promotion_product_ids or item['product_id'] == promotion.gift_product_id:
                     applicable_items.append(item)
         
         # Если нет ограничений - все товары подходят
@@ -187,7 +188,7 @@ class PromotionService:
         # Фильтруем по минимальному количеству
         filtered_items = []
         for item in applicable_items:
-            if item['quantity'] >= promotion.min_quantity:
+            if item['quantity'] >= promotion.min_quantity or item['product_id'] == promotion.gift_product_id:
                 filtered_items.append(item)
             else:
                 print(f"Item {item['product_id']} quantity {item['quantity']} < min {promotion.min_quantity}")
@@ -240,13 +241,14 @@ class PromotionService:
         """Применяет акцию 'подарок'"""
         if not promotion.gift_product_id:
             return False
-        
+        print(f"products {products}")
+        print(f"promotion gift {promotion.gift_product_id}")
         gift_product = products.get(promotion.gift_product_id)
         if not gift_product:
             return False
         
-        # Находим товары, которые участвуют в акции
         for item in items:
+            print(item)
             if item['quantity'] >= promotion.min_quantity:
                 # Добавляем информацию о подарке
                 item['applied_promotions'].append({
@@ -256,6 +258,14 @@ class PromotionService:
                     'gift_product_id': promotion.gift_product_id,
                     'gift_product_name': gift_product.name
                 })
-                # Можно добавить логику для добавления подарка в заказ
-        
+
+            if item['product_id'] == promotion.gift_product_id:
+                item['discount_price'] = 0
+                item['applied_promotions'].append({
+                    'promotion_id': promotion.id,
+                    'name': promotion.name,
+                    'type': 'gift',
+                    'gift_product_id': promotion.gift_product_id,
+                    'gift_product_name': gift_product.name
+                })
         return True

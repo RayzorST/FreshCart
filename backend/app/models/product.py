@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Boolean, ForeignKey
+# app/models/__init__.py
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.models.database import Base
@@ -12,6 +13,14 @@ class Category(Base):
     image_url = Column(String(500))
     
     products = relationship("Product", back_populates="category")
+
+class Tag(Base):
+    __tablename__ = "tags"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False, index=True)
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Product(Base):
     __tablename__ = "products"
@@ -28,4 +37,19 @@ class Product(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     category = relationship("Category", back_populates="products")
-    # order_items = relationship("OrderItem", back_populates="product")  # ЗАКОММЕНТИРОВАТЬ!
+    product_tags = relationship("ProductTag", back_populates="product")
+
+class ProductTag(Base):
+    __tablename__ = "product_tags"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    tag_id = Column(Integer, ForeignKey("tags.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('product_id', 'tag_id', name='uq_product_tag'),
+    )
+    
+    product = relationship("Product", back_populates="product_tags")
+    tag = relationship("Tag")

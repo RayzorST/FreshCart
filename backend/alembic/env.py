@@ -10,9 +10,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.config import settings
 from app.models.database import Base
-from app.models.user import User, Role
-from app.models.product import Category, Product
-from app.models.order import Order, OrderItem, Address
+from app.models.user import User, Role, UserSettings
+from app.models.product import Category, Product, ProductTag
+from app.models.order import Order, OrderItem, Address, OrderPromotion
+from app.models.cart import CartItem
+from app.models.favorite import Favorite
+from app.models.promotions import Promotion, PromotionCategory, PromotionProduct
 
 config = context.config
 
@@ -30,6 +33,8 @@ def run_migrations_offline() -> None:
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
+        compare_type=True,
+        compare_server_default=True,
         dialect_opts={"paramstyle": "named"},
     )
 

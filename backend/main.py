@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.models.database import engine, Base, SessionLocal
 from app.models.user import Role
 from app.services.rabbitmq_consumer import message_consumer
-from app.api.endpoints import auth, products, orders, cart, addresses, images, favorites, promotions
+from app.api.endpoints import auth, products, orders, cart, addresses, images, favorites, promotions, analysis
 
 
 
@@ -65,6 +65,7 @@ app.include_router(addresses.router, prefix="/addresses", tags=["addresses"])
 app.include_router(images.router, prefix="/images", tags=["images"])
 app.include_router(favorites.router, prefix="/favorites", tags=["favorites"])
 app.include_router(promotions.router, prefix="/promotions", tags=["promotions"])
+app.include_router(analysis.router, prefix="/clarifai", tags=["clarifai"])
 
 
 

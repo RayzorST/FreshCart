@@ -36,7 +36,6 @@ class SplashScreen extends StatelessWidget {
             
             const SizedBox(height: 8),
             
-            // Слоган
             Text(
               'Свежие продукты с доставкой',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(

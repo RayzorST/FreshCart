@@ -2,23 +2,45 @@ import logging
 import threading
 import time
 from app.services.rabbitmq import RabbitMQClient
+from app.services.tag_service import TagService
+from sqlalchemy.orm import Session
+from app.models.database import get_db
+
 
 logger = logging.getLogger(__name__)
 
 class MessageConsumer:
-    def __init__(self):
+    def __init__(self, db: Session):
         self.is_running = False
         self.consumer_threads = {}
+        self.db = db
     
     def handle_image_processing(self, message):
-        """Обработчик сообщений обработки изображений"""
         try:
-            logger.info(f"🖼️ Processing image: {message}")
-            # Здесь будет логика обработки изображений
-            # Например: анализ фото блюда, определение ингредиентов и т.д.
+            # 1. Анализ в Clarifai
+            clarifai_results = self.clarifai_analyze(message['image_data'])
+            
+            # 2. Подбор альтернатив через теги
+            tag_service = TagService(self.db)
+            alternatives = tag_service.find_ingredient_alternatives(
+                clarifai_results, 
+                message['user_id']
+            )
+            
+            # 3. Отправка результата
+            self.rabbitmq_client.publish_message('ai_results', {
+                'user_id': message['user_id'],
+                'session_id': message['session_id'],
+                'alternatives': alternatives
+            })
             
         except Exception as e:
-            logger.error(f"❌ Error processing image: {e}")
+            logger.error(f"Image processing error: {e}")
+
+    def clarifai_analyze(self, image_data):
+        """Заглушка - заменить на реальный Clarifai API"""
+        # TODO: Реальная интеграция с Clarifai
+        return ["салат", "курица", "сыр", "помидор"]
     
     def handle_order_processing(self, message):
         """Обработчик сообщений обработки заказов"""
@@ -151,4 +173,4 @@ class MessageConsumer:
         logger.info("🛑 All consumers stopped")
 
 # Глобальный экземпляр consumer
-message_consumer = MessageConsumer()
+message_consumer = MessageConsumer(get_db())
