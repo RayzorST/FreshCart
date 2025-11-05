@@ -308,6 +308,23 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  // Analysis methods
+  static Future<Map<String, dynamic>> analyzeFoodImage(String base64Image) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/ai/base64'),
+      headers: _headers,
+      body: json.encode({
+        'image_data': base64Image,
+      }),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> analyzeFoodImageFile(List<int> imageBytes) async {
+    final base64Image = base64Encode(imageBytes);
+    return analyzeFoodImage(base64Image);
+  }
+
   static dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return json.decode(response.body);
