@@ -163,7 +163,6 @@ async def get_tags(
     result = []
     for tag in tags:
         tag_data = TagResponse.from_orm(tag)
-        tag_data.products_count = db.query(ProductTag).filter(ProductTag.tag_id == tag.id).count()
         result.append(tag_data)
     
     return result
