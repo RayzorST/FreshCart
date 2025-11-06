@@ -29,6 +29,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     role = relationship("Role", back_populates="users")
+    analysis_history = relationship("AnalysisHistory", back_populates="user")
     #settings = relationship("UserSettings", back_populates="user", uselist=False)
 
     def verify_password(self, password: str) -> bool:

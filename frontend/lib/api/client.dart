@@ -309,6 +309,11 @@ class ApiClient {
   }
 
   // Analysis methods
+  static Future<Map<String, dynamic>> analyzeFoodImageFile(List<int> imageBytes) async {
+    final base64Image = base64Encode(imageBytes);
+    return analyzeFoodImage(base64Image);
+  }
+
   static Future<Map<String, dynamic>> analyzeFoodImage(String base64Image) async {
     final response = await http.post(
       Uri.parse('$baseUrl/ai/base64'),
@@ -320,9 +325,21 @@ class ApiClient {
     return _handleResponse(response);
   }
 
-  static Future<Map<String, dynamic>> analyzeFoodImageFile(List<int> imageBytes) async {
-    final base64Image = base64Encode(imageBytes);
-    return analyzeFoodImage(base64Image);
+  // History methods
+  static Future<List<dynamic>> getAnalysisHistory({int skip = 0, int limit = 20}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/ai/history?skip=$skip&limit=$limit'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> getAnalysisStats() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/ai/history/stats'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
   }
 
   static dynamic _handleResponse(http.Response response) {

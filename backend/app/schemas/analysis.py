@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 from typing import List, Dict
 
 class Base64ImageRequest(BaseModel):
@@ -21,3 +22,19 @@ class AnalysisResponse(BaseModel):
     basic_alternatives: List[Dict]
     additional_alternatives: List[Dict]
     recommendations: List[str]
+
+class AnalysisHistoryBase(BaseModel):
+    detected_dish: str
+    confidence: float
+    ingredients: Dict
+    alternatives_found: Dict
+
+class AnalysisHistoryResponse(AnalysisHistoryBase):
+    id: int
+    created_at: datetime
+
+class AnalysisStatsResponse(BaseModel):
+    total_analyses: int
+    high_confidence_analyses: int
+    recent_week_analyses: int
+    success_rate: float

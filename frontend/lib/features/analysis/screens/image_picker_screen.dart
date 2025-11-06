@@ -11,6 +11,17 @@ class ImagePickerScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Анализ блюда'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              // TODO: Переход на историю анализов
+              // Navigator.push(context, MaterialPageRoute(
+              //   builder: (context) => AnalysisHistoryScreen()
+              // ));
+            },
+          ),
+        ],
       ),
       body: Center(
         child: Column(
@@ -46,6 +57,13 @@ class ImagePickerScreen extends StatelessWidget {
                 label: const Text('Выбрать из галереи'),
               ),
             ),
+            const SizedBox(height: 24),
+            TextButton(
+              onPressed: () {
+                _showExampleResults(context);
+              },
+              child: const Text('Посмотреть пример анализа'),
+            ),
           ],
         ),
       ),
@@ -55,7 +73,12 @@ class ImagePickerScreen extends StatelessWidget {
   Future<void> _pickImage(ImageSource source, BuildContext context) async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: source);
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
       
       if (image != null && context.mounted) {
         Navigator.push(
@@ -66,9 +89,21 @@ class ImagePickerScreen extends StatelessWidget {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
     }
+  }
+
+  void _showExampleResults(BuildContext context) {
+    // Показываем пример анализа для демонстрации
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AnalysisScreen(imagePath: 'example'),
+      ),
+    );
   }
 }

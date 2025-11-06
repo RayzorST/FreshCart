@@ -1,5 +1,6 @@
 // analysis_screen.dart
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -37,11 +38,18 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       if (widget.imageFile != null) {
         // Анализ из файла
         final imageBytes = await widget.imageFile!.readAsBytes();
+        
+        // Проверяем размер изображения (макс 5MB)
+        if (imageBytes.length > 5 * 1024 * 1024) {
+          throw Exception('Изображение слишком большое. Максимум 5MB');
+        }
+        
         result = await ApiClient.analyzeFoodImageFile(imageBytes);
       } else if (widget.imagePath != null) {
-        // Анализ из пути (если нужно)
-        // TODO: Реализовать конвертацию пути в base64
-        result = await _analyzeFromPath();
+        // Анализ из пути файла
+        final file = File(widget.imagePath!);
+        final imageBytes = await file.readAsBytes();
+        result = await ApiClient.analyzeFoodImageFile(imageBytes);
       } else {
         throw Exception('No image provided');
       }
@@ -56,50 +64,19 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       if (mounted) {
         setState(() {
           _isAnalyzing = false;
-          _errorMessage = 'Ошибка анализа: $e';
+          _errorMessage = 'Ошибка анализа: ${e.toString()}';
         });
       }
     }
   }
 
-  Future<Map<String, dynamic>> _analyzeFromPath() async {
-    // Заглушка - в реальности нужно конвертировать imagePath в base64
-    await Future.delayed(const Duration(seconds: 2));
-    return {
-      'success': true,
-      'detected_dish': 'Салат Цезарь',
-      'confidence': 0.85,
-      'message': 'Определено блюдо: Салат Цезарь',
-      'basic_ingredients': ['салат романо', 'курица', 'сыр пармезан', 'сухарики'],
-      'additional_ingredients': ['черри', 'бекон', 'соус цезарь'],
-      'basic_alternatives': [
-        {
-          'ingredient': 'салат романо',
-          'products': [
-            {'id': 5, 'name': 'Салат Цезарь «Белая дача» Романо и айсберг', 'price': 179.0, 'image_url': '/minio/images/c02dacf0-abd3-45c1-aaf8-5269bf41e2cd.jpg', 'in_favorites': false}
-          ]
-        },
-        {
-          'ingredient': 'соус цезарь', 
-          'products': [
-            {'id': 4, 'name': 'Соус Цезарь Heinz', 'price': 215.0, 'image_url': '/minio/images/22366249-c01a-4b80-831d-3cc8c4f97c29.jpg', 'in_favorites': true}
-          ]
-        }
-      ],
-      'additional_alternatives': [
-        {
-          'ingredient': 'черри',
-          'products': [
-            {'id': 6, 'name': 'Помидоры Черри', 'price': 320.0, 'image_url': '', 'in_favorites': false}
-          ]
-        }
-      ],
-      'recommendations': [
-        '✅ Высокая уверенность в определении блюда: Салат Цезарь',
-        '🔍 Найдено 2 из 4 основных ингредиентов',
-        '✨ Найдено 1 дополнительных ингредиентов для улучшения блюда'
-      ]
-    };
+  void _retryAnalysis() {
+    setState(() {
+      _isAnalyzing = true;
+      _errorMessage = null;
+      _analysisResult = null;
+    });
+    _startAnalysis();
   }
 
   @override
@@ -112,6 +89,13 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
             IconButton(
               icon: const Icon(Icons.shopping_cart),
               onPressed: _addAllToCart,
+              tooltip: 'Добавить все в корзину',
+            ),
+          if (_errorMessage != null)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _retryAnalysis,
+              tooltip: 'Повторить анализ',
             ),
         ],
       ),
@@ -164,9 +148,19 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Попробовать снова'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FilledButton(
+                  onPressed: _retryAnalysis,
+                  child: const Text('Повторить'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Назад'),
+                ),
+              ],
             ),
           ],
         ),
@@ -176,9 +170,17 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
 
   Widget _buildResults() {
     final result = _analysisResult!;
-    final dishName = result['detected_dish'];
-    final confidence = result['confidence'];
+    
+    // Проверяем успешность запроса
+    if (result['success'] == false) {
+      return _buildError();
+    }
+    
+    final dishName = result['detected_dish'] ?? 'Неизвестное блюдо';
+    final confidence = (result['confidence'] ?? 0.0).toDouble();
     final recommendations = List<String>.from(result['recommendations'] ?? []);
+    final basicAlternatives = List<dynamic>.from(result['basic_alternatives'] ?? []);
+    final additionalAlternatives = List<dynamic>.from(result['additional_alternatives'] ?? []);
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -200,16 +202,27 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Уверенность: ${(confidence * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      color: confidence > 0.7 ? Colors.green : 
-                            confidence > 0.4 ? Colors.orange : Colors.red,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Уверенность: ${(confidence * 100).toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            color: confidence > 0.7 ? Colors.green : 
+                                  confidence > 0.4 ? Colors.orange : Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      _buildConfidenceIndicator(confidence),
+                    ],
                   ),
                   if (result['message'] != null) ...[
                     const SizedBox(height: 8),
-                    Text(result['message']),
+                    Text(
+                      result['message'],
+                      style: const TextStyle(color: Colors.grey),
+                    ),
                   ],
                 ],
               ),
@@ -233,7 +246,11 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, size: 16),
+                  Icon(
+                    _getRecommendationIcon(rec),
+                    size: 16,
+                    color: _getRecommendationColor(rec),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(child: Text(rec)),
                 ],
@@ -243,8 +260,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
           ],
           
           // Основные ингредиенты
-          if (result['basic_alternatives'] != null && 
-              (result['basic_alternatives'] as List).isNotEmpty) ...[
+          if (basicAlternatives.isNotEmpty) ...[
             const Text(
               'Основные ингредиенты:',
               style: TextStyle(
@@ -253,12 +269,27 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ..._buildIngredientSections(result['basic_alternatives']),
+            ..._buildIngredientSections(basicAlternatives),
+          ] else if (result['basic_ingredients'] != null) ...[
+            const Text(
+              'Основные ингредиенты:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                'Ингредиенты не найдены в магазине: ${(result['basic_ingredients'] as List).join(', ')}',
+                style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+              ),
+            ),
           ],
           
           // Дополнительные ингредиенты
-          if (result['additional_alternatives'] != null && 
-              (result['additional_alternatives'] as List).isNotEmpty) ...[
+          if (additionalAlternatives.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text(
               'Дополнительные ингредиенты:',
@@ -268,7 +299,25 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ..._buildIngredientSections(result['additional_alternatives']),
+            ..._buildIngredientSections(additionalAlternatives),
+          ] else if (result['additional_ingredients'] != null && 
+                    (result['additional_ingredients'] as List).isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Дополнительные ингредиенты:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                'Ингредиенты не найдены в магазине: ${(result['additional_ingredients'] as List).join(', ')}',
+                style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+              ),
+            ),
           ],
           
           const SizedBox(height: 32),
@@ -280,9 +329,57 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     );
   }
 
+  Widget _buildConfidenceIndicator(double confidence) {
+    return Container(
+      width: 60,
+      height: 6,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: FractionallySizedBox(
+        alignment: Alignment.centerLeft,
+        widthFactor: confidence,
+        child: Container(
+          decoration: BoxDecoration(
+            color: confidence > 0.7 ? Colors.green : 
+                  confidence > 0.4 ? Colors.orange : Colors.red,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getRecommendationIcon(String recommendation) {
+    if (recommendation.contains('✅') || recommendation.contains('🎉')) {
+      return Icons.check_circle;
+    } else if (recommendation.contains('⚠️') || recommendation.contains('🔍')) {
+      return Icons.info;
+    } else if (recommendation.contains('❌')) {
+      return Icons.warning;
+    } else if (recommendation.contains('✨') || recommendation.contains('💡')) {
+      return Icons.lightbulb;
+    }
+    return Icons.info_outline;
+  }
+
+  Color _getRecommendationColor(String recommendation) {
+    if (recommendation.contains('✅') || recommendation.contains('🎉')) {
+      return Colors.green;
+    } else if (recommendation.contains('⚠️') || recommendation.contains('🔍')) {
+      return Colors.orange;
+    } else if (recommendation.contains('❌')) {
+      return Colors.red;
+    } else if (recommendation.contains('✨') || recommendation.contains('💡')) {
+      return Colors.blue;
+    }
+    return Colors.grey;
+  }
+
   List<Widget> _buildIngredientSections(List<dynamic> alternatives) {
     return alternatives.map<Widget>((alt) {
-      final ingredient = alt['ingredient'];
+      final ingredient = alt['ingredient'] ?? 'Неизвестный ингредиент';
       final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
       
       return Card(
@@ -300,7 +397,16 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...products.map((product) => _buildProductItem(product)),
+              if (products.isNotEmpty) 
+                ...products.map((product) => _buildProductItem(product))
+              else
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'Товары не найдены',
+                    style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                  ),
+                ),
             ],
           ),
         ),
@@ -309,48 +415,83 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   }
 
   Widget _buildProductItem(Map<String, dynamic> product) {
+    final productId = product['id'] ?? 0;
+    final productName = product['name'] ?? 'Неизвестный товар';
+    final price = (product['price'] ?? 0.0).toDouble();
+    final imageUrl = product['image_url']?.toString() ?? '';
+    final inFavorites = product['in_favorites'] == true;
+    final stockQuantity = (product['stock_quantity'] ?? 0).toInt();
+    final isOutOfStock = stockQuantity <= 0;
+
     return ListTile(
-      leading: product['image_url'] != null && product['image_url'].isNotEmpty
+      leading: imageUrl.isNotEmpty
           ? CircleAvatar(
-              backgroundImage: NetworkImage('${ApiClient.baseUrl}/images/products/${product['id']}/image'),
+              backgroundImage: NetworkImage(
+                '${ApiClient.baseUrl}/images/products/${product['id']}/image'
+              ),
+              onBackgroundImageError: (exception, stackTrace) {
+                // Если изображение не загружается, показываем заглушку
+              },
             )
           : const CircleAvatar(
               child: Icon(Icons.food_bank),
             ),
-      title: Text(product['name']),
-      subtitle: Text('${product['price']} ₽'),
+      title: Text(productName),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$price ₽'),
+          if (isOutOfStock)
+            const Text(
+              'Нет в наличии',
+              style: TextStyle(color: Colors.red, fontSize: 12),
+            )
+          else if (stockQuantity < 10)
+            Text(
+              'Осталось: $stockQuantity шт.',
+              style: const TextStyle(color: Colors.orange, fontSize: 12),
+            ),
+        ],
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (product['in_favorites'] == true)
-            const Icon(Icons.favorite, color: Colors.red, size: 16),
+          if (inFavorites)
+            const Icon(Icons.favorite, color: Colors.red, size: 20),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.add_shopping_cart),
-            onPressed: () => _addToCart(product['id']),
+            icon: Icon(
+              isOutOfStock ? Icons.remove_shopping_cart : Icons.add_shopping_cart,
+              color: isOutOfStock ? Colors.grey : Theme.of(context).primaryColor,
+            ),
+            onPressed: isOutOfStock ? null : () => _addToCart(productId),
           ),
         ],
       ),
       onTap: () {
         // TODO: Переход на карточку товара
         // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => ProductDetailScreen(productId: product['id'])
+        //   builder: (context) => ProductDetailScreen(productId: productId)
         // ));
       },
     );
   }
 
   Widget _buildActionButtons() {
+    final hasProducts = _hasAvailableProducts();
+    
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _addAllToCart,
-            child: const Text('Добавить все в корзину'),
+        if (hasProducts) ...[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _addAllToCart,
+              child: const Text('Добавить все в корзину'),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
@@ -362,16 +503,37 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     );
   }
 
+  bool _hasAvailableProducts() {
+    final result = _analysisResult!;
+    final basicAlts = List<dynamic>.from(result['basic_alternatives'] ?? []);
+    final additionalAlts = List<dynamic>.from(result['additional_alternatives'] ?? []);
+    
+    for (final alt in [...basicAlts, ...additionalAlts]) {
+      final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
+      for (final product in products) {
+        final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
+        if (stockQuantity > 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   void _addToCart(int productId) async {
     try {
       await ApiClient.addToCart(productId, 1);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Товар добавлен в корзину')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Товар добавлен в корзину')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
     }
   }
 
@@ -382,13 +544,19 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       final additionalAlts = List<dynamic>.from(result['additional_alternatives'] ?? []);
       
       int addedCount = 0;
+      int skippedCount = 0;
       
       // Добавляем основные ингредиенты
       for (final alt in basicAlts) {
         final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
         for (final product in products) {
-          await ApiClient.addToCart(product['id'], 1);
-          addedCount++;
+          final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
+          if (stockQuantity > 0) {
+            await ApiClient.addToCart(product['id'], 1);
+            addedCount++;
+          } else {
+            skippedCount++;
+          }
         }
       }
       
@@ -396,18 +564,32 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       for (final alt in additionalAlts) {
         final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
         for (final product in products) {
-          await ApiClient.addToCart(product['id'], 1);
-          addedCount++;
+          final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
+          if (stockQuantity > 0) {
+            await ApiClient.addToCart(product['id'], 1);
+            addedCount++;
+          } else {
+            skippedCount++;
+          }
         }
       }
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Добавлено $addedCount товаров в корзину')),
-      );
+      if (mounted) {
+        String message = 'Добавлено $addedCount товаров в корзину';
+        if (skippedCount > 0) {
+          message += ' (пропущено $skippedCount - нет в наличии)';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка при добавлении: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка при добавлении: $e')),
+        );
+      }
     }
   }
 }
