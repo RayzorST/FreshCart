@@ -11,13 +11,8 @@ pydantic-settings
 aiofiles
 sqlalchemy
 alembic
-python-magic
 minio
-celery
 redis
-torch 
-torchvision 
-opencv-python 
-pillow 
-ultralytics
 transformers 
+pillow
+torch

@@ -162,7 +162,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       setState(() => _isLoading = true);
       
       try {
-        final response = await ApiClient.register(
+        final response = await ApiClient.registration(
           _usernameController.text,
           _emailController.text,
           _passwordController.text,

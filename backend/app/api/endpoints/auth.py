@@ -38,33 +38,31 @@ async def get_current_user(
         )
     return user
 
-@router.post("/register", response_model=UserResponse)
-async def register(
+@router.post("/registration", response_model=UserResponse)
+async def registration(
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
     """Регистрация нового пользователя"""
-    # Проверка существования пользователя
     existing_user = db.query(User).filter(
-        (User.email == user_data.email) | (User.username == user_data.username)
+        (User.email == user_data.email)
     ).first()
     
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email or username already exists"
+            detail="User with this email already exists"
         )
     
     # Создание пользователя
     hashed_password = get_password_hash(user_data.password)
     db_user = User(
-        username=user_data.username,
         email=user_data.email,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         date_of_birth=user_data.date_of_birth,
         password_hash=hashed_password,
-        role_id=1  # Обычный пользователь
+        role_id=1  
     )
     
     db.add(db_user)
@@ -79,7 +77,6 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """Аутентификация пользователя"""
-    # Поиск пользователя по email
     user = db.query(User).filter(User.email == form_data.email).first()
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
@@ -93,7 +90,6 @@ async def login(
             detail="Inactive user"
         )
     
-    # Создание токена
     access_token = create_access_token(
         data={"sub": str(user.id)}
     )
@@ -114,8 +110,7 @@ async def get_me(
         db.add(settings)
         db.commit()
         db.refresh(settings)
-    
-    # Вместо ручного словаря, обновляем объект current_user
+
     current_user.settings = {
         "order_notifications": settings.order_notifications,
         "promo_notifications": settings.promo_notifications,
@@ -123,14 +118,12 @@ async def get_me(
     
     return current_user
 
-# Было: UserProfileUpdate -> Стало: UserUpdate
 @router.put("/profile", response_model=UserResponse)
 async def update_profile(
-    profile_data: UserUpdate,  # ← Используем UserUpdate
+    profile_data: UserUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # ... код ...
     """Обновить профиль пользователя"""
     update_data = profile_data.dict(exclude_unset=True)
     
@@ -148,14 +141,12 @@ async def change_password(
     db: Session = Depends(get_db)
 ):
     """Сменить пароль"""
-    # Проверяем текущий пароль
     if not current_user.verify_password(password_data.current_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Неверный текущий пароль"
         )
     
-    # Устанавливаем новый пароль
     current_user.set_password(password_data.new_password)
     db.commit()
     
@@ -170,7 +161,6 @@ async def get_notification_settings(
     settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
     
     if not settings:
-        # Создаем настройки по умолчанию если их нет
         settings = UserSettings(user_id=current_user.id)
         db.add(settings)
         db.commit()

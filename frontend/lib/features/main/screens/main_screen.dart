@@ -73,12 +73,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ],
         ),
 
-        // Акции
         SliverToBoxAdapter(
           child: _buildPromotionsSection(promotionsAsync),
         ),
 
-        // Остальные секции без изменений...
         SliverToBoxAdapter(
           child: _buildCategoryFilter(categoriesAsync, selectedCategory),
         ),
@@ -599,7 +597,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Изображение продукта
                   Container(
                     height: 150,
                     width: double.infinity,
@@ -666,8 +663,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 ],
               ),
             ),
-            
-            // Кнопка избранного в правом верхнем углу
+
             Positioned(
               top: 8,
               right: 8,

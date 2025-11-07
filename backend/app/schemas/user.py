@@ -3,7 +3,6 @@ from typing import Optional, Dict
 from datetime import datetime, date
 
 class UserBase(BaseModel):
-    username: str
     email: EmailStr
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -31,10 +30,7 @@ class UserWithSettingsResponse(UserResponse):
     class Config:
         from_attributes = True
 
-# УБИРАЕМ: UserProfile - дублирует UserBase/UserResponse
-# УБИРАЕМ: UserProfileUpdate - используем UserBase
-
-class UserUpdate(BaseModel):  # Переименовываем
+class UserUpdate(BaseModel): 
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None

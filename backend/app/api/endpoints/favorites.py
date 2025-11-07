@@ -49,7 +49,6 @@ async def add_to_favorites(
     db: Session = Depends(get_db)
 ):
     """Добавить товар в избранное"""
-    # Проверяем существует ли товар
     product = db.query(Product).filter(Product.id == favorite_data.product_id).first()
     if not product:
         raise HTTPException(
@@ -57,7 +56,6 @@ async def add_to_favorites(
             detail="Product not found"
         )
     
-    # Проверяем не добавлен ли уже товар в избранное
     existing_favorite = db.query(Favorite).filter(
         Favorite.user_id == current_user.id,
         Favorite.product_id == favorite_data.product_id
@@ -69,7 +67,6 @@ async def add_to_favorites(
             detail="Product already in favorites"
         )
     
-    # Создаем запись в избранном
     favorite = Favorite(
         user_id=current_user.id,
         product_id=favorite_data.product_id

@@ -77,34 +77,27 @@ class MinIOClient:
     async def upload_image_file(self, file) -> str:
         """Загружает файл изображения в MinIO"""
         try:
-            # Читаем файл
             contents = await file.read()
             
-            # Проверяем размер
-            MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+            MAX_FILE_SIZE = 10 * 1024 * 1024
             if len(contents) > MAX_FILE_SIZE:
                 raise HTTPException(
                     status_code=400,
                     detail=f"File too large. Max size: {MAX_FILE_SIZE // 1024 // 1024}MB"
                 )
             
-            # Обрабатываем изображение
             image = Image.open(io.BytesIO(contents))
             
-            # Конвертируем в RGB если нужно
             if image.mode in ('RGBA', 'LA', 'P'):
                 image = image.convert('RGB')
             
-            # Сохраняем в буфер как JPEG
             output_buffer = io.BytesIO()
             image.save(output_buffer, "JPEG", quality=85, optimize=True)
             output_buffer.seek(0)
             
-            # Генерируем уникальное имя файла
-            file_extension = ".jpg"  # Всегда сохраняем как JPEG
+            file_extension = ".jpg" 
             filename = f"{uuid.uuid4()}{file_extension}"
             
-            # Загружаем в MinIO
             self.client.put_object(
                 bucket_name=self.bucket_name,
                 object_name=filename,
@@ -128,7 +121,6 @@ class MinIOClient:
             if not image_url:
                 return False
                 
-            # Извлекаем имя файла из URL
             filename = image_url.split('/')[-1]
             
             if not filename:
@@ -149,22 +141,18 @@ class MinIOClient:
         if not image_url:
             return ""
             
-        # Если это уже полный URL, возвращаем как есть
         if image_url.startswith(('http://', 'https://')):
             return image_url
             
-        # Иначе генерируем URL через MinIO
         filename = image_url.split('/')[-1]
         try:
-            # Генерируем presigned URL на 7 дней
             return self.client.presigned_get_object(
                 self.bucket_name,
                 filename,
-                expires=604800  # 7 дней
+                expires=604800 
             )
         except S3Error:
-            # Если не получилось, возвращаем исходный путь
+
             return image_url
 
-# Создаем глобальный клиент MinIO
 minio_client = MinIOClient()

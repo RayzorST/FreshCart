@@ -31,4 +31,3 @@ def delete_image(image_url: str) -> None:
         minio_client.delete_image(image_url)
     except Exception as e:
         print(f"Error deleting image: {e}")
-        # Не выбрасываем исключение при удалении, чтобы не ломать основной flow

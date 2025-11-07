@@ -10,15 +10,11 @@ from app.models.user import Role
 from app.services.rabbitmq_consumer import message_consumer
 from app.api.endpoints import auth, products, orders, cart, addresses, images, favorites, promotions, analysis
 
-
-
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Создание таблиц БД
 Base.metadata.create_all(bind=engine)
 
 def create_initial_role():
@@ -48,7 +44,8 @@ app.add_middleware(
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "http://10.0.2.2:8000",
-        "http://192.168.1.100:8000"
+        "http://192.168.1.100:8000",
+        "https://freshcart.cloudpub.ru"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -75,7 +72,6 @@ async def startup_event():
     logger = logging.getLogger(__name__)
     logger.info("🚀 Starting Food Marketplace API...")
     
-    # Запуск consumers RabbitMQ в отдельном потоке
     consumer_thread = threading.Thread(
         target=message_consumer.start_consumers,
         daemon=True,
@@ -100,7 +96,6 @@ async def health_check():
     from app.models.database import SessionLocal
     from sqlalchemy import text
     
-    # Проверка БД
     db_status = "connected"
     try:
         db = SessionLocal()
@@ -109,7 +104,6 @@ async def health_check():
     except Exception:
         db_status = "disconnected"
     
-    # Проверка RabbitMQ
     rabbitmq_status = "connected"
     try:
         from app.services.rabbitmq import rabbitmq_client
@@ -121,35 +115,5 @@ async def health_check():
         "status": "healthy",
         "database": db_status,
         "rabbitmq": rabbitmq_status
-    }
-
-@app.get("/debug/models")
-async def debug_models():
-    from app.models.user import User
-    from app.models.order import Order
-    return {
-        "user_model": str(User),
-        "order_model": str(Order),
-        "status": "models_loaded"
-    }
-
-# Тестовый эндпоинт для проверки RabbitMQ
-@app.post("/test-message")
-async def test_message(queue: str = "image_processing"):
-    """Эндпоинт для тестирования отправки сообщений"""
-    from app.services.rabbitmq import rabbitmq_client
-    
-    test_message = {
-        "type": "test",
-        "message": "Hello from FastAPI!",
-        "timestamp": "2024-01-01T00:00:00Z"
-    }
-    
-    rabbitmq_client.publish_message(queue, test_message)
-    
-    return {
-        "status": "message_sent",
-        "queue": queue,
-        "message": test_message
     }
 

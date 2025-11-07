@@ -17,7 +17,6 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(100), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     first_name = Column(String(100))
     last_name = Column(String(100))
@@ -30,7 +29,6 @@ class User(Base):
     
     role = relationship("Role", back_populates="users")
     analysis_history = relationship("AnalysisHistory", back_populates="user")
-    #settings = relationship("UserSettings", back_populates="user", uselist=False)
 
     def verify_password(self, password: str) -> bool:
         return verify_password(password, self.password_hash)

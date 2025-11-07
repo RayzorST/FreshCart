@@ -19,13 +19,11 @@ async def create_order(
     current_user: User = Depends(get_current_user)
 ):
     """Создание нового заказа"""
-    
-    # Проверяем наличие товаров и рассчитываем общую сумму
+
     total_amount = 0
     order_items = []
     
     for item in order_data.items:
-        # Проверяем существование товара
         product = db.query(Product).filter(
             Product.id == item.product_id,
             Product.is_active == True
@@ -37,17 +35,14 @@ async def create_order(
                 detail=f"Product with id {item.product_id} not found"
             )
         
-        # Проверяем доступное количество
         if product.stock_quantity < item.quantity:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Not enough stock for product {product.name}. Available: {product.stock_quantity}"
             )
         
-        # Суммируем общую стоимость
         total_amount += item.price * item.quantity
         
-        # Создаем OrderItem
         order_item = OrderItem(
             product_id=item.product_id,
             quantity=item.quantity,
@@ -55,7 +50,6 @@ async def create_order(
         )
         order_items.append(order_item)
     
-    # Создаем заказ
     order = Order(
         user_id=current_user.id,
         shipping_address=order_data.shipping_address,
@@ -65,15 +59,13 @@ async def create_order(
     )
     
     db.add(order)
-    db.flush()  # Получаем ID заказа
+    db.flush() 
     
-    # Добавляем items к заказу
     for order_item in order_items:
         order_item.order_id = order.id
     
     db.add_all(order_items)
-    
-    # Обновляем количество товаров на складе
+
     for item in order_data.items:
         product = db.query(Product).filter(Product.id == item.product_id).first()
         product.stock_quantity -= item.quantity
@@ -94,7 +86,7 @@ async def get_my_orders(
     orders = db.query(Order).filter(
         Order.user_id == current_user.id
     ).options(
-        joinedload(Order.items).joinedload(OrderItem.product)  # ← ВОССТАНОВИТЬ эту строку
+        joinedload(Order.items).joinedload(OrderItem.product) 
     ).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     return orders
@@ -110,7 +102,7 @@ async def get_order(
         Order.id == order_id,
         Order.user_id == current_user.id
     ).options(
-        joinedload(Order.items).joinedload(OrderItem.product)  # ← Добавить и здесь
+        joinedload(Order.items).joinedload(OrderItem.product) 
     ).first()
     
     if not order:
@@ -139,8 +131,7 @@ async def update_order(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Order not found"
         )
-    
-    # Обновляем только переданные поля
+
     update_data = order_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(order, field, value)
@@ -161,7 +152,7 @@ async def cancel_order(
     order = db.query(Order).filter(
         Order.id == order_id,
         Order.user_id == current_user.id,
-        Order.status == 'pending'  # Можно отменить только pending заказы
+        Order.status == 'pending'
     ).first()
     
     if not order:
@@ -169,8 +160,7 @@ async def cancel_order(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Order not found or cannot be cancelled"
         )
-    
-    # Возвращаем товары на склад
+
     for item in order.items:
         product = db.query(Product).filter(Product.id == item.product_id).first()
         if product:

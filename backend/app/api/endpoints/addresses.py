@@ -30,7 +30,6 @@ async def create_address(
 ):
     """Создание нового адреса"""
     
-    # Если это default адрес, снимаем default с других адресов
     if address_data.is_default:
         db.query(Address).filter(
             Address.user_id == current_user.id,
@@ -87,14 +86,12 @@ async def update_address(
             detail="Address not found"
         )
     
-    # Если устанавливаем как default, снимаем default с других адресов
     if address_data.is_default:
         db.query(Address).filter(
             Address.user_id == current_user.id,
             Address.is_default == True
         ).update({"is_default": False})
     
-    # Обновляем только переданные поля
     update_data = address_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(address, field, value)
@@ -144,13 +141,11 @@ async def set_default_address(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Address not found"
         )
-    
-    # Снимаем default со всех адресов пользователя
+
     db.query(Address).filter(
         Address.user_id == current_user.id
     ).update({"is_default": False})
-    
-    # Устанавливаем выбранный адрес как default
+
     address.is_default = True
     db.commit()
     

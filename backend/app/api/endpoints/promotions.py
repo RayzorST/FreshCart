@@ -29,8 +29,7 @@ async def get_promotions(
     
     if promotion_type is not None:
         query = query.filter(Promotion.promotion_type == promotion_type)
-    
-    # Фильтр по датам - показываем только активные по времени
+
     now = datetime.now()
     query = query.filter(Promotion.start_date <= now, Promotion.end_date >= now)
     
@@ -57,14 +56,12 @@ async def create_promotion(
     """Создать новую акцию (только для админов)"""
     try:
         logger.info(f"Creating promotion with data: {promotion_data.dict()}")
-        
-        # Проверяем существование товара-подарка если указан
+
         if promotion_data.promotion_type == PromotionType.GIFT and promotion_data.gift_product_id:
             gift_product = db.query(Product).filter(Product.id == promotion_data.gift_product_id).first()
             if not gift_product:
                 raise HTTPException(status_code=400, detail="Gift product not found")
-        
-        # Создаем акцию
+
         promotion_dict = promotion_data.dict(exclude={'category_ids', 'product_ids'})
         logger.info(f"Promotion dict: {promotion_dict}")
         
@@ -73,8 +70,7 @@ async def create_promotion(
         db.commit()
         db.refresh(promotion)
         logger.info(f"Promotion created with ID: {promotion.id}")
-        
-        # Добавляем категории если указаны
+
         if promotion_data.category_ids:
             logger.info(f"Adding categories: {promotion_data.category_ids}")
             for category_id in promotion_data.category_ids:
@@ -83,8 +79,7 @@ async def create_promotion(
                     category_id=category_id
                 )
                 db.add(promotion_category)
-        
-        # Добавляем товары если указаны
+
         if promotion_data.product_ids:
             logger.info(f"Adding products: {promotion_data.product_ids}")
             for product_id in promotion_data.product_ids:
@@ -132,8 +127,7 @@ async def delete_promotion(
     promotion = db.query(Promotion).filter(Promotion.id == promotion_id).first()
     if not promotion:
         raise HTTPException(status_code=404, detail="Promotion not found")
-    
-    # Удаляем связи с категориями и товарами
+
     db.query(PromotionCategory).filter(PromotionCategory.promotion_id == promotion_id).delete()
     db.query(PromotionProduct).filter(PromotionProduct.promotion_id == promotion_id).delete()
     

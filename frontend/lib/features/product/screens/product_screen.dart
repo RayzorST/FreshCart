@@ -141,7 +141,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
       ),
       body: Column(
         children: [
-          // Изображение товара
           Container(
             width: double.infinity,
             height: 280,
@@ -184,7 +183,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                           ),
                   ),
                 ),
-                // Бейдж акции/скидки (если есть)
                 if (widget.product['discount'] != null)
                   Positioned(
                     top: 16,
@@ -231,7 +229,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Заголовок и категория
                     Row(
                       children: [
                         Expanded(
@@ -264,7 +261,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                             ],
                           ),
                         ),
-                        // Иконка избранного
                         IconButton(
                           onPressed: _isLoadingFavorite ? null : _toggleFavorite,
                           icon: _isLoadingFavorite
@@ -286,7 +282,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                     
                     const SizedBox(height: 24),
                     
-                    // Цена и рейтинг
                     Row(
                       children: [
                         Text(
@@ -297,7 +292,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                           ),
                         ),
                         const Spacer(),
-                        // Рейтинг (если есть)
                         if (widget.product['rating'] != null)
                           Row(
                             children: [
@@ -321,7 +315,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                     
                     const SizedBox(height: 8),
                     
-                    // Наличие на складе
                     Row(
                       children: [
                         Icon(
@@ -344,7 +337,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                     
                     const SizedBox(height: 32),
                     
-                    // Описание
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -368,7 +360,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                     
                     const SizedBox(height: 32),
                     
-                    // Характеристики (если есть)
                     if (widget.product['characteristics'] != null)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,7 +398,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
             ),
           ),
           
-          // Нижняя панель с управлением корзиной
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -422,7 +412,7 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
             child: SafeArea(
               top: false,
               child: Container(
-                width: double.infinity, // ← Занимает всю ширину
+                width: double.infinity, 
                 decoration: BoxDecoration(
                   border: Border.all(
                     width: 2,
@@ -433,7 +423,6 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Кнопка уменьшения
                     IconButton(
                       onPressed: _isLoadingCart || _quantity == 0 ? null : () {
                         _updateCartQuantity(_quantity - 1);
@@ -447,8 +436,7 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                       ),
                       padding: const EdgeInsets.all(16),
                     ),
-                    
-                    // Количество
+
                     _isLoadingCart
                         ? SizedBox(
                             width: 20,
@@ -477,8 +465,7 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
                               ),
                             ],
                           ),
-                    
-                    // Кнопка увеличения
+
                     IconButton(
                       onPressed: _isLoadingCart || !isAvailable || _quantity >= maxQuantity ? null : () {
                         _updateCartQuantity(_quantity + 1);

@@ -69,7 +69,6 @@ async def add_to_cart(
     current_user: User = Depends(get_current_user)
 ):
     """Добавление товара в корзину"""
-    # Проверяем существование товара
     product = db.query(Product).filter(
         Product.id == cart_item_data.product_id,
         Product.is_active == True
@@ -81,20 +80,17 @@ async def add_to_cart(
             detail="Product not found"
         )
     
-    # Проверяем есть ли уже товар в корзине
     existing_item = db.query(CartItem).filter(
         CartItem.user_id == current_user.id,
         CartItem.product_id == cart_item_data.product_id
     ).first()
     
     if existing_item:
-        # Обновляем количество если товар уже в корзине
         existing_item.quantity += cart_item_data.quantity
         db.commit()
         db.refresh(existing_item)
         return existing_item
     else:
-        # Добавляем новый товар в корзину
         cart_item = CartItem(
             user_id=current_user.id,
             product_id=cart_item_data.product_id,

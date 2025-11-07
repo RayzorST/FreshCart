@@ -79,10 +79,10 @@ class ApiClient {
     return _handleResponse(response);
   }
 
-  static Future<Map<String, dynamic>> register(
+  static Future<Map<String, dynamic>> registration(
     String username, String email, String password, String firstName, String lastName) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/auth/register'),
+      Uri.parse('$baseUrl/auth/registration'),
       headers: _headers,
       body: json.encode({
         'username': username,

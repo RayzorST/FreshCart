@@ -51,9 +51,6 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
   }
 
   Future<void> _initializeApp() async {
-    // Короткая задержка чтобы нативный черный экран был виден
-    await Future.delayed(const Duration(milliseconds: 100));
-    
     if (mounted) {
       setState(() {
         _showSplash = false;
@@ -63,7 +60,6 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
 
   @override
   Widget build(BuildContext context) {
-    // Сначала показываем черный экран, потом ваш сплеш
     if (_showSplash) {
       return Container(color: Colors.black);
     }
@@ -89,10 +85,9 @@ class _MainAppState extends ConsumerState<_MainApp> {
   }
 
   Future<void> _initializeApp() async {
-    // Ждем инициализации провайдеров
     await Future.wait([
       _waitForAuth(),
-      Future.delayed(const Duration(seconds: 2)), // Время показа вашего сплеша
+      Future.delayed(const Duration(seconds: 2)),
     ]);
 
     if (mounted) {
@@ -105,17 +100,14 @@ class _MainAppState extends ConsumerState<_MainApp> {
   Future<void> _waitForAuth() async {
     await Future.delayed(const Duration(milliseconds: 500));
     final authState = ref.read(authProvider);
-    print('Auth state: $authState');
   }
 
   @override
   Widget build(BuildContext context) {
-    // Показываем ваш кастомный сплеш пока приложение инициализируется
     if (!_isAppInitialized) {
       return const SplashScreen();
     }
 
-    // Когда все готово - показываем основное приложение
     return _AppWithRouter();
   }
 }
