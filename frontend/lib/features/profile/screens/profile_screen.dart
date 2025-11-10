@@ -33,7 +33,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading profile: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -177,7 +176,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       child: Column(
         children: [
-          // Аватар с инициалами
           Container(
             width: 80,
             height: 80,
@@ -217,7 +215,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           
           const SizedBox(height: 4),
           
-          // Email
           Text(
             _userData?['email'] ?? 'email@example.com',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -227,7 +224,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           
           const SizedBox(height: 16),
           
-          // Статистика
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -324,7 +320,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             TextButton(
               onPressed: () {
                 final authNotifier = ref.read(authProvider.notifier);
-                // Очищаем токен и переходим на логин
                 authNotifier.clearToken();
                 Navigator.of(context).pop();
                 context.go('/login');

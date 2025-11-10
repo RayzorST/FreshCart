@@ -32,9 +32,8 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
       setState(() => _isLoadingFavorite = true);
       final response = await ApiClient.checkFavorite(widget.product['id']);
       setState(() => _isFavorite = response['is_favorite'] ?? false);
-    } catch (e) {
-      print('Error checking favorite: $e');
-    } finally {
+    } catch (e) {} 
+    finally {
       setState(() => _isLoadingFavorite = false);
     }
   }
@@ -52,9 +51,7 @@ class _ProductScreenState extends ConsumerState<ProductScreen> {
       if (cartItem != null) {
         setState(() => _quantity = cartItem['quantity'] ?? 0);
       }
-    } catch (e) {
-      print('Error loading cart quantity: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _toggleFavorite() async {

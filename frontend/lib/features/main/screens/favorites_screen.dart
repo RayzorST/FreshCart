@@ -31,7 +31,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading favorites: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -85,7 +84,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Избранное'),
+        title: Text(
+          'Избранное',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

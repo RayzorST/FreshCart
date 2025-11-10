@@ -327,8 +327,6 @@ async def set_product_tags(
     db.commit()
     return new_tags
 
-# ===== ПОИСК ПРОДУКТОВ ПО ТЕГАМ =====
-
 @router.get("/search/by-tags", response_model=List[ProductResponse])
 async def search_products_by_tags(
     tags: List[str] = Query(..., description="Список тегов для поиска"),

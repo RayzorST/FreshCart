@@ -27,7 +27,6 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading addresses: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -104,13 +103,10 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Список существующих адресов
         if (_addresses != null && _addresses!.isNotEmpty) ...[
           ..._addresses!.map((address) => _buildAddressCard(context, address)),
           const SizedBox(height: 16),
         ],
-        
-        // Карточка для добавления нового адреса
         _buildAddAddressCard(context),
       ],
     );

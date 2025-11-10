@@ -28,7 +28,6 @@ class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading orders: $e');
       setState(() => _isLoading = false);
     }
   }

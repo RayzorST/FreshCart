@@ -42,8 +42,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'promo_notifications': _promoNotifications,
       });
     } catch (e) {
-      print('Error updating notification settings: $e');
-      // Откатываем изменения в случае ошибки
       setState(() {
         _orderNotifications = !_orderNotifications;
         _promoNotifications = !_promoNotifications;
@@ -187,7 +185,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-// Экран редактирования профиля
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -219,7 +216,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading profile: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка загрузки профиля: $e')),
       );
@@ -243,7 +239,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
         Navigator.pop(context);
       } catch (e) {
-        print('Error saving profile: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка сохранения: $e')),
         );
@@ -349,7 +344,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 }
 
-// Диалог смены пароля
 class ChangePasswordDialog extends StatefulWidget {
   const ChangePasswordDialog({super.key});
 
@@ -382,7 +376,6 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
         );
         Navigator.pop(context);
       } catch (e) {
-        print('Error changing password: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка смены пароля: $e')),
         );

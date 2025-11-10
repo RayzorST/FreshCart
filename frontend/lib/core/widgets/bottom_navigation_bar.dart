@@ -9,66 +9,77 @@ class CustomBottomNavigationBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(currentIndexProvider);
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      height: 77,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-            width: 1,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 66,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildNavItem(
+                  context: context,
+                  icon: Icons.home,
+                  label: 'Главная',
+                  index: 0,
+                  currentIndex: currentIndex,
+                  onTap: () => ref.read(currentIndexProvider.notifier).state = 0,
+                ),
+                _buildNavItem(
+                  context: context,
+                  icon: Icons.shopping_cart,
+                  label: 'Корзина',
+                  index: 1,
+                  currentIndex: currentIndex,
+                  onTap: () => ref.read(currentIndexProvider.notifier).state = 1,
+                ),
+                
+                const SizedBox(width: 60),
+                
+                _buildNavItem(
+                  context: context,
+                  icon: Icons.favorite,
+                  label: 'Избранное',
+                  index: 2,
+                  currentIndex: currentIndex,
+                  onTap: () => ref.read(currentIndexProvider.notifier).state = 2,
+                ),
+                _buildNavItem(
+                  context: context,
+                  icon: Icons.person,
+                  label: 'Профиль',
+                  index: 3,
+                  currentIndex: currentIndex,
+                  onTap: () => ref.read(currentIndexProvider.notifier).state = 3,
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildNavItem(
-              context: context,
-              icon: Icons.home,
-              label: 'Главная',
-              index: 0,
-              currentIndex: currentIndex,
-              onTap: () => ref.read(currentIndexProvider.notifier).state = 0,
-            ),
-            _buildNavItem(
-              context: context,
-              icon: Icons.shopping_cart,
-              label: 'Корзина',
-              index: 1,
-              currentIndex: currentIndex,
-              onTap: () => ref.read(currentIndexProvider.notifier).state = 1,
-            ),
-            
-            const SizedBox(width: 60),
-            
-            _buildNavItem(
-              context: context,
-              icon: Icons.favorite,
-              label: 'Избранное',
-              index: 2,
-              currentIndex: currentIndex,
-              onTap: () => ref.read(currentIndexProvider.notifier).state = 2,
-            ),
-            _buildNavItem(
-              context: context,
-              icon: Icons.person,
-              label: 'Профиль',
-              index: 3,
-              currentIndex: currentIndex,
-              onTap: () => ref.read(currentIndexProvider.notifier).state = 3,
-            ),
-          ],
+        // Область SafeArea с таким же цветом
+        Container(
+          height: bottomPadding,
+          color: Theme.of(context).colorScheme.primaryContainer,
         ),
-      ),
+      ],
     );
   }
 
