@@ -7,8 +7,18 @@ import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/api/client.dart';
 import 'package:go_router/go_router.dart';
 
-class ProductGridSection extends ConsumerWidget {
-  final String selectedCategory;
+class ProductGridSection extends ConsumerStatefulWidget {
+  const ProductGridSection({
+    super.key,
+  });
+
+  @override
+  ConsumerState<ProductGridSection> createState() => _ProductGridSectionState();
+}
+
+class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
+  late TextEditingController _searchController;
+  bool _isControllerInitialized = false;
 
   String _getProductsCountText(int count) {
     if (count % 10 == 1 && count % 100 != 11) {
@@ -19,61 +29,144 @@ class ProductGridSection extends ConsumerWidget {
       return '$count товаров';
     }
   }
-  const ProductGridSection({
-    super.key,
-    required this.selectedCategory,
-  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isControllerInitialized) {
+      final searchQuery = ref.read(searchQueryProvider);
+      _searchController.text = searchQuery;
+      _isControllerInitialized = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    ref.read(searchQueryProvider.notifier).state = value;
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    ref.read(searchQueryProvider.notifier).state = '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsProvider);
 
     return Column(
       children: [
-        _buildProductsHeader(productsAsync, selectedCategory, context),
-        _buildProductsGrid(productsAsync, selectedCategory, context, ref),
+        _buildProductsHeader(productsAsync, context),
+        _buildProductsGrid(productsAsync, context, ref),
       ],
     );
   }
 
   Widget _buildProductsHeader(
     AsyncValue<List<dynamic>> productsAsync,
-    String selectedCategory,
     BuildContext context,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Все продукты',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+    final searchQuery = ref.watch(searchQueryProvider);
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Все продукты',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              productsAsync.when(
+                loading: () => const Text('... товаров'),
+                error: (error, stack) => const Text('0 товаров'),
+                data: (products) {
+                  return Text(
+                    _getProductsCountText(products.length),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                  );
+                },
+              ),
+            ],
           ),
-          productsAsync.when(
-            loading: () => const Text('... товаров'),
-            error: (error, stack) => const Text('0 товаров'),
-            data: (products) {
-              final filteredProducts = selectedCategory == 'Все'
-                  ? products
-                  : products.where((p) => p['category']['name'] == selectedCategory).toList();
-              
-              return Text(
-                _getProductsCountText(filteredProducts.length),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+        ),
+        
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Theme.of(context).colorScheme.surfaceVariant,
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  Icon(
+                    Icons.search,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: _onSearchChanged,
+                      decoration: InputDecoration(
+                        hintText: 'Поиск продуктов...',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
+                        ),
+                      ),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
-              );
-            },
+                  ),
+                  if (searchQuery.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        size: 20,
+                      ),
+                      onPressed: _clearSearch,
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildProductsGrid(
     AsyncValue<List<dynamic>> productsAsync,
-    String selectedCategory,
     BuildContext context,
     WidgetRef ref,
   ) {
@@ -106,11 +199,7 @@ class ProductGridSection extends ConsumerWidget {
         ),
       ),
       data: (products) {
-        final filteredProducts = selectedCategory == 'Все'
-            ? products
-            : products.where((p) => p['category']['name'] == selectedCategory).toList();
-
-        if (filteredProducts.isEmpty) {
+        if (products.isEmpty) {
           return const Center(
             child: Column(
               children: [
@@ -123,18 +212,18 @@ class ProductGridSection extends ConsumerWidget {
         }
 
         return GridView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             childAspectRatio: 0.65,
           ),
-          itemCount: filteredProducts.length,
+          itemCount: products.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
-            final product = filteredProducts[index];
+            final product = products[index];
             return _buildProductCard(product, context, ref);
           },
         );

@@ -24,17 +24,22 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final currentIndex = ref.watch(currentIndexProvider);
     final productsAsync = ref.watch(productsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
-    final selectedCategory = ref.watch(selectedCategoryProvider);
     final promotionsAsync = ref.watch(promotionsListProvider);
     
     final List<Widget> screens = [
-      _buildHomeScreen(productsAsync, categoriesAsync, selectedCategory, promotionsAsync),
+      _buildHomeScreen(productsAsync, categoriesAsync, promotionsAsync),
       const CartScreen(),
       const FavoritesScreen(),
       const ProfileScreen(),
     ];
 
     return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Продуктовый маркет',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
+      ),
       body: screens[currentIndex],
       bottomNavigationBar: const CustomBottomNavigationBar(),
       floatingActionButton: const CameraFAB(),
@@ -45,40 +50,16 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   Widget _buildHomeScreen(
     AsyncValue<List<dynamic>> productsAsync,
     AsyncValue<List<dynamic>> categoriesAsync,
-    String selectedCategory,
     AsyncValue<List<dynamic>> promotionsAsync,
   ) {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          title: Text(
-            'Продуктовый маркет',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          floating: true,
-          snap: true,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                // TODO: Реализовать поиск
-              },
-            ),
-          ],
-        ),
-
-        SliverToBoxAdapter(
-          child: PromotionsSection(),
-        ),
-
-        SliverToBoxAdapter(
-          child: CategoryFilterWidget(),
-        ),
-
-        SliverToBoxAdapter(
-          child: ProductGridSection(selectedCategory: selectedCategory),
-        ),
-      ],
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          PromotionsSection(),
+          CategoryFilterWidget(),
+          ProductGridSection(),
+        ],
+      ),
     );
   }
 }

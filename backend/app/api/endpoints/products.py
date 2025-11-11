@@ -59,6 +59,29 @@ async def get_products(
     products = query.offset(skip).limit(limit).all()
     return products
 
+@router.get("/search", response_model=List[ProductResponse])
+async def search_products(
+    name: Optional[str] = Query(None, min_length=1, max_length=100),
+    category_id: Optional[int] = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """
+    Расширенный поиск продуктов
+    """
+    query = db.query(Product).filter(Product.is_active == True)
+    
+    if name:
+        name_term = f"%{name.strip()}%"
+        query = query.filter(Product.name.ilike(name_term))
+    
+    if category_id:
+        query = query.filter(Product.category_id == category_id)
+    
+    products = query.offset(offset).limit(limit).all()
+    return products
+
 @router.get("/items/{product_id}", response_model=ProductResponse)
 async def get_product(
     product_id: int,

@@ -42,7 +42,7 @@ class CategoryFilterWidget extends ConsumerWidget {
           crossAxisCount: 3,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.0, // квадратные карточки
+          childAspectRatio: 1.0,
         ),
         itemCount: 6,
         itemBuilder: (context, index) {
@@ -54,7 +54,7 @@ class CategoryFilterWidget extends ConsumerWidget {
             child: Column(
               children: [
                 Container(
-                  height: 80, // контейнер для изображения
+                  height: 80,
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
@@ -114,6 +114,7 @@ class CategoryFilterWidget extends ConsumerWidget {
     WidgetRef ref, 
     BuildContext context,
   ) {
+    // Создаем список категорий с добавлением "Все"
     final allCategories = [
       {
         'id': 0,
@@ -132,12 +133,13 @@ class CategoryFilterWidget extends ConsumerWidget {
           crossAxisCount: 3,
           crossAxisSpacing: 3,
           mainAxisSpacing: 3,
-          childAspectRatio: 1.0, // идеальный квадрат
+          childAspectRatio: 1.0,
         ),
         itemCount: allCategories.length,
         itemBuilder: (context, index) {
           final category = allCategories[index];
-          final isSelected = selectedCategory == category['name'];
+          // Используем ID для сравнения выбранной категории
+          final isSelected = selectedCategory == category['id'].toString();
           
           return _buildCategoryCard(category, isSelected, ref, context);
         },
@@ -162,16 +164,18 @@ class CategoryFilterWidget extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          ref.read(selectedCategoryProvider.notifier).state = category['name'];
+          // Устанавливаем ID категории и обновляем продукты
+          ref.read(selectedCategoryProvider.notifier).state = category['id'].toString();
+          // Сбрасываем поисковый запрос при выборе категории
+          ref.read(searchQueryProvider.notifier).state = '';
         },
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Контейнер для изображения как у товаров
               Container(
-                height: 70, // занимает большую часть карточки
+                height: 70,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
@@ -219,7 +223,6 @@ class CategoryFilterWidget extends ConsumerWidget {
                           ),
               ),
               const SizedBox(height: 2),
-              // Название категории
               Expanded(
                 child: Text(
                   category['name'],

@@ -21,7 +21,6 @@ class PromotionsSection extends ConsumerWidget {
     final promotionsAsync = ref.watch(promotionsListProvider);
 
     return Column(
-      spacing: 20,
       children: [
         _buildPromotionsHeader(promotionsAsync, context),
         _buildPromotionsContent(promotionsAsync, context),

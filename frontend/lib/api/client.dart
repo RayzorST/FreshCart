@@ -116,6 +116,39 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  static Future<List<dynamic>> searchProducts({
+    String? name,
+    int? categoryId,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final params = <String, String>{
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+    };
+    
+    if (name != null && name.isNotEmpty) {
+      params['name'] = name;
+    }
+    
+    if (categoryId != null) {
+      params['category_id'] = categoryId.toString();
+    }
+    
+    final uri = Uri.parse('$baseUrl/products/search').replace(queryParameters: params);
+    
+    print('🔍 Search URL: $uri'); 
+    
+    final response = await http.get(
+      uri,
+      headers: _headers,
+    );
+    
+    print('📡 Search response status: ${response.statusCode}');
+    
+    return _handleResponse(response);
+  }
+
   static Future<List<dynamic>> getCategories() async {
     final response = await http.get(
       Uri.parse('$baseUrl/products/categories'),
