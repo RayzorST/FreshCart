@@ -55,7 +55,7 @@ class PromotionsSection extends ConsumerWidget {
 
   Widget _buildPromotionsContent(AsyncValue<List<dynamic>> promotionsAsync, BuildContext context) {
     return SizedBox(
-      height: 95,
+      height: 85,
       child: promotionsAsync.when(
         loading: () => _buildPromotionsLoading(),
         error: (error, stack) => _buildPromotionsError(error, context),
@@ -156,7 +156,7 @@ class PromotionsSection extends ConsumerWidget {
 
     return ListView.builder(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 6),
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
       itemCount: promotions.length,
       itemBuilder: (context, index) {
         final promotion = promotions[index];

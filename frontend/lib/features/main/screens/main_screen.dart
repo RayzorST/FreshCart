@@ -34,12 +34,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Продуктовый маркет',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-      ),
       body: screens[currentIndex],
       bottomNavigationBar: const CustomBottomNavigationBar(),
       floatingActionButton: const CameraFAB(),
@@ -52,14 +46,22 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     AsyncValue<List<dynamic>> categoriesAsync,
     AsyncValue<List<dynamic>> promotionsAsync,
   ) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          PromotionsSection(),
-          CategoryFilterWidget(),
-          ProductGridSection(),
-        ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Продуктовый маркет',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
       ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            PromotionsSection(),
+            CategoryFilterWidget(),
+            ProductGridSection(),
+          ],
+        ),
+      )
     );
   }
 }

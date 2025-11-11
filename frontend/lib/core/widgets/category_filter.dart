@@ -125,7 +125,7 @@ class CategoryFilterWidget extends ConsumerWidget {
     ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -164,9 +164,7 @@ class CategoryFilterWidget extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // Устанавливаем ID категории и обновляем продукты
           ref.read(selectedCategoryProvider.notifier).state = category['id'].toString();
-          // Сбрасываем поисковый запрос при выборе категории
           ref.read(searchQueryProvider.notifier).state = '';
         },
         child: Padding(
