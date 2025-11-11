@@ -166,6 +166,7 @@ class CategoryFilterWidget extends ConsumerWidget {
         onTap: () {
           ref.read(selectedCategoryProvider.notifier).state = category['id'].toString();
           ref.read(searchQueryProvider.notifier).state = '';
+          ref.refresh(productsProvider);
         },
         child: Padding(
           padding: const EdgeInsets.all(8),

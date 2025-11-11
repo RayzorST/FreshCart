@@ -5,8 +5,6 @@ import 'package:client/features/main/screens/favorites_screen.dart';
 import 'package:client/features/profile/screens/profile_screen.dart';
 import 'package:client/core/widgets/bottom_navigation_bar.dart';
 import 'package:client/core/widgets/camera_fab.dart';
-import 'package:client/core/providers/products_provider.dart';
-import 'package:client/core/providers/promotions_provider.dart'; 
 import 'package:client/core/widgets/category_filter.dart';
 import 'package:client/core/widgets/product_section.dart';
 import 'package:client/core/widgets/promotions_section.dart';
@@ -22,12 +20,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(currentIndexProvider);
-    final productsAsync = ref.watch(productsProvider);
-    final categoriesAsync = ref.watch(categoriesProvider);
-    final promotionsAsync = ref.watch(promotionsListProvider);
     
     final List<Widget> screens = [
-      _buildHomeScreen(productsAsync, categoriesAsync, promotionsAsync),
+      _buildHomeScreen(), 
       const CartScreen(),
       const FavoritesScreen(),
       const ProfileScreen(),
@@ -41,11 +36,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     );
   }
 
-  Widget _buildHomeScreen(
-    AsyncValue<List<dynamic>> productsAsync,
-    AsyncValue<List<dynamic>> categoriesAsync,
-    AsyncValue<List<dynamic>> promotionsAsync,
-  ) {
+  Widget _buildHomeScreen() { 
     return Scaffold(
       appBar: AppBar(
         title: Text(

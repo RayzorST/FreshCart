@@ -54,27 +54,34 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
 
   void _onSearchChanged(String value) {
     ref.read(searchQueryProvider.notifier).state = value;
+    ref.read(productsProvider.notifier).refresh();
   }
 
   void _clearSearch() {
     _searchController.clear();
     ref.read(searchQueryProvider.notifier).state = '';
+    ref.read(productsProvider.notifier).refresh();
+  }
+
+  void _loadMoreProducts() {
+    print('🔄 Loading more products...');
+    ref.read(productsProvider.notifier).loadMore();
   }
 
   @override
   Widget build(BuildContext context) {
-    final productsAsync = ref.watch(productsProvider);
+    final productsState = ref.watch(productsProvider);
 
     return Column(
       children: [
-        _buildProductsHeader(productsAsync, context),
-        _buildProductsGrid(productsAsync, context, ref),
+        _buildProductsHeader(productsState, context),
+        _buildProductsGrid(productsState, context, ref),
       ],
     );
   }
 
   Widget _buildProductsHeader(
-    AsyncValue<List<dynamic>> productsAsync,
+    ProductsState productsState,
     BuildContext context,
   ) {
     final searchQuery = ref.watch(searchQueryProvider);
@@ -90,18 +97,17 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
                 'Все продукты',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
-              productsAsync.when(
-                loading: () => const Text('... товаров'),
-                error: (error, stack) => const Text('0 товаров'),
-                data: (products) {
-                  return Text(
-                    _getProductsCountText(products.length),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                        ),
-                  );
-                },
-              ),
+              if (productsState.isLoading && productsState.products.isEmpty)
+                const Text('... товаров')
+              else if (productsState.error != null && productsState.products.isEmpty)
+                const Text('0 товаров')
+              else
+                Text(
+                  _getProductsCountText(productsState.products.length),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                ),
             ],
           ),
         ),
@@ -166,13 +172,19 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
   }
 
   Widget _buildProductsGrid(
-    AsyncValue<List<dynamic>> productsAsync,
+    ProductsState productsState,
     BuildContext context,
     WidgetRef ref,
   ) {
-    return productsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(
+    final isLoadingMore = ref.watch(productsLoadingMoreProvider);
+    final hasMore = ref.watch(hasMoreProductsProvider);
+
+    if (productsState.isLoading && productsState.products.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (productsState.error != null && productsState.products.isEmpty) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -184,7 +196,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
             ),
             const SizedBox(height: 8),
             Text(
-              error.toString(),
+              productsState.error!,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[500],
@@ -192,26 +204,29 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.invalidate(productsProvider),
+              onPressed: () => ref.read(productsProvider.notifier).refresh(),
               child: const Text('Повторить'),
             ),
           ],
         ),
-      ),
-      data: (products) {
-        if (products.isEmpty) {
-          return const Center(
-            child: Column(
-              children: [
-                Icon(Icons.search_off, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('Товары не найдены'),
-              ],
-            ),
-          );
-        }
+      );
+    }
 
-        return GridView.builder(
+    if (productsState.products.isEmpty) {
+      return const Center(
+        child: Column(
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Товары не найдены'),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        GridView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
@@ -219,15 +234,51 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
             mainAxisSpacing: 12,
             childAspectRatio: 0.65,
           ),
-          itemCount: products.length,
+          itemCount: productsState.products.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
-            final product = products[index];
+            final product = productsState.products[index];
             return _buildProductCard(product, context, ref);
           },
-        );
-      },
+        ),
+        
+        // Индикатор загрузки следующих товаров
+        if (isLoadingMore)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        
+        // Кнопка для загрузки следующих товаров
+        if (hasMore && !isLoadingMore && productsState.products.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              onPressed: _loadMoreProducts,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('Загрузить еще товары'),
+            ),
+          ),
+        
+        // Сообщение что товары закончились
+        if (!hasMore && productsState.products.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Все товары загружены',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
