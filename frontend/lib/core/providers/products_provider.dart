@@ -1,11 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
+final isCategoriesExpandedProvider = StateProvider<bool>((ref) => false);
 
 final productsPageProvider = StateProvider<int>((ref) => 1);
 final hasMoreProductsProvider = StateProvider<bool>((ref) => true);
 final productsLoadingMoreProvider = StateProvider<bool>((ref) => false);
+
+// Провайдер для SharedPreferences
+final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
+  return await SharedPreferences.getInstance();
+});
 
 class ProductsState {
   final List<dynamic> products;

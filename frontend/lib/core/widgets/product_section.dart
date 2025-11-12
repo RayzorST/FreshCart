@@ -272,7 +272,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Все товары загружены',
+              'Товары кончились :(',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Colors.grey[600],
               ),

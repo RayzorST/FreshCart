@@ -156,7 +156,7 @@ class PromotionsSection extends ConsumerWidget {
 
     return ListView.builder(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
+      padding: const EdgeInsets.only(left: 16, right: 16),
       itemCount: promotions.length,
       itemBuilder: (context, index) {
         final promotion = promotions[index];

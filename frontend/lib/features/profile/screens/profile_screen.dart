@@ -131,6 +131,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       
                       const SizedBox(height: 16),
                       Card(
+                        elevation: 0,
                         child: ListTile(
                           leading: Icon(
                             Icons.logout,
@@ -266,6 +267,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required VoidCallback onTap,
   }) {
     return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Container(

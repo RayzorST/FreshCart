@@ -18,18 +18,13 @@ class AuthNotifier extends StateNotifier<String?> {
       if (token != null) {
         state = token;
         ApiClient.setToken(token);
-        print('Token loaded from storage: ${token}');
       } else {
-        print('No token found in storage');
         ApiClient.clearToken();
       }
       try {
         await ApiClient.getProfile();
-        print('Token is valid');
       } catch (e) {
-        // Если получили 401 - очищаем токен
         if (e.toString().contains('401') || e.toString().contains('Требуется авторизация')) {
-          print('Token is invalid, clearing...');
           await clearToken();
         } else {
           rethrow;
@@ -37,7 +32,6 @@ class AuthNotifier extends StateNotifier<String?> {
       }
       await ApiClient.getProfile();
     } catch (e) {
-      print('Error loading token: $e');
     } finally {
       _isLoading = false;
     }
@@ -67,7 +61,6 @@ final authProvider = StateNotifierProvider<AuthNotifier, String?>((ref) {
   return AuthNotifier();
 });
 
-// Добавьте провайдер для проверки статуса загрузки
 final authLoadingProvider = Provider<bool>((ref) {
   final authNotifier = ref.watch(authProvider.notifier);
   return authNotifier.isLoading;
