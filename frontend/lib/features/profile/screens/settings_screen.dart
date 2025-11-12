@@ -140,6 +140,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required Function(bool) onChanged,
   }) {
     return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         title: Text(title),
@@ -158,6 +159,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required VoidCallback onTap,
   }) {
     return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(icon, color: Theme.of(context).colorScheme.primary),

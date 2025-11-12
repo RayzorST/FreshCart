@@ -50,7 +50,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         ),
       );
     } catch (e) {
-      print('Error removing favorite: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Ошибка: $e'),
@@ -188,7 +187,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final productId = product['id'] as int;
 
     return Card(
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),

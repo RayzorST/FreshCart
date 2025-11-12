@@ -62,6 +62,7 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
   void _showDeleteDialog(int addressId, String addressTitle) {
     showDialog(
       context: context,
+      barrierColor: Colors.grey.withOpacity(0.2),
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Удаление адреса'),
@@ -116,6 +117,7 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
     final isDefault = address['is_default'] ?? false;
     
     return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Container(
@@ -193,6 +195,7 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
 
   Widget _buildAddAddressCard(BuildContext context) {
     return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
       color: Theme.of(context).colorScheme.surfaceVariant,
       child: ListTile(
@@ -241,6 +244,7 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
 
     showDialog(
       context: context,
+      barrierColor: Colors.grey.withOpacity(0.2),
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
@@ -336,6 +340,7 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
 
     showDialog(
       context: context,
+      barrierColor: Colors.grey.withOpacity(0.2),
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(

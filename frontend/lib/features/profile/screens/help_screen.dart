@@ -47,6 +47,7 @@ class HelpScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Icon(icon, color: Theme.of(context).colorScheme.primary),

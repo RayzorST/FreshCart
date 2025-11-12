@@ -27,6 +27,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     _loadCart();
   }
 
+  String _getProductsCountText(int count) {
+    if (count % 10 == 1 && count % 100 != 11) {
+      return '$count товар';
+    } else if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) {
+      return '$count товара';
+    } else {
+      return '$count товаров';
+    }
+  }
+
   Future<void> _loadCart() async {
     try {
       setState(() {
@@ -116,19 +126,84 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   }
 
   Future<void> _updateCartItem(int productId, int quantity) async {
+    final previousQuantity = _getCurrentQuantity(productId);
     try {
+      // Сохраняем предыдущее значение для отката
+      
+      // Оптимистичное обновление UI
+      setState(() {
+        _updateLocalQuantity(productId, quantity);
+        _updateTotalAmount();
+      });
+
       if (quantity == 0) {
         await ref.read(cartProvider.notifier).removeFromCart(productId);
       } else {
         await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
       }
-      //await Future.delayed(const Duration(milliseconds: 100));
-      await _loadCart();
+
     } catch (e) {
+      // Откатываем изменения при ошибке
+      setState(() {
+        _updateLocalQuantity(productId, previousQuantity);
+        _updateTotalAmount();
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обновления: $e')),
+        SnackBar(
+          content: Text('Ошибка обновления: $e'),
+          action: SnackBarAction(
+            label: 'Повторить',
+            onPressed: () => _updateCartItem(productId, quantity),
+          ),
+        ),
       );
     }
+  }
+
+  void _updateLocalQuantity(int productId, int quantity) {
+    final index = _cartItems.indexWhere(
+      (item) => _convertToSafeMap(item)['product_id'] == productId
+    );
+    
+    if (index != -1) {
+      final item = _convertToSafeMap(_cartItems[index]);
+      if (quantity == 0) {
+        _cartItems.removeAt(index);
+      } else {
+        _cartItems[index] = {...item, 'quantity': quantity};
+      }
+    }
+  }
+
+  int _getCurrentQuantity(int productId) {
+    final index = _cartItems.indexWhere(
+      (item) => _convertToSafeMap(item)['product_id'] == productId
+    );
+    if (index != -1) {
+      return (_convertToSafeMap(_cartItems[index])['quantity'] as num).toInt();
+    }
+    return 0;
+  }
+
+  void _updateTotalAmount() {
+    double newTotal = 0.0;
+    double newOriginalTotal = 0.0;
+    
+    for (var item in _cartItems) {
+      final itemMap = _convertToSafeMap(item);
+      final quantity = (itemMap['quantity'] as num).toInt();
+      final price = (itemMap['display_price'] as num).toDouble();
+      final originalPrice = (itemMap['original_price'] as num?)?.toDouble() ?? price;
+      
+      newTotal += price * quantity;
+      newOriginalTotal += originalPrice * quantity;
+    }
+    
+    setState(() {
+      _totalAmount = newTotal;
+      _originalTotalAmount = newOriginalTotal;
+    });
   }
 
   void _navigateToPromotionScreen(List<dynamic> appliedPromotions, BuildContext context) {
@@ -306,15 +381,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    _cartItems.length.toString(),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    "${_getProductsCountText(_cartItems.length)}",
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
                 ),
@@ -412,20 +484,20 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   }
 
   Widget _buildCartWithItems() {
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _cartItems.length,
-            itemBuilder: (context, index) {
-              final item = _cartItems[index];
-              final itemMap = _convertToSafeMap(item);
-              return _buildCartItem(itemMap);
-            },
-          ),
-        ),
+        // Список товаров
+        ..._cartItems.map((item) {
+          final itemMap = _convertToSafeMap(item);
+          return _buildCartItem(itemMap);
+        }).toList(),
+        
+        // Карточка с итогами
         _buildOrderSummary(),
+        
+        // Отступ снизу
+        const SizedBox(height: 20),
       ],
     );
   }
@@ -439,7 +511,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -612,101 +684,211 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final hasDiscount = _originalTotalAmount > _totalAmount;
     final totalSavings = _originalTotalAmount - _totalAmount;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+    return Card(
+      margin: const EdgeInsets.all(0),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        children: [
-          if (hasDiscount) ...[
-            _buildSummaryRow('Сумма без скидок', '${_originalTotalAmount.toStringAsFixed(2)} ₽'),
-            _buildSummaryRow('Скидка', '-${totalSavings.toStringAsFixed(2)} ₽', isDiscount: true),
-            const SizedBox(height: 8),
-            const Divider(),
-            const SizedBox(height: 8),
-          ],
-          _buildSummaryRow(
-            'Итого к оплате',
-            '${_totalAmount.toStringAsFixed(2)} ₽',
-            isTotal: true,
-            isDiscounted: hasDiscount,
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isCreatingOrder ? null : _createOrder,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Заголовок раздела
+            Row(
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
                 ),
-              ),
-              child: _isCreatingOrder
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                      ),
-                    )
-                  : Text(
-                      'Оформить заказ',
-                      style: TextStyle(
-                        fontSize: 16,
+                const SizedBox(width: 8),
+                Text(
+                  'Детали заказа',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
-                    ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            
+            // Разделитель
+            Divider(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              height: 1,
+            ),
+            const SizedBox(height: 16),
+            
+            // Список стоимостей
+            Column(
+              children: [
+                if (hasDiscount) ...[
+                  _buildSummaryRow(
+                    'Сумма товаров',
+                    '${_originalTotalAmount.toStringAsFixed(2)} ₽',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSummaryRow(
+                    'Ваша скидка',
+                    '-${totalSavings.toStringAsFixed(2)} ₽',
+                    valueColor: Colors.green,
+                    icon: Icons.discount_outlined,
+                  ),
+                  const SizedBox(height: 12),
+                  Divider(
+                    color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                    height: 1,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildSummaryRow(
+                  'Итого к оплате',
+                  '${_totalAmount.toStringAsFixed(2)} ₽',
+                  isTotal: true,
+                  valueColor: Theme.of(context).colorScheme.primary,
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Кнопка оформления
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _isCreatingOrder ? null : _createOrder,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 1,
+                ),
+                child: _isCreatingOrder
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'Оформляем...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.shopping_bag_outlined, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Оформить заказ',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${_totalAmount.toStringAsFixed(0)} ₽',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            
+            // Дополнительная информация
+            if (!_isCreatingOrder) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.lock_outlined,
+                      size: 14,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Безопасная оплата',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isDiscount = false, bool isTotal = false, bool isDiscounted = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isTotal = false,
+    Color? valueColor,
+    IconData? icon,
+  }) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(
+            icon,
+            size: 18,
+            color: valueColor ?? Colors.grey[700],
+          ),
+          const SizedBox(width: 8),
+        ],
+        Expanded(
+          child: Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDiscount ? Colors.green : Colors.grey[700],
+                  color: Colors.grey[700],
                   fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
                 ),
           ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDiscount 
-                      ? Colors.green
-                      : isDiscounted && isTotal
-                          ? Colors.green
-                          : Colors.grey[700],
-                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                  fontSize: isTotal ? 18 : null,
-                ),
-          ),
-        ],
-      ),
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: valueColor ?? Colors.grey[700],
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                fontSize: isTotal ? 17 : null,
+              ),
+        ),
+      ],
     );
-  }
+}
 }
