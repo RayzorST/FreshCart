@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.models.database import get_db
 from app.models.favorite import Favorite
@@ -13,11 +13,17 @@ router = APIRouter()
 
 @router.get("/", response_model=List[FavoriteWithProductResponse])
 async def get_favorites(
+    search: Optional[str] = Query(None, description="Поиск по названию товара"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список избранных товаров пользователя"""
-    favorites = db.query(Favorite).filter(Favorite.user_id == current_user.id).all()
+    """Получить список избранных товаров пользователя с возможностью поиска"""
+    query = db.query(Favorite).filter(Favorite.user_id == current_user.id)
+    
+    if search:
+        query = query.join(Product).filter(Product.name.ilike(f"%{search}%"))
+    
+    favorites = query.all()
     
     result = []
     for favorite in favorites:

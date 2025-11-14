@@ -369,9 +369,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       appBar: AppBar(
         title: Text(
           'Корзина',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
         ),
         actions: [
           if (_cartItems.isNotEmpty)
@@ -473,7 +471,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
           const SizedBox(height: 24),
           
-          ElevatedButton.icon(
+          FilledButton.icon(
             onPressed: () => ref.read(currentIndexProvider.notifier).state = 0,
             icon: const Icon(Icons.shopping_bag),
             label: const Text('Перейти к покупкам'),
@@ -485,7 +483,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
   Widget _buildCartWithItems() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       children: [
         // Список товаров
         ..._cartItems.map((item) {
@@ -728,6 +726,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   _buildSummaryRow(
                     'Сумма товаров',
                     '${_originalTotalAmount.toStringAsFixed(2)} ₽',
+                    icon: Icons.shopping_cart_outlined,
                   ),
                   const SizedBox(height: 12),
                   _buildSummaryRow(
@@ -748,23 +747,23 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   '${_totalAmount.toStringAsFixed(2)} ₽',
                   isTotal: true,
                   valueColor: Theme.of(context).colorScheme.primary,
+                  icon: Icons.shopping_cart_outlined,
                 ),
               ],
             ),
             
             const SizedBox(height: 20),
             
-            // Кнопка оформления
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: _isCreatingOrder ? null : _createOrder,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 1,
                 ),
@@ -802,52 +801,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${_totalAmount.toStringAsFixed(0)} ₽',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
               ),
             ),
-            
-            // Дополнительная информация
-            if (!_isCreatingOrder) ...[
-              const SizedBox(height: 16),
-              Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.lock_outlined,
-                      size: 14,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Безопасная оплата',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -875,7 +832,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           child: Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[700],
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
                 ),
           ),

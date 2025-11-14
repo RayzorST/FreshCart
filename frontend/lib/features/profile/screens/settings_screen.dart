@@ -58,7 +58,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Настройки'),
+        title: Text(
+          'Настройки',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

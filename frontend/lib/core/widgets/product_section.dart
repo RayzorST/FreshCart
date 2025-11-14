@@ -64,7 +64,6 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
   }
 
   void _loadMoreProducts() {
-    print('🔄 Loading more products...');
     ref.read(productsProvider.notifier).loadMore();
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
 
+final favoritesSearchQueryProvider = StateProvider<String>((ref) => '');
+
 final favoritesProvider = StateNotifierProvider<FavoritesNotifier, Map<int, bool>>((ref) {
   return FavoritesNotifier();
 });

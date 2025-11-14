@@ -92,7 +92,10 @@ class _AddressesScreenState extends ConsumerState<AddressesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Мои адреса'),
+        title: Text(
+          'Мои адреса',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

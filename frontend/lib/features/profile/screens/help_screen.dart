@@ -7,7 +7,10 @@ class HelpScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Помощь и поддержка'),
+        title: Text(
+          'Помощь и поддержка',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

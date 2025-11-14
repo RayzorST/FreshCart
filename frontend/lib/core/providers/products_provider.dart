@@ -9,7 +9,6 @@ final productsPageProvider = StateProvider<int>((ref) => 1);
 final hasMoreProductsProvider = StateProvider<bool>((ref) => true);
 final productsLoadingMoreProvider = StateProvider<bool>((ref) => false);
 
-// Провайдер для SharedPreferences
 final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
 });
@@ -65,31 +64,23 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
   }
   
   Future<void> loadMore() async {
-    print('🔄 loadMore called - isLoadingMore: ${ref.read(productsLoadingMoreProvider)}, hasMore: ${ref.read(hasMoreProductsProvider)}');
     if (ref.read(productsLoadingMoreProvider)){
-      print('❌ Already loading more, skipping');
       return;
     }
     if (!ref.read(hasMoreProductsProvider)) {
-      print('❌ No more products, skipping');
       return;
     }
     if (state.isLoading) {
-      print('❌ Still loading initial, skipping');
       return;
     }
     
     ref.read(productsLoadingMoreProvider.notifier).state = true;
-    print('✅ Starting to load more products...');
     
     try {
       final nextPage = ref.read(productsPageProvider) + 1;
-      print('📄 Loading page: $nextPage');
       final newProducts = await _fetchProducts(page: nextPage);
-      print('📦 Loaded ${newProducts.length} new products');
       
       if (newProducts.isEmpty) {
-        print('🏁 No more products available');
         ref.read(hasMoreProductsProvider.notifier).state = false;
       } else {
         final allProducts = [...state.products, ...newProducts];
@@ -98,10 +89,8 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
         ref.read(hasMoreProductsProvider.notifier).state = newProducts.length == 100;
       }
     } catch (e) {
-      print('Error loading more products: $e');
     } finally {
       ref.read(productsLoadingMoreProvider.notifier).state = false;
-      print('🔄 loadMore finished');
     }
   }
   
@@ -114,7 +103,7 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
       categoryId = int.tryParse(selectedCategory);
     }
     
-    final limit = 100; // Твой временный лимит
+    final limit = 100; 
     final offset = (page - 1) * limit;
     
     return await ApiClient.searchProducts(

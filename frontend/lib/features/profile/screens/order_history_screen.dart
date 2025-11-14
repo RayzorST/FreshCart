@@ -93,7 +93,10 @@ class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Мои заказы'),
+        title: Text(
+          'Мои заказы',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -241,12 +244,12 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
       steps = [
         StatusStep(icon: Icons.shopping_cart, label: 'Заказ создан', isActive: true),
         StatusStep(
-          icon: Icons.check_circle, 
+          icon: Icons.local_shipping, 
           label: 'Подтвержден', 
           isActive: status == 'confirmed' || status == 'delivered'
         ),
         StatusStep(
-          icon: Icons.local_shipping, 
+          icon: Icons.check_circle, 
           label: 'Доставлен', 
           isActive: status == 'delivered'
         ),

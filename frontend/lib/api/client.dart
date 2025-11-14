@@ -281,9 +281,14 @@ class ApiClient {
   }
 
   // Favorites
-  static Future<List<dynamic>> getFavorites() async {
+  static Future<List<dynamic>> getFavorites({String? search}) async {
+    final Map<String, String> queryParams = {};
+    if (search != null && search.isNotEmpty) {
+      queryParams['search'] = search;
+    }
+    
     final response = await http.get(
-      Uri.parse('$baseUrl/favorites/'),
+      Uri.parse('$baseUrl/favorites/').replace(queryParameters: queryParams),
       headers: _headers,
     );
     return _handleResponse(response);
