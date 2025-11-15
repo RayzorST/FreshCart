@@ -2,6 +2,14 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict
 from datetime import datetime, date
 
+class RoleResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
 class UserBase(BaseModel):
     email: EmailStr
     first_name: Optional[str] = None
@@ -18,6 +26,7 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     id: int
     is_active: bool
+    role: RoleResponse
     created_at: datetime
     settings: Optional[Dict[str, bool]] = None
     

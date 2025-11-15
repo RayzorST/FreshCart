@@ -1,6 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
 
+final selectedAddressProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
+final isAddressExpandedProvider = StateProvider<bool>((ref) => false);
+final addressesListProvider = FutureProvider<List<dynamic>>((ref) async {
+  return await ApiClient.getAddresses();
+});
+
 final cartProvider = StateNotifierProvider<CartNotifier, Map<int, int>>((ref) {
   return CartNotifier();
 });

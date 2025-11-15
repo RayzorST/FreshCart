@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
 import 'package:client/core/providers/cart_provider.dart';
-import 'package:client/core/widgets/bottom_navigation_bar.dart';
+import 'package:client/core/widgets/navigation_bar.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
@@ -278,21 +278,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Future<void> _createOrder() async {
     if (_cartItems.isEmpty) return;
 
+    final selectedAddress = ref.read(selectedAddressProvider);
+    if (selectedAddress == null) {
+      _showAddAddressDialog();
+      return;
+    }
+
     setState(() => _isCreatingOrder = true);
     
     try {
-      final addresses = await ApiClient.getAddresses();
-      
-      if (addresses.isEmpty) {
-        _showAddAddressDialog();
-        return;
-      }
-
-      final defaultAddress = addresses.firstWhere(
-        (addr) => addr['is_default'] == true,
-        orElse: () => addresses.first,
-      );
-
       final orderItems = _cartItems.map<Map<String, dynamic>>((item) {
         final itemMap = _convertToSafeMap(item);
         return {
@@ -301,11 +295,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           'price': (itemMap['display_price'] as num).toDouble(),
         };
       }).toList();
-
-      print('Creating order with items: $orderItems');
       
       await ApiClient.createOrder(
-        defaultAddress['address_line'],
+        selectedAddress['address_line'],
         '',
         orderItems,
       );
@@ -483,18 +475,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
   Widget _buildCartWithItems() {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12, top: 12),
       children: [
-        // Список товаров
+        _buildAddressSelector(),
         ..._cartItems.map((item) {
           final itemMap = _convertToSafeMap(item);
           return _buildCartItem(itemMap);
         }).toList(),
         
-        // Карточка с итогами
         _buildOrderSummary(),
         
-        // Отступ снизу
         const SizedBox(height: 20),
       ],
     );
@@ -593,7 +583,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
@@ -847,5 +837,240 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         ),
       ],
     );
-}
+  }
+
+  Widget _buildAddressSelector() {
+    final addressesAsync = ref.watch(addressesListProvider);
+    final selectedAddress = ref.watch(selectedAddressProvider);
+    final isExpanded = ref.watch(isAddressExpandedProvider);
+
+    return addressesAsync.when(
+      loading: () => Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 12),
+              Text('Загрузка адресов...'),
+            ],
+          ),
+        ),
+      ),
+      error: (error, stack) => Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Ошибка загрузки адресов',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (addresses) {
+        if (addresses.isEmpty) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Адрес доставки',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Адрес не указан',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                  ),
+                  SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => context.push('/addresses'),
+                    child: Text('Добавить адрес'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (selectedAddress == null && addresses.isNotEmpty) {
+          final defaultAddress = addresses.firstWhere(
+            (addr) => addr['is_default'] == true,
+            orElse: () => addresses.first,
+          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(selectedAddressProvider.notifier).state = defaultAddress;
+          });
+        }
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    ref.read(isAddressExpandedProvider.notifier).state = !isExpanded;
+                  },
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Адрес доставки',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            if (selectedAddress != null) ...[
+                              SizedBox(height: 4),
+                              Text(
+                                selectedAddress['address_line'] ?? 'Адрес не указан',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Colors.grey[600],
+                                    ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        isExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: Colors.grey[600],
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (isExpanded) ...[
+                  SizedBox(height: 16),
+                  ...addresses.map((address) {
+                    final isSelected = selectedAddress?['id'] == address['id'];
+                    return _buildAddressItem(address, isSelected);
+                  }).toList(),
+                  
+                  SizedBox(height: 12),
+                  Divider(height: 1),
+                  SizedBox(height: 12),
+                  
+                  TextButton.icon(
+                    onPressed: () => context.push('/addresses'),
+                    icon: Icon(Icons.add, size: 18),
+                    label: Text('Добавить новый адрес'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAddressItem(Map<String, dynamic> address, bool isSelected) {
+    return Card(
+      elevation: 0,
+      color: isSelected 
+          ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+          : Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        leading: Icon(
+          isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+        ),
+        title: Text(
+          address['address_line'] ?? 'Адрес не указан',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+        ),
+        subtitle: address['apartment'] != null 
+            ? Text('Кв. ${address['apartment']}')
+            : null,
+        trailing: address['is_default'] == true
+            ? Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'По умолчанию',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              )
+            : null,
+        onTap: () {
+          ref.read(selectedAddressProvider.notifier).state = address;
+          ref.read(isAddressExpandedProvider.notifier).state = false;
+        },
+        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+      ),
+    );
+  }
 }

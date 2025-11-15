@@ -1,8 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 class ApiClient {
-  static String baseUrl = "https://freshcart.cloudpub.ru";
+  static String baseUrl = kIsWeb ? "${Uri.base.origin}/api" : "https://freshcart-api.cloudpub.ru";
   static String? _token;
 
   static void setToken(String token) {
@@ -375,6 +376,190 @@ class ApiClient {
   static Future<Map<String, dynamic>> getAnalysisStats() async {
     final response = await http.get(
       Uri.parse('$baseUrl/ai/history/stats'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  // В client.dart добавим админ-методы
+
+  // Admin - Users
+  static Future<List<dynamic>> getAdminUsers({int skip = 0, int limit = 100}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/auth/admin/users?skip=$skip&limit=$limit'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> blockUser(int userId) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/admin/users/$userId/block'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> unblockUser(int userId) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/admin/users/$userId/unblock'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> setUserRole(int userId, String roleName) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/admin/users/$userId/role'),
+      headers: _headers,
+      body: json.encode({'role_name': roleName}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Admin - Products
+  static Future<List<dynamic>> getAdminProducts({bool includeInactive = false, int skip = 0, int limit = 100}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/products/admin/products?include_inactive=$includeInactive&skip=$skip&limit=$limit'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createAdminProduct(Map<String, dynamic> productData) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/products/admin/products'),
+      headers: _headers,
+      body: json.encode(productData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminProduct(int productId, Map<String, dynamic> productData) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/products/admin/products/$productId'),
+      headers: _headers,
+      body: json.encode(productData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<void> deleteAdminProduct(int productId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/products/admin/products/$productId'),
+      headers: _headers,
+    );
+    _handleResponse(response);
+  }
+
+  // Admin - Orders
+  static Future<List<dynamic>> getAdminOrders({String? status, int skip = 0, int limit = 100}) async {
+    final params = <String, String>{
+      'skip': skip.toString(),
+      'limit': limit.toString(),
+    };
+    if (status != null) {
+      params['status'] = status;
+    }
+    
+    final response = await http.get(
+      Uri.parse('$baseUrl/orders/admin/orders').replace(queryParameters: params),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateOrderStatus(int orderId, String status) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/orders/admin/orders/$orderId/status'),
+      headers: _headers,
+      body: json.encode({'status': status}),
+    );
+    return _handleResponse(response);
+  }
+
+  // Admin - Categories
+  static Future<List<dynamic>> getAdminCategories({int skip = 0, int limit = 100}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/products/admin/categories?skip=$skip&limit=$limit'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createAdminCategory(Map<String, dynamic> categoryData) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/products/admin/categories'),
+      headers: _headers,
+      body: json.encode(categoryData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminCategory(int categoryId, Map<String, dynamic> categoryData) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/products/admin/categories/$categoryId'),
+      headers: _headers,
+      body: json.encode(categoryData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<void> deleteAdminCategory(int categoryId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/products/admin/categories/$categoryId'),
+      headers: _headers,
+    );
+    _handleResponse(response);
+  }
+
+  // Admin - Promotions
+  static Future<List<dynamic>> getAdminPromotions({bool? isActive, int skip = 0, int limit = 100}) async {
+    final params = <String, String>{
+      'skip': skip.toString(),
+      'limit': limit.toString(),
+    };
+    if (isActive != null) {
+      params['is_active'] = isActive.toString();
+    }
+    
+    final response = await http.get(
+      Uri.parse('$baseUrl/promotions/admin/promotions').replace(queryParameters: params),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createAdminPromotion(Map<String, dynamic> promotionData) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/promotions/admin/promotions'),
+      headers: _headers,
+      body: json.encode(promotionData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminPromotion(int promotionId, Map<String, dynamic> promotionData) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/promotions/admin/promotions/$promotionId'),
+      headers: _headers,
+      body: json.encode(promotionData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<void> deleteAdminPromotion(int promotionId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/promotions/admin/promotions/$promotionId'),
+      headers: _headers,
+    );
+    _handleResponse(response);
+  }
+
+  // Admin - Statistics
+  static Future<Map<String, dynamic>> getAdminStats() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/stats'),
       headers: _headers,
     );
     return _handleResponse(response);

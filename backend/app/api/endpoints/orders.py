@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 from app.models.database import get_db
@@ -8,7 +8,7 @@ from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.order import OrderResponse, OrderCreate, OrderUpdate
-from app.api.endpoints.auth import get_current_user
+from app.api.endpoints.auth import get_current_user, get_current_admin
 
 router = APIRouter()
 
@@ -173,3 +173,52 @@ async def cancel_order(
     db.commit()
     
     return {"message": "Order cancelled successfully"}
+
+# В orders.py добавим админ-эндпоинты
+
+@router.get("/admin/orders", response_model=List[OrderResponse])
+async def get_all_orders(
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Получение всех заказов (админ)"""
+    query = db.query(Order).options(
+        joinedload(Order.items).joinedload(OrderItem.product)
+    )
+    
+    if status:
+        query = query.filter(Order.status == status)
+    
+    orders = query.order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+    return orders
+
+@router.put("/admin/orders/{order_id}/status")
+async def update_order_status(
+    order_id: int,
+    status_data: dict,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Обновление статуса заказа (админ)"""
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+    
+    new_status = status_data.get('status')
+    if new_status not in ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid status"
+        )
+    
+    order.status = new_status
+    order.updated_at = datetime.utcnow()
+    db.commit()
+    
+    return {"message": f"Order status updated to {new_status}"}

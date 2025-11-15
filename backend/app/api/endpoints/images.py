@@ -118,12 +118,16 @@ async def get_product_image(
             
             image_data = response.read()
             
-            return StreamingResponse(
-                io.BytesIO(image_data),
+            # Используем Response вместо StreamingResponse
+            return Response(
+                content=image_data,
                 media_type="image/jpeg",
                 headers={
                     "Content-Disposition": f"inline; filename={filename}",
-                    "Cache-Control": "public, max-age=3600" 
+                    "Cache-Control": "public, max-age=3600",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, OPTIONS",
+                    "Access-Control-Allow-Headers": "*"
                 }
             )
             
@@ -146,3 +150,15 @@ async def get_product_image(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
+    
+@router.options("/products/{product_id}/image")
+async def options_product_image():
+    """Обработчик CORS preflight запросов"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )

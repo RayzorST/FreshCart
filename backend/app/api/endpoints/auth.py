@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from typing import List
 
 from app.core.security import (
     verify_password, 
@@ -37,6 +37,18 @@ async def get_current_user(
             detail="User not found",
         )
     return user
+
+async def get_current_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Проверка, что пользователь является администратором"""
+    # Предположим, что роль администратора имеет id=2 или name='admin'
+    if current_user.role.name != "admin":  # Или проверим по названию роли
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+    return current_user
 
 @router.post("/registration", response_model=UserResponse)
 async def registration(
@@ -187,3 +199,54 @@ async def update_notification_settings(
     db.commit()
     db.refresh(settings)
     return settings
+
+# В auth.py добавим админ-эндпоинты для пользователей
+
+@router.get("/admin/users", response_model=List[UserResponse])
+async def get_all_users(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Получение всех пользователей (админ)"""
+    users = db.query(User).offset(skip).limit(limit).all()
+    return users
+
+@router.put("/admin/users/{user_id}/block")
+async def block_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Блокировка пользователя (админ)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_active = False
+    db.commit()
+    
+    return {"message": "User blocked successfully"}
+
+@router.put("/admin/users/{user_id}/unblock")
+async def unblock_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Разблокировка пользователя (админ)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.is_active = True
+    db.commit()
+    
+    return {"message": "User unblocked successfully"}

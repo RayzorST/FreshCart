@@ -11,7 +11,7 @@ from app.schemas.product import (
     TagResponse, TagCreate, ProductTagsUpdate,
     ProductResponse, ProductTagLinkResponse
 )
-from app.api.endpoints.auth import get_current_user
+from app.api.endpoints.auth import get_current_user, get_current_admin
 from app.models.user import User
 
 router = APIRouter()
@@ -406,3 +406,89 @@ async def get_products_by_tag(
     ).offset(skip).limit(limit).all()
     
     return products
+
+# В products.py добавим админ-эндпоинты
+
+@router.get("/admin/products", response_model=List[ProductResponse])
+async def get_all_products_admin(
+    skip: int = 0,
+    limit: int = 100,
+    include_inactive: bool = False,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Получение всех товаров (включая неактивные) для админа"""
+    query = db.query(Product)
+    
+    if not include_inactive:
+        query = query.filter(Product.is_active == True)
+    
+    products = query.offset(skip).limit(limit).all()
+    return products
+
+@router.post("/admin/products", response_model=ProductResponse)
+async def create_product_admin(
+    product_data: ProductCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Создание товара (админ)"""
+    if product_data.category_id:
+        category = db.query(Category).filter(Category.id == product_data.category_id).first()
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category not found"
+            )
+    
+    product = Product(**product_data.dict())
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return product
+
+@router.put("/admin/products/{product_id}", response_model=ProductResponse)
+async def update_product_admin(
+    product_id: int,
+    product_data: ProductUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Обновление товара (админ)"""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+
+    update_data = product_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(product, field, value)
+    
+    db.commit()
+    db.refresh(product)
+    return product
+
+@router.delete("/admin/products/{product_id}")
+async def delete_product_admin(
+    product_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Полное удаление товара (админ)"""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+
+    # Удаляем связи с тегами
+    db.query(ProductTag).filter(ProductTag.product_id == product_id).delete()
+    
+    # Полное удаление товара
+    db.delete(product)
+    db.commit()
+    
+    return {"message": "Product permanently deleted"}

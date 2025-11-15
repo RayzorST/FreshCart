@@ -5,7 +5,7 @@ import 'package:client/api/client.dart';
 import 'package:client/core/providers/favorites_provider.dart';
 import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
-import 'package:client/core/widgets/bottom_navigation_bar.dart';
+import 'package:client/core/widgets/navigation_bar.dart';
 import 'dart:async';
 
 class FavoritesScreen extends ConsumerStatefulWidget {
@@ -434,7 +434,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
