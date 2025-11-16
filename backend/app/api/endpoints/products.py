@@ -492,3 +492,210 @@ async def delete_product_admin(
     db.commit()
     
     return {"message": "Product permanently deleted"}
+
+# В products.py добавим админ-эндпоинты для категорий
+
+@router.get("/admin/categories", response_model=List[CategoryResponse])
+async def get_all_categories_admin(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Получение всех категорий (админ)"""
+    categories = db.query(Category).offset(skip).limit(limit).all()
+    return categories
+
+@router.post("/admin/categories", response_model=CategoryResponse)
+async def create_category_admin(
+    category_data: CategoryCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Создание категории (админ)"""
+    # Проверяем уникальность названия
+    existing_category = db.query(Category).filter(func.lower(Category.name) == func.lower(category_data.name)).first()
+    if existing_category:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Category with this name already exists"
+        )
+    
+    category = Category(**category_data.dict())
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+@router.put("/admin/categories/{category_id}", response_model=CategoryResponse)
+async def update_category_admin(
+    category_id: int,
+    category_data: CategoryCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Обновление категории (админ)"""
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found"
+        )
+    
+    # Проверяем уникальность названия (исключая текущую категорию)
+    existing_category = db.query(Category).filter(
+        func.lower(Category.name) == func.lower(category_data.name),
+        Category.id != category_id
+    ).first()
+    if existing_category:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Category with this name already exists"
+        )
+
+    for field, value in category_data.dict().items():
+        setattr(category, field, value)
+    
+    db.commit()
+    db.refresh(category)
+    return category
+
+@router.delete("/admin/categories/{category_id}")
+async def delete_category_admin(
+    category_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Удаление категории (админ)"""
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found"
+        )
+
+    # Проверяем, есть ли товары в этой категории
+    products_count = db.query(Product).filter(Product.category_id == category_id).count()
+    if products_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete category with {products_count} products. Move products to another category first."
+        )
+
+    db.delete(category)
+    db.commit()
+    
+    return {"message": "Category deleted successfully"}
+
+# В products.py добавим админ-эндпоинты для тегов
+
+@router.get("/admin/tags", response_model=List[TagResponse])
+async def get_all_tags_admin(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Получение всех тегов (админ)"""
+    query = db.query(Tag)
+    
+    if search:
+        query = query.filter(Tag.name.ilike(f"%{search}%"))
+    
+    tags = query.offset(skip).limit(limit).all()
+    return tags
+
+@router.post("/admin/tags", response_model=TagResponse)
+async def create_tag_admin(
+    tag_data: TagCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Создание тега (админ)"""
+    existing_tag = db.query(Tag).filter(func.lower(Tag.name) == func.lower(tag_data.name)).first()
+    if existing_tag:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tag with this name already exists"
+        )
+    
+    tag = Tag(**tag_data.dict())
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    return tag
+
+@router.put("/admin/tags/{tag_id}", response_model=TagResponse)
+async def update_tag_admin(
+    tag_id: int,
+    tag_data: TagCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Обновление тега (админ)"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found"
+        )
+    
+    existing_tag = db.query(Tag).filter(
+        func.lower(Tag.name) == func.lower(tag_data.name),
+        Tag.id != tag_id
+    ).first()
+    if existing_tag:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tag with this name already exists"
+        )
+
+    tag.name = tag_data.name
+    db.commit()
+    db.refresh(tag)
+    return tag
+
+@router.delete("/admin/tags/{tag_id}")
+async def delete_tag_admin(
+    tag_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Удаление тега (админ)"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found"
+        )
+
+    # Удаляем связи с продуктами
+    db.query(ProductTag).filter(ProductTag.tag_id == tag_id).delete()
+    
+    db.delete(tag)
+    db.commit()
+    
+    return {"message": "Tag deleted successfully"}
+
+@router.get("/admin/tags/{tag_id}/products", response_model=List[ProductResponse])
+async def get_products_by_tag_admin(
+    tag_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Получение продуктов по тегу (админ)"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found"
+        )
+    
+    products = db.query(Product).join(Product.product_tags).filter(
+        ProductTag.tag_id == tag_id
+    ).offset(skip).limit(limit).all()
+    
+    return products

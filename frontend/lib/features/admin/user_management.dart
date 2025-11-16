@@ -96,7 +96,13 @@ class _UserManagementState extends ConsumerState<UserManagement> {
                 ? const Center(child: CircularProgressIndicator())
                 : _users.isEmpty
                     ? const Center(child: Text('Пользователи не найдены'))
-                    : ListView.builder(
+                    : GridView.builder(
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 400, // Максимальная ширина элемента
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 1.2,
+                        ),
                         itemCount: _users.length,
                         itemBuilder: (context, index) {
                           final user = _users[index];
@@ -132,57 +138,107 @@ class UserCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: user['is_active'] ? Colors.green : Colors.red,
-          child: Text(
-            user['first_name']?.toString().substring(0, 1) ?? 'U',
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-        title: Text('${user['first_name']} ${user['last_name']}'),
-        subtitle: Column(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(user['email']),
-            Text('Роль: ${user['role']?['name'] ?? 'user'}'),
-            Text(
-              user['is_active'] ? 'Активен' : 'Заблокирован',
-              style: TextStyle(
-                color: user['is_active'] ? Colors.green : Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Смена роли
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.admin_panel_settings),
-              onSelected: (role) => onChangeRole(role),
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'user', child: Text('Пользователь')),
-                const PopupMenuItem(value: 'admin', child: Text('Администратор')),
-                const PopupMenuItem(value: 'moderator', child: Text('Модератор')),
+            // Верхняя часть с аватаром и основной информацией
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: user['is_active'] ? Colors.green : Colors.red,
+                  child: Text(
+                    user['first_name']?.toString().substring(0, 1) ?? 'U',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${user['first_name']} ${user['last_name']}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      Text(
+                        user['email'],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-            const SizedBox(width: 8),
-            // Блокировка/разблокировка
-            if (onBlock != null)
-              IconButton(
-                icon: const Icon(Icons.block, color: Colors.red),
-                onPressed: onBlock,
-                tooltip: 'Заблокировать',
-              ),
-            if (onUnblock != null)
-              IconButton(
-                icon: const Icon(Icons.check_circle, color: Colors.green),
-                onPressed: onUnblock,
-                tooltip: 'Разблокировать',
-              ),
+            
+            const SizedBox(height: 12),
+            
+            // Информация о роли и статусе
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Роль: ${user['role']?['name'] ?? 'user'}',
+                  style: const TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user['is_active'] ? 'Активен' : 'Заблокирован',
+                  style: TextStyle(
+                    color: user['is_active'] ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            
+            const Spacer(),
+            
+            // Кнопки действий
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Смена роли
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.admin_panel_settings, size: 20),
+                  onSelected: (role) => onChangeRole(role),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'user', child: Text('Пользователь')),
+                    const PopupMenuItem(value: 'admin', child: Text('Администратор')),
+                    const PopupMenuItem(value: 'moderator', child: Text('Модератор')),
+                  ],
+                ),
+                
+                // Блокировка/разблокировка
+                if (onBlock != null)
+                  IconButton(
+                    icon: const Icon(Icons.block, color: Colors.red, size: 20),
+                    onPressed: onBlock,
+                    tooltip: 'Заблокировать',
+                  ),
+                if (onUnblock != null)
+                  IconButton(
+                    icon: const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    onPressed: onUnblock,
+                    tooltip: 'Разблокировать',
+                  ),
+              ],
+            ),
           ],
         ),
       ),

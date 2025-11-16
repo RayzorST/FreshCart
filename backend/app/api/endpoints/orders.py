@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime
 
@@ -222,3 +223,21 @@ async def update_order_status(
     db.commit()
     
     return {"message": f"Order status updated to {new_status}"}
+
+@router.get("/admin/orders/stats")
+async def get_orders_stats(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Статистика по заказам (админ)"""
+    total_orders = db.query(Order).count()
+    pending_orders = db.query(Order).filter(Order.status == 'pending').count()
+    completed_orders = db.query(Order).filter(Order.status == 'delivered').count()
+    total_revenue = db.query(func.sum(Order.total_amount)).filter(Order.status == 'delivered').scalar() or 0
+    
+    return {
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "completed_orders": completed_orders,
+        "total_revenue": float(total_revenue)
+    }

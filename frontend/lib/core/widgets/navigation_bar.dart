@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:client/api/client.dart';
+
+final isAdminProvider = FutureProvider<bool>((ref) async {
+  return await ApiClient.isUserAdmin();
+});
 
 final currentIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -19,6 +24,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
   Widget _buildSideNavigation(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(currentIndexProvider);
     final isWeb = kIsWeb;
+    final isAdminAsync = ref.watch(isAdminProvider);
 
     return SizedBox(
       width: isWeb ? 200 : 80, // Широкая панель для веба, узкая для планшетов
@@ -92,15 +98,20 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                       currentIndex: currentIndex,
                       onTap: () => ref.read(currentIndexProvider.notifier).state = 3,
                     ),
-                    // Админ панель только для веб-версии
                     if (isWeb)
-                      _buildWebNavItem(
-                        context: context,
-                        icon: Icons.admin_panel_settings,
-                        label: 'Админ панель',
-                        index: 4,
-                        currentIndex: currentIndex,
-                        onTap: () => ref.read(currentIndexProvider.notifier).state = 4,
+                      isAdminAsync.when(
+                        loading: () => const SizedBox(), // Не показываем пока загружается
+                        error: (error, stack) => const SizedBox(), // Не показываем при ошибке
+                        data: (isAdmin) => isAdmin
+                            ? _buildWebNavItem(
+                                context: context,
+                                icon: Icons.admin_panel_settings,
+                                label: 'Админ панель',
+                                index: 4,
+                                currentIndex: currentIndex,
+                                onTap: () => ref.read(currentIndexProvider.notifier).state = 4,
+                              )
+                            : const SizedBox(),
                       ),
                   ],
                 ),

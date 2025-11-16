@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -170,8 +171,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
           ],
         ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
+        borderRadius: BorderRadius.only(
+          bottomLeft: kIsWeb ? Radius.circular(24) : Radius.circular(0),
           bottomRight: Radius.circular(24),
         ),
       ),

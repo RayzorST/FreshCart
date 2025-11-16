@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/features/admin/product_management.dart';
 import 'package:client/features/admin/user_management.dart';
 import 'package:client/features/admin/admin_dashboard.dart';
+import 'package:client/features/admin/promotion_management.dart';
+import 'package:client/features/admin/order_management.dart';
 
 class AdminScreen extends ConsumerStatefulWidget {
   const AdminScreen({super.key});
@@ -18,9 +20,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
     const AdminDashboard(),
     const UserManagement(),
     const ProductManagement(),
-    //const OrderManagement(),
-    //const PromotionManagement(),
-    //const CategoryManagement(),
+    const OrderManagement(),
+    const PromotionManagement(),
   ];
 
   final List<String> _sectionTitles = [
@@ -29,7 +30,6 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
     'Товары',
     'Заказы',
     'Акции',
-    'Категории',
   ];
 
   final List<IconData> _sectionIcons = [

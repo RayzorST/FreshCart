@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.models.database import engine, Base, SessionLocal
 from app.models.user import Role
 from app.services.rabbitmq_consumer import message_consumer
-from app.api.endpoints import auth, products, orders, cart, addresses, images, favorites, promotions, analysis
+from app.api.endpoints import auth, products, orders, cart, addresses, images, favorites, promotions, analysis, admin
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +56,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(products.router, prefix="/products", tags=["products"])
 app.include_router(orders.router, prefix="/orders", tags=["orders"])
 app.include_router(cart.router, prefix="/cart", tags=["cart"])

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:client/core/providers/products_provider.dart';
 import 'package:client/api/client.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class CategoryFilterWidget extends ConsumerWidget {
   const CategoryFilterWidget({super.key});
@@ -12,17 +13,20 @@ class CategoryFilterWidget extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final sharedPrefsAsync = ref.watch(sharedPreferencesProvider);
-    final isExpanded = ref.watch(isCategoriesExpandedProvider);
+    final isExpanded = kIsWeb ? true : ref.watch(isCategoriesExpandedProvider);
 
-    sharedPrefsAsync.whenData((sharedPrefs) {
-      final savedState = sharedPrefs.getBool('categories_expanded');
-      if (savedState != null) {
-        final currentState = ref.read(isCategoriesExpandedProvider);
-        if (currentState != savedState) {
-          ref.read(isCategoriesExpandedProvider.notifier).state = savedState;
+    if (!kIsWeb) {
+      final sharedPrefsAsync = ref.watch(sharedPreferencesProvider);
+      sharedPrefsAsync.whenData((sharedPrefs) {
+        final savedState = sharedPrefs.getBool('categories_expanded');
+        if (savedState != null) {
+          final currentState = ref.read(isCategoriesExpandedProvider);
+          if (currentState != savedState) {
+            ref.read(isCategoriesExpandedProvider.notifier).state = savedState;
+          }
         }
-      }
-    });
+      });
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -38,17 +42,18 @@ class CategoryFilterWidget extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const Spacer(),
-              IconButton(
-                icon: Icon(
-                  isExpanded ? Icons.expand_less : Icons.expand_more,
-                  size: 20,
+              if (!kIsWeb)
+                IconButton(
+                  icon: Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    _toggleExpandedState(ref, !isExpanded, sharedPrefsAsync);
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 ),
-                onPressed: () {
-                  _toggleExpandedState(ref, !isExpanded, sharedPrefsAsync);
-                },
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              ),
             ],
           ),
         ),
@@ -67,6 +72,8 @@ class CategoryFilterWidget extends ConsumerWidget {
   }
   
   void _toggleExpandedState(WidgetRef ref, bool newState, AsyncValue<SharedPreferences> sharedPrefsAsync) {
+    if (kIsWeb) return;
+    
     ref.read(isCategoriesExpandedProvider.notifier).state = newState;
     
     sharedPrefsAsync.whenData((sharedPrefs) {
@@ -238,10 +245,10 @@ class CategoryFilterWidget extends ConsumerWidget {
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 120, // Максимальная ширина категории
+          crossAxisSpacing: 3,
+          mainAxisSpacing: 3,
           childAspectRatio: 1.0,
         ),
         itemCount: 6,
@@ -329,10 +336,10 @@ class CategoryFilterWidget extends ConsumerWidget {
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 3,
-          mainAxisSpacing: 3,
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 120,
+          crossAxisSpacing: 7,
+          mainAxisSpacing: 7,
           childAspectRatio: 1.0,
         ),
         itemCount: allCategories.length,

@@ -384,6 +384,16 @@ class ApiClient {
   // В client.dart добавим админ-методы
 
   // Admin - Users
+  static Future<bool> isUserAdmin() async {
+    try {
+      final profile = await getProfile();
+      return profile['role']?['name'] == 'admin';
+    } catch (e) {
+      print('Error checking admin status: $e');
+      return false;
+    }
+  }
+
   static Future<List<dynamic>> getAdminUsers({int skip = 0, int limit = 100}) async {
     final response = await http.get(
       Uri.parse('$baseUrl/auth/admin/users?skip=$skip&limit=$limit'),
@@ -478,6 +488,14 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> getOrdersStats() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/orders/admin/orders/stats'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
   // Admin - Categories
   static Future<List<dynamic>> getAdminCategories({int skip = 0, int limit = 100}) async {
     final response = await http.get(
@@ -554,6 +572,57 @@ class ApiClient {
       headers: _headers,
     );
     _handleResponse(response);
+  }
+
+  // Admin - Tags
+  static Future<List<dynamic>> getAdminTags({String? search, int skip = 0, int limit = 100}) async {
+    final params = <String, String>{
+      'skip': skip.toString(),
+      'limit': limit.toString(),
+    };
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+    
+    final response = await http.get(
+      Uri.parse('$baseUrl/products/admin/tags').replace(queryParameters: params),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createAdminTag(Map<String, dynamic> tagData) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/products/admin/tags'),
+      headers: _headers,
+      body: json.encode(tagData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> updateAdminTag(int tagId, Map<String, dynamic> tagData) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/products/admin/tags/$tagId'),
+      headers: _headers,
+      body: json.encode(tagData),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<void> deleteAdminTag(int tagId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/products/admin/tags/$tagId'),
+      headers: _headers,
+    );
+    _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getAdminTagProducts(int tagId, {int skip = 0, int limit = 100}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/products/admin/tags/$tagId/products?skip=$skip&limit=$limit'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
   }
 
   // Admin - Statistics
