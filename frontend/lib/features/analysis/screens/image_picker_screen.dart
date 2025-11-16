@@ -1,72 +1,309 @@
 // image_picker_screen.dart
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'analysis_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class ImagePickerScreen extends StatelessWidget {
   const ImagePickerScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Анализ блюда'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {
-              // TODO: Переход на историю анализов
-              // Navigator.push(context, MaterialPageRoute(
-              //   builder: (context) => AnalysisHistoryScreen()
-              // ));
-            },
-          ),
-        ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: colorScheme.onSurface,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.photo_camera, size: 80, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text(
-              'Сфотографируйте ваше блюдо',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.background,
+              colorScheme.surfaceVariant.withOpacity(0.3),
+            ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Иконка и заголовок
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colorScheme.outline.withOpacity(0.2),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.photo_camera_outlined,
+                    size: 60,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                // Заголовок
+                Text(
+                  'Анализ блюда по фото',
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                
+                // Описание
+                Text(
+                  'Сфотографируйте блюдо и ИИ определит его состав,\nа также подберет нужные ингредиенты из магазина',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                
+                // Основные кнопки выбора изображения
+                _buildImageSelectionButtons(context),
+                const SizedBox(height: 24),
+                
+                // Дополнительные кнопки
+                _buildAdditionalButtons(context),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'ИИ определит блюдо и подберет\nнужные ингредиенты из магазина',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: 200,
-              child: FilledButton.icon(
-                onPressed: () => _pickImage(ImageSource.camera, context),
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Сфотографировать'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 200,
-              child: OutlinedButton.icon(
-                onPressed: () => _pickImage(ImageSource.gallery, context),
-                icon: const Icon(Icons.photo_library),
-                label: const Text('Выбрать из галереи'),
-              ),
-            ),
-            const SizedBox(height: 24),
-            TextButton(
-              onPressed: () {
-                _showExampleResults(context);
-              },
-              child: const Text('Посмотреть пример анализа'),
-            ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildImageSelectionButtons(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      children: [
+        // Кнопка камеры
+        Container(
+          width: double.infinity,
+          height: 60,
+          margin: const EdgeInsets.only(bottom: 16),
+          child: ElevatedButton(
+            onPressed: () => _pickImage(ImageSource.camera, context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              elevation: 4,
+              shadowColor: colorScheme.primary.withOpacity(0.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.onPrimary.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.camera_alt, size: 20, color: colorScheme.onPrimary),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Сфотографировать',
+                  style: textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Кнопка галереи
+        Container(
+          width: double.infinity,
+          height: 60,
+          child: OutlinedButton(
+            onPressed: () => _pickImage(ImageSource.gallery, context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colorScheme.primary,
+              side: BorderSide(color: colorScheme.primary, width: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.photo_library, size: 20, color: colorScheme.primary),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Выбрать из галереи',
+                  style: textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdditionalButtons(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      children: [
+        // Кнопка истории анализов
+        Container(
+          width: double.infinity,
+          height: 56,
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ElevatedButton(
+            onPressed: () {
+              // Используем GoRouter для навигации
+              context.push('/analysis/history');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.surface,
+              foregroundColor: colorScheme.onSurface,
+              elevation: 2,
+              shadowColor: colorScheme.shadow.withOpacity(0.1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: colorScheme.outline.withOpacity(0.2), width: 1),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'История анализов',
+                  style: textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '2',
+                    style: textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Информационная панель
+        Container(
+          margin: const EdgeInsets.only(top: 24),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome, size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ИИ анализирует изображение и определяет блюдо',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.shopping_basket, size: 16, color: colorScheme.secondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Подбирает подходящие ингредиенты из магазина',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.history, size: 16, color: colorScheme.tertiary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Сохраняет историю для быстрого доступа',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -81,29 +318,32 @@ class ImagePickerScreen extends StatelessWidget {
       );
       
       if (image != null && context.mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AnalysisScreen(imageFile: image),
-          ),
+        // Используем GoRouter для навигации с передачей параметра
+        context.push(
+          '/analysis/result',
+          extra: image, // Передаем image как extra
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         );
       }
     }
   }
 
   void _showExampleResults(BuildContext context) {
-    // Показываем пример анализа для демонстрации
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AnalysisScreen(imagePath: 'example'),
-      ),
+    // Используем GoRouter для навигации с query параметром
+    context.push(
+      '/analysis/result?imagePath=example',
     );
   }
 }

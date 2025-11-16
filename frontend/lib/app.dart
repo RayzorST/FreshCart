@@ -8,8 +8,9 @@ import 'package:client/features/auth/screens/login_screen.dart';
 import 'package:client/features/auth/screens/register_screen.dart';
 import 'package:client/features/main/screens/main_screen.dart';
 import 'package:client/features/main/screens/promotion_screen.dart';
-import 'package:client/features/camera/screens/camera_screen.dart';
 import 'package:client/features/analysis/screens/analysis_screen.dart';
+import 'package:client/features/analysis/screens/image_picker_screen.dart';
+import 'package:client/features/analysis/screens/analysis_history_screen.dart';
 import 'package:client/features/product/screens/product_screen.dart';
 import 'package:client/features/profile/screens/addresses_screen.dart';
 import 'package:client/features/profile/screens/help_screen.dart';
@@ -153,12 +154,16 @@ class _AppWithRouter extends ConsumerWidget {
           builder: (context, state) => const MainScreen(),
         ),
         GoRoute(
-          path: '/camera',
+          path: '/analysis/camera',
           name: 'camera',
-          builder: (context, state) => const CameraScreen(),
+          builder: (context, state) => const ImagePickerScreen(),
         ),
         GoRoute(
-          path: '/analysis',
+          path: '/analysis/history',
+          builder: (context, state) => const AnalysisHistoryScreen(),
+        ),
+        GoRoute(
+          path: '/analysis/result',
           name: 'analysis',
           builder: (context, state) => AnalysisScreen(
             imagePath: state.extra as String,

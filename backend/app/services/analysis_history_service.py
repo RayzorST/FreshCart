@@ -50,18 +50,13 @@ class AnalysisHistoryService:
         self.db.refresh(record)
         return record
     
-    def get_user_analysis_history(
-        self, 
-        user_id: int, 
-        limit: int = 50,
-        offset: int = 0
-    ) -> List[AnalysisHistory]:
-        """Получение истории анализов пользователя"""
-        return self.db.query(AnalysisHistory).filter(
-            AnalysisHistory.user_id == user_id
-        ).order_by(
-            AnalysisHistory.created_at.desc()
-        ).offset(offset).limit(limit).all()
+    def get_user_analysis_history(self, user_id: int, offset: int = 0, limit: int = 20, min_confidence: float = None):
+        query = self.db.query(AnalysisHistory)
+        
+        if min_confidence is not None:
+            query = query.filter(AnalysisHistory.confidence >= min_confidence)
+        
+        return query.order_by(AnalysisHistory.created_at.desc()).offset(offset).limit(limit).all()
     
     def get_analysis_stats(self, user_id: int) -> Dict:
         """Статистика по анализам пользователя"""

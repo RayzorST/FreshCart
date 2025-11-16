@@ -11,7 +11,7 @@ class CameraFAB extends StatelessWidget {
       child: FloatingActionButton(
         backgroundColor: Theme.of(context).colorScheme.primary,
         onPressed: () {
-          context.push('/camera');
+          context.push('/analysis/camera');
         },
         elevation: 4,
         shape: RoundedRectangleBorder(

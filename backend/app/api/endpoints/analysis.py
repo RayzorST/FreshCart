@@ -242,3 +242,21 @@ async def delete_analysis_record(
     db.commit()
     
     return {"message": "Analysis record deleted"}
+
+@router.get("/history/high-confidence", response_model=List[AnalysisHistoryResponse])
+async def get_high_confidence_analysis_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    min_confidence: float = Query(0.7, ge=0.0, le=1.0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получение истории анализов с высокой уверенностью"""
+    history_service = AnalysisHistoryService(db)
+    history = history_service.get_user_analysis_history(
+        user_id=current_user.id,
+        offset=skip,
+        limit=limit,
+        min_confidence=min_confidence
+    )
+    return history
