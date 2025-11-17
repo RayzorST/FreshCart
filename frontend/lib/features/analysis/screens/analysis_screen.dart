@@ -1,24 +1,21 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
 
-class AnalysisScreen extends ConsumerStatefulWidget {
-  final String? imagePath;
-  final XFile? imageFile;
+class AnalysisResultScreen extends ConsumerStatefulWidget {
+  final String? imageData;
   
-  const AnalysisScreen({
+  const AnalysisResultScreen({
     super.key,
-    this.imagePath,
-    this.imageFile,
+    this.imageData,
   });
 
   @override
-  ConsumerState<AnalysisScreen> createState() => _AnalysisScreenState();
+  ConsumerState<AnalysisResultScreen> createState() => _AnalysisResultScreenState();
 }
 
-class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
+class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
   bool _isAnalyzing = true;
   Map<String, dynamic>? _analysisResult;
   String? _errorMessage;
@@ -33,23 +30,10 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     try {
       Map<String, dynamic> result;
       
-      if (widget.imageFile != null) {
-        // Анализ из файла
-        final imageBytes = await widget.imageFile!.readAsBytes();
-        
-        // Проверяем размер изображения (макс 5MB)
-        if (imageBytes.length > 5 * 1024 * 1024) {
-          throw Exception('Изображение слишком большое. Максимум 5MB');
-        }
-        
-        result = await ApiClient.analyzeFoodImageFile(imageBytes);
-      } else if (widget.imagePath != null) {
-        // Анализ из пути файла
-        final file = File(widget.imagePath!);
-        final imageBytes = await file.readAsBytes();
-        result = await ApiClient.analyzeFoodImageFile(imageBytes);
+      if (widget.imageData != null) {
+        result = await ApiClient.analyzeFoodImage(widget.imageData!);
       } else {
-        throw Exception('No image provided');
+        throw Exception('No image data provided');
       }
       
       if (mounted) {
@@ -81,7 +65,11 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Анализ блюда'),
+        title: const Text('Результат анализа'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
         actions: [
           if (_analysisResult != null)
             IconButton(
@@ -155,7 +143,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => context.pop(),
                   child: const Text('Назад'),
                 ),
               ],
@@ -169,7 +157,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   Widget _buildResults() {
     final result = _analysisResult!;
     
-    // Проверяем успешность запроса
     if (result['success'] == false) {
       return _buildError();
     }
@@ -185,7 +172,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Заголовок с уверенностью
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -229,7 +215,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
           
           const SizedBox(height: 16),
           
-          // Рекомендации
           if (recommendations.isNotEmpty) ...[
             const Text(
               'Рекомендации:',
@@ -257,7 +242,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
             const SizedBox(height: 16),
           ],
           
-          // Основные ингредиенты
           if (basicAlternatives.isNotEmpty) ...[
             const Text(
               'Основные ингредиенты:',
@@ -286,7 +270,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
             ),
           ],
           
-          // Дополнительные ингредиенты
           if (additionalAlternatives.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text(
@@ -320,7 +303,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
           
           const SizedBox(height: 32),
           
-          // Кнопки действий
           _buildActionButtons(),
         ],
       ),
@@ -424,12 +406,8 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     return ListTile(
       leading: imageUrl.isNotEmpty
           ? CircleAvatar(
-              backgroundImage: NetworkImage(
-                '${ApiClient.baseUrl}/images/products/${product['id']}/image'
-              ),
-              onBackgroundImageError: (exception, stackTrace) {
-                // Если изображение не загружается, показываем заглушку
-              },
+              backgroundImage: NetworkImage(imageUrl),
+              onBackgroundImageError: (exception, stackTrace) {},
             )
           : const CircleAvatar(
               child: Icon(Icons.food_bank),
@@ -466,12 +444,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
           ),
         ],
       ),
-      onTap: () {
-        // TODO: Переход на карточку товара
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => ProductDetailScreen(productId: productId)
-        // ));
-      },
     );
   }
 
@@ -493,7 +465,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: const Text('Сделать новый анализ'),
           ),
         ),
@@ -544,7 +516,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       int addedCount = 0;
       int skippedCount = 0;
       
-      // Добавляем основные ингредиенты
       for (final alt in basicAlts) {
         final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
         for (final product in products) {
@@ -558,7 +529,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
         }
       }
       
-      // Добавляем дополнительные ингредиенты
       for (final alt in additionalAlts) {
         final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
         for (final product in products) {

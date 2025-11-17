@@ -1,4 +1,4 @@
-// image_picker_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -37,7 +37,6 @@ class ImagePickerScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Иконка и заголовок
                 Container(
                   width: 120,
                   height: 120,
@@ -57,7 +56,6 @@ class ImagePickerScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 
-                // Заголовок
                 Text(
                   'Анализ блюда по фото',
                   style: textTheme.headlineSmall?.copyWith(
@@ -68,7 +66,6 @@ class ImagePickerScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 
-                // Описание
                 Text(
                   'Сфотографируйте блюдо и ИИ определит его состав,\nа также подберет нужные ингредиенты из магазина',
                   textAlign: TextAlign.center,
@@ -79,11 +76,9 @@ class ImagePickerScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 40),
                 
-                // Основные кнопки выбора изображения
                 _buildImageSelectionButtons(context),
                 const SizedBox(height: 24),
                 
-                // Дополнительные кнопки
                 _buildAdditionalButtons(context),
               ],
             ),
@@ -99,7 +94,6 @@ class ImagePickerScreen extends StatelessWidget {
 
     return Column(
       children: [
-        // Кнопка камеры
         Container(
           width: double.infinity,
           height: 60,
@@ -140,7 +134,6 @@ class ImagePickerScreen extends StatelessWidget {
           ),
         ),
         
-        // Кнопка галереи
         Container(
           width: double.infinity,
           height: 60,
@@ -187,14 +180,12 @@ class ImagePickerScreen extends StatelessWidget {
 
     return Column(
       children: [
-        // Кнопка истории анализов
         Container(
           width: double.infinity,
           height: 56,
           margin: const EdgeInsets.only(bottom: 12),
           child: ElevatedButton(
             onPressed: () {
-              // Используем GoRouter для навигации
               context.push('/analysis/history');
             },
             style: ElevatedButton.styleFrom(
@@ -238,7 +229,6 @@ class ImagePickerScreen extends StatelessWidget {
           ),
         ),
         
-        // Информационная панель
         Container(
           margin: const EdgeInsets.only(top: 24),
           padding: const EdgeInsets.all(16),
@@ -318,10 +308,12 @@ class ImagePickerScreen extends StatelessWidget {
       );
       
       if (image != null && context.mounted) {
-        // Используем GoRouter для навигации с передачей параметра
+        final imageBytes = await image.readAsBytes();
+        final base64Image = base64Encode(imageBytes);
+        
         context.push(
           '/analysis/result',
-          extra: image, // Передаем image как extra
+          extra: base64Image,
         );
       }
     } catch (e) {
@@ -338,12 +330,5 @@ class ImagePickerScreen extends StatelessWidget {
         );
       }
     }
-  }
-
-  void _showExampleResults(BuildContext context) {
-    // Используем GoRouter для навигации с query параметром
-    context.push(
-      '/analysis/result?imagePath=example',
-    );
   }
 }

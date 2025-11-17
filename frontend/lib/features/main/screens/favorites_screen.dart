@@ -6,6 +6,7 @@ import 'package:client/core/providers/favorites_provider.dart';
 import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/navigation_bar.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 import 'dart:async';
 
 class FavoritesScreen extends ConsumerStatefulWidget {
@@ -131,19 +132,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         _filteredProducts.removeWhere((fav) => fav['product_id'] == productId);
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Удалено из избранного'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Удалено из избранного');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка: $e'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка');
     }
   }
 
@@ -157,9 +148,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обновления корзины: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка обновления корзины');
     }
   }
 

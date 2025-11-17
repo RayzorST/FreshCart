@@ -5,6 +5,7 @@ import 'package:client/api/client.dart';
 import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/widgets/navigation_bar.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -148,16 +149,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         _updateLocalQuantity(productId, previousQuantity);
         _updateTotalAmount();
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка обновления: $e'),
-          action: SnackBarAction(
-            label: 'Повторить',
-            onPressed: () => _updateCartItem(productId, quantity),
-          ),
-        ),
-      );
+
+      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
     }
   }
 
@@ -308,18 +301,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       }
 
       await _loadCart();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заказ успешно создан!')),
-      );
+
+      AppSnackbar.showSuccess(context: context, message: 'Заказ успешно создан!');
 
       context.push('/order-history');
       
     } catch (e) {
-      print('Error creating order: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка создания заказа: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка создания заказа');
     } finally {
       setState(() => _isCreatingOrder = false);
     }

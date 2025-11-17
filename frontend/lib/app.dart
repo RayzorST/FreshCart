@@ -164,10 +164,13 @@ class _AppWithRouter extends ConsumerWidget {
         ),
         GoRoute(
           path: '/analysis/result',
-          name: 'analysis',
-          builder: (context, state) => AnalysisScreen(
-            imagePath: state.extra as String,
-          ),
+          builder: (context, state) {
+            final imageData = state.extra as String?;
+            
+            return AnalysisResultScreen(
+              imageData: imageData,
+            );
+          },
         ),
         GoRoute(
           path: '/product/:id',

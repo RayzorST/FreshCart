@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:client/core/providers/products_provider.dart';
 import 'package:client/api/client.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class CategoryFilterWidget extends ConsumerWidget {
   const CategoryFilterWidget({super.key});
@@ -13,9 +12,10 @@ class CategoryFilterWidget extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final sharedPrefsAsync = ref.watch(sharedPreferencesProvider);
-    final isExpanded = kIsWeb ? true : ref.watch(isCategoriesExpandedProvider);
+    final isWideScreen = MediaQuery.of(context).size.width > 600;
+    final isExpanded = isWideScreen ? true : ref.watch(isCategoriesExpandedProvider);
 
-    if (!kIsWeb) {
+    if (!isWideScreen) {
       final sharedPrefsAsync = ref.watch(sharedPreferencesProvider);
       sharedPrefsAsync.whenData((sharedPrefs) {
         final savedState = sharedPrefs.getBool('categories_expanded');
@@ -42,7 +42,7 @@ class CategoryFilterWidget extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const Spacer(),
-              if (!kIsWeb)
+              if (!isWideScreen)
                 IconButton(
                   icon: Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
@@ -72,7 +72,7 @@ class CategoryFilterWidget extends ConsumerWidget {
   }
   
   void _toggleExpandedState(WidgetRef ref, bool newState, AsyncValue<SharedPreferences> sharedPrefsAsync) {
-    if (kIsWeb) return;
+    //if (isWideScreen) return;
     
     ref.read(isCategoriesExpandedProvider.notifier).state = newState;
     

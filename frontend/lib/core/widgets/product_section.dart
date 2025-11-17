@@ -6,6 +6,7 @@ import 'package:client/core/providers/favorites_provider.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/api/client.dart';
 import 'package:go_router/go_router.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class ProductGridSection extends ConsumerStatefulWidget {
   const ProductGridSection({
@@ -407,30 +408,16 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
         await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обновления корзины: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка обновления корзины');  
     }
   }
 
   Future<void> _toggleFavorite(int productId, bool isFavorite, BuildContext context, WidgetRef ref) async {
     try {
-      await ref.read(favoritesProvider.notifier).toggleFavorite(productId, isFavorite);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isFavorite ? 'Добавлено в избранное' : 'Удалено из избранного'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      await ref.read(favoritesProvider.notifier).toggleFavorite(productId, isFavorite);  
+      AppSnackbar.showInfo(context: context, message: isFavorite ? 'Добавлено в избранное' : 'Удалено из избранного');
     } catch (e) {
-      print('Error toggling favorite: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка: $e'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка добавления в избранное');
     }
   }
 }
