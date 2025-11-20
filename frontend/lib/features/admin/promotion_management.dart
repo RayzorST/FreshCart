@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class PromotionManagement extends ConsumerStatefulWidget {
   const PromotionManagement({super.key});
@@ -28,7 +29,6 @@ class _PromotionManagementState extends ConsumerState<PromotionManagement> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading promotions: $e');
       setState(() {
         _isLoading = false;
       });
@@ -39,13 +39,9 @@ class _PromotionManagementState extends ConsumerState<PromotionManagement> {
     try {
       await ApiClient.createAdminPromotion(promotionData);
       _loadPromotions();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Акция создана')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Акция создана');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка создания: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка создания');
     }
   }
 
@@ -53,13 +49,9 @@ class _PromotionManagementState extends ConsumerState<PromotionManagement> {
     try {
       await ApiClient.deleteAdminPromotion(promotionId);
       _loadPromotions();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Акция удалена')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Акция удалена');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка удаления: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка удаления');
     }
   }
 
@@ -109,7 +101,6 @@ class _PromotionManagementState extends ConsumerState<PromotionManagement> {
   }
 
   void _showCreatePromotionDialog() {
-    // TODO: Реализовать диалог создания акции
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

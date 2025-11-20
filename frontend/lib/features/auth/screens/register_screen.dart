@@ -1,27 +1,48 @@
-// register_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:client/api/client.dart';
-import 'package:client/core/providers/auth_provider.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
+import 'package:client/features/auth/bloc/register_bloc.dart';
+import 'package:client/features/auth/bloc/auth_bloc.dart'; // Добавляем импорт
 
-class RegisterScreen extends ConsumerStatefulWidget {
+class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
 
   @override
-  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => RegisterBloc(),
+      child: BlocListener<RegisterBloc, RegisterState>(
+        listener: (context, state) {
+          if (state is RegisterSuccess) {
+            // Используем AuthBloc вместо AuthProvider
+            context.read<AuthBloc>().add(LoggedIn(state.token));
+            context.go('/');
+            AppSnackbar.showSuccess(context: context, message: 'Успешная регистрация');
+          } else if (state is RegisterFailure) {
+            AppSnackbar.showError(context: context, message: state.error);
+          }
+        },
+        child: const _RegisterScreenContent(),
+      ),
+    );
+  }
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+class _RegisterScreenContent extends StatefulWidget {
+  const _RegisterScreenContent();
+
+  @override
+  State<_RegisterScreenContent> createState() => __RegisterScreenContentState();
+}
+
+class __RegisterScreenContentState extends State<_RegisterScreenContent> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +92,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       labelText: 'Имя',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Введите имя';
+                      }
+                      return null;
+                    },
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -81,6 +108,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       labelText: 'Фамилия',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Введите фамилию';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ],
@@ -119,18 +152,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               },
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _isLoading ? null : _register,
-                child: _isLoading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Создать аккаунт'),
-              ),
+            BlocBuilder<RegisterBloc, RegisterState>(
+              builder: (context, state) {
+                return SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: state is RegisterLoading ? null : _submitForm,
+                    child: state is RegisterLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Создать аккаунт'),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 16),
             TextButton(
@@ -150,7 +187,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
           child: Card(
             elevation: 4,
-            child: registerForm
+            child: registerForm,
           ),
         ),
       );
@@ -161,47 +198,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Future<void> _register() async {
+  void _submitForm() {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      
-      try {
-        final response = await ApiClient.registration(
-          _usernameController.text,
-          _emailController.text,
-          _passwordController.text,
-          _firstNameController.text,
-          _lastNameController.text,
-        );
-        
-        // Автоматически логинимся после регистрации
-        final loginResponse = await ApiClient.login(
-          _emailController.text,
-          _passwordController.text,
-        );
-        
-        // Сохраняем токен через authProvider
-        final authNotifier = ref.read(authProvider.notifier);
-        await authNotifier.setToken(loginResponse['access_token']);
-
-        if (mounted){
-          context.go('/');
-          AppSnackbar.showSuccess(context: context, message: 'Успешная регистрация');
-        }
-        
-      } catch (e) {
-        if (mounted){
-          AppSnackbar.showError(context: context, message: 'Ошибка регистрации');
-        }
-      } finally {
-        setState(() => _isLoading = false);
-      }
+      context.read<RegisterBloc>().add(
+            RegisterButtonPressed(
+              email: _emailController.text,
+              password: _passwordController.text,
+              firstName: _firstNameController.text,
+              lastName: _lastNameController.text,
+            ),
+          );
     }
   }
 
   @override
   void dispose() {
-    _usernameController.dispose();
     _emailController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();

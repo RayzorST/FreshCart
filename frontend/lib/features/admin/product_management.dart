@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class ProductManagement extends ConsumerStatefulWidget {
   const ProductManagement({super.key});
@@ -17,7 +18,6 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
   List<dynamic> _categories = [];
   List<dynamic> _tags = [];
   bool _isLoading = true;
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -312,13 +312,9 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
     try {
       await ApiClient.createAdminProduct(productData);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Товар создан')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Товар создан');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка создания: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка создания');
     }
   }
 
@@ -326,13 +322,9 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
     try {
       await ApiClient.updateAdminProduct(productId, productData);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Товар обновлен')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Товар обновлен');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обновления: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
     }
   }
 
@@ -340,28 +332,19 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
     try {
       await ApiClient.deleteAdminProduct(productId);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Товар удален')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Товар удален');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка удаления: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка удаления');
     }
   }
 
-  // Методы для работы с категориями
   Future<void> _createCategory(Map<String, dynamic> categoryData) async {
     try {
       await ApiClient.createAdminCategory(categoryData);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Категория создана')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Категория создана');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка создания: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка создания');
     }
   }
 
@@ -369,13 +352,9 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
     try {
       await ApiClient.updateAdminCategory(categoryId, categoryData);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Категория обновлена')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Категория обновлена');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обновления: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
     }
   }
 
@@ -383,28 +362,19 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
     try {
       await ApiClient.deleteAdminCategory(categoryId);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Категория удалена')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Категория удалена');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка удаления: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка удаления');
     }
   }
 
-  // Методы для работы с тегами
   Future<void> _createTag(Map<String, dynamic> tagData) async {
     try {
       await ApiClient.createAdminTag(tagData);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Тег создан')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Тег создан');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка создания: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка создания');
     }
   }
 
@@ -412,13 +382,9 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
     try {
       await ApiClient.updateAdminTag(tagId, tagData);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Тег обновлен')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Тег обновлен');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обновления: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
     }
   }
 
@@ -426,13 +392,9 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
     try {
       await ApiClient.deleteAdminTag(tagId);
       _loadData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Тег удален')),
-      );
+      AppSnackbar.showInfo(context: context, message: 'Тег удален');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка удаления: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка удаления');
     }
   }
 

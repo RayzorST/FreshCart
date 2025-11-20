@@ -1,33 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
 
-final isAdminProvider = FutureProvider<bool>((ref) async {
-  return await ApiClient.isUserAdmin();
-});
+class CustomNavigationBar extends StatelessWidget {
+  final int currentIndex;
+  final Function(int) onItemTapped;
+  final bool isVertical;
 
-final currentIndexProvider = StateProvider<int>((ref) => 0);
-
-class CustomBottomNavigationBar extends ConsumerWidget {
-  const CustomBottomNavigationBar({super.key});
+  const CustomNavigationBar({
+    super.key,
+    required this.currentIndex,
+    required this.onItemTapped,
+    required this.isVertical,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final isWideScreen = MediaQuery.of(context).size.width > 600;
 
-    return isWideScreen 
-        ? _buildSideNavigation(context, ref)
-        : _buildBottomNavigation(context, ref);
+    return isVertical 
+        ? _buildSideNavigation(context)
+        : _buildBottomNavigation(context);
   }
 
-  Widget _buildSideNavigation(BuildContext context, WidgetRef ref) {
-    final currentIndex = ref.watch(currentIndexProvider);
+  Widget _buildSideNavigation(BuildContext context) {
     final isWeb = kIsWeb;
-    final isAdminAsync = ref.watch(isAdminProvider);
 
     return SizedBox(
-      width: isWeb ? 200 : 80, // Широкая панель для веба, узкая для планшетов
+      width: isWeb ? 200 : 80,
       child: Column(
         children: [
           // Заголовок для веб-версии
@@ -72,7 +72,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                       label: 'Главная',
                       index: 0,
                       currentIndex: currentIndex,
-                      onTap: () => ref.read(currentIndexProvider.notifier).state = 0,
+                      onTap: () => onItemTapped(0),
                     ),
                     _buildWebNavItem(
                       context: context,
@@ -80,7 +80,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                       label: 'Корзина',
                       index: 1,
                       currentIndex: currentIndex,
-                      onTap: () => ref.read(currentIndexProvider.notifier).state = 1,
+                      onTap: () => onItemTapped(1),
                     ),
                     _buildWebNavItem(
                       context: context,
@@ -88,7 +88,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                       label: 'Избранное',
                       index: 2,
                       currentIndex: currentIndex,
-                      onTap: () => ref.read(currentIndexProvider.notifier).state = 2,
+                      onTap: () => onItemTapped(2),
                     ),
                     _buildWebNavItem(
                       context: context,
@@ -96,22 +96,29 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                       label: 'Профиль',
                       index: 3,
                       currentIndex: currentIndex,
-                      onTap: () => ref.read(currentIndexProvider.notifier).state = 3,
+                      onTap: () => onItemTapped(3),
                     ),
                     if (isWeb)
-                      isAdminAsync.when(
-                        loading: () => const SizedBox(), // Не показываем пока загружается
-                        error: (error, stack) => const SizedBox(), // Не показываем при ошибке
-                        data: (isAdmin) => isAdmin
-                            ? _buildWebNavItem(
-                                context: context,
-                                icon: Icons.admin_panel_settings,
-                                label: 'Админ панель',
-                                index: 4,
-                                currentIndex: currentIndex,
-                                onTap: () => ref.read(currentIndexProvider.notifier).state = 4,
-                              )
-                            : const SizedBox(),
+                      FutureBuilder<bool>(
+                        future: ApiClient.isUserAdmin(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const SizedBox();
+                          }
+                          
+                          if (snapshot.hasData && snapshot.data == true) {
+                            return _buildWebNavItem(
+                              context: context,
+                              icon: Icons.admin_panel_settings,
+                              label: 'Админ панель',
+                              index: 4,
+                              currentIndex: currentIndex,
+                              onTap: () => onItemTapped(4),
+                            );
+                          }
+                          
+                          return const SizedBox();
+                        },
                       ),
                   ],
                 ),
@@ -135,7 +142,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
     final isWeb = kIsWeb;
 
     return Container(
-      height: 50, // Фиксированная высота для веб-версии
+      height: 50,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
         color: isSelected 
@@ -180,8 +187,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
     );
   }
 
-  Widget _buildBottomNavigation(BuildContext context, WidgetRef ref) {
-    final currentIndex = ref.watch(currentIndexProvider);
+  Widget _buildBottomNavigation(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Column(
@@ -208,7 +214,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                   label: 'Главная',
                   index: 0,
                   currentIndex: currentIndex,
-                  onTap: () => ref.read(currentIndexProvider.notifier).state = 0,
+                  onTap: () => onItemTapped(0),
                   isVertical: false,
                 ),
                 _buildNavItem(
@@ -217,7 +223,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                   label: 'Корзина',
                   index: 1,
                   currentIndex: currentIndex,
-                  onTap: () => ref.read(currentIndexProvider.notifier).state = 1,
+                  onTap: () => onItemTapped(1),
                   isVertical: false,
                 ),
                 
@@ -229,7 +235,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                   label: 'Избранное',
                   index: 2,
                   currentIndex: currentIndex,
-                  onTap: () => ref.read(currentIndexProvider.notifier).state = 2,
+                  onTap: () => onItemTapped(2),
                   isVertical: false,
                 ),
                 _buildNavItem(
@@ -238,7 +244,7 @@ class CustomBottomNavigationBar extends ConsumerWidget {
                   label: 'Профиль',
                   index: 3,
                   currentIndex: currentIndex,
-                  onTap: () => ref.read(currentIndexProvider.notifier).state = 3,
+                  onTap: () => onItemTapped(3),
                   isVertical: false,
                 ),
               ],

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class OrderManagement extends ConsumerStatefulWidget {
   const OrderManagement({super.key});
@@ -31,7 +32,6 @@ class _OrderManagementState extends ConsumerState<OrderManagement> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading orders: $e');
       setState(() {
         _isLoading = false;
       });
@@ -41,14 +41,10 @@ class _OrderManagementState extends ConsumerState<OrderManagement> {
   Future<void> _updateOrderStatus(int orderId, String newStatus) async {
     try {
       await ApiClient.updateOrderStatus(orderId, newStatus);
-      _loadOrders(); // Перезагружаем список
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Статус заказа обновлен на $newStatus')),
-      );
+      _loadOrders();
+      AppSnackbar.showInfo(context: context, message: 'Статус заказа обновлен на $newStatus');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
     }
   }
 
@@ -68,7 +64,6 @@ class _OrderManagementState extends ConsumerState<OrderManagement> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              // Фильтр по статусу
               DropdownButton<String>(
                 value: _selectedStatus,
                 items: [
@@ -160,13 +155,11 @@ class OrderCard extends StatelessWidget {
             Text('Сумма: ${order['total_amount']} ₽'),
             Text('Дата: ${DateTime.parse(order['created_at']).toString().substring(0, 16)}'),
             const SizedBox(height: 8),
-            // Товары в заказе
             ...order['items'].map<Widget>((item) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text('• ${item['product']?['name']} - ${item['quantity']} шт. x ${item['price']} ₽'),
             )).toList(),
             const SizedBox(height: 12),
-            // Смена статуса
             Row(
               children: [
                 const Text('Изменить статус:'),

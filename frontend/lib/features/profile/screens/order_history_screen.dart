@@ -1,35 +1,177 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:client/features/profile/bloc/order_history_bloc.dart';
 import 'package:client/api/client.dart';
-import 'package:client/core/widgets/navigation_bar.dart';
 
-class OrderHistoryScreen extends ConsumerStatefulWidget {
+class OrderHistoryScreen extends StatelessWidget {
   const OrderHistoryScreen({super.key});
 
   @override
-  ConsumerState<OrderHistoryScreen> createState() => _OrderHistoryScreenState();
-}
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => OrderHistoryBloc()..add(LoadOrders()),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Мои заказы',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        body: BlocBuilder<OrderHistoryBloc, OrderHistoryState>(
+          builder: (context, state) {
+            if (state is OrderHistoryLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen> {
-  List<dynamic>? _orders;
-  bool _isLoading = true;
+            if (state is OrderHistoryLoaded) {
+              return state.orders.isEmpty 
+                  ? _buildEmptyState(context)
+                  : _buildOrdersList(context, state.orders);
+            }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadOrders();
+            if (state is OrderHistoryError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => context.read<OrderHistoryBloc>().add(LoadOrders()),
+                      child: const Text('Повторить'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
   }
 
-  Future<void> _loadOrders() async {
-    try {
-      final orders = await ApiClient.getMyOrders();
-      setState(() {
-        _orders = orders;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shopping_bag_outlined,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Нет заказов',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Здесь будут отображаться ваши заказы',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersList(BuildContext context, List<dynamic> orders) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ...orders.map((order) => _buildOrderCard(context, order)),
+      ],
+    );
+  }
+
+  Widget _buildOrderCard(BuildContext context, dynamic order) {
+    final status = order['status'] ?? 'pending';
+    final items = order['items'] ?? [];
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Заказ #${order['id']}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _getStatusText(status),
+                    style: TextStyle(
+                      color: _getStatusColor(status),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            _buildStatusIndicator(status),
+            const SizedBox(height: 12),
+            
+            Text(
+              _formatDate(order['created_at']),
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _getItemsPreview(items),
+              style: const TextStyle(fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${order['total_amount']?.toStringAsFixed(0) ?? '0'} ₽',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.green,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    _showOrderDetails(context, order);
+                  },
+                  child: const Text('Подробнее'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _getStatusText(String status) {
@@ -88,149 +230,6 @@ class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen> {
     }
     return preview;
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Мои заказы',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _orders == null || _orders!.isEmpty
-              ? _buildEmptyState()
-              : _buildOrdersList(),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.shopping_bag_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Нет заказов',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Здесь будут отображаться ваши заказы',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => ref.read(currentIndexProvider.notifier).state = 0,
-            icon: const Icon(Icons.shopping_cart),
-            label: const Text('Сделать первый заказ'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOrdersList() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        ..._orders!.map((order) => _buildOrderCard(context, order)),
-      ],
-    );
-  }
-
-Widget _buildOrderCard(BuildContext context, dynamic order) {
-  final status = order['status'] ?? 'pending';
-  final items = order['items'] ?? [];
-
-  return Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Заказ #${order['id']}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(status).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _getStatusText(status),
-                  style: TextStyle(
-                    color: _getStatusColor(status),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          _buildStatusIndicator(status),
-          const SizedBox(height: 12),
-          
-          Text(
-            _formatDate(order['created_at']),
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _getItemsPreview(items),
-            style: const TextStyle(fontSize: 14),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${order['total_amount']?.toStringAsFixed(0) ?? '0'} ₽',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Colors.green,
-                ),
-              ),
-              if (status != 'cancelled' && status != 'delivered')
-                TextButton(
-                  onPressed: () {
-                    _showOrderDetails(order);
-                  },
-                  child: const Text('Подробнее'),
-                ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
   Widget _buildStatusIndicator(String status) {
     final List<StatusStep> steps;
@@ -300,13 +299,12 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
     );
   }
 
-  void _showOrderDetails(dynamic order) {
+  void _showOrderDetails(BuildContext context, dynamic order) {
     final items = order['items'] ?? [];
     
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      barrierColor: Colors.grey.withOpacity(0.2),
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(16),
@@ -429,7 +427,7 @@ Widget _buildOrderCard(BuildContext context, dynamic order) {
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
-                      '${ApiClient.baseUrl}/images/products/${item['product']['id']}/image',
+                      '${ApiClient.baseUrl}/images/products/${ item['product']['id']}/image',
                       fit: BoxFit.cover,
                     ),
                   )

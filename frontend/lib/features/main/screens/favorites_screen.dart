@@ -1,116 +1,47 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
-import 'package:client/core/providers/favorites_provider.dart';
-import 'package:client/core/providers/cart_provider.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
-import 'package:client/core/widgets/navigation_bar.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
-import 'dart:async';
+import 'package:client/features/main/bloc/favorites_bloc.dart';
+import 'package:client/features/main/bloc/cart_bloc.dart';
 
-class FavoritesScreen extends ConsumerStatefulWidget {
+class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
 
   @override
-  ConsumerState<FavoritesScreen> createState() => _FavoritesScreenState();
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
-class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
-  List<dynamic> _favoritesProducts = [];
-  List<dynamic> _filteredProducts = [];
-  bool _isLoading = true;
+class _FavoritesScreenState extends State<FavoritesScreen> {
   final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
-  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
-    _loadFavoritesWithProducts();
     _searchController.addListener(_onSearchChanged);
+    // Загружаем избранное при инициализации
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<FavoritesBloc>().add(const FavoritesLoaded());
+    });
   }
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadFavoritesWithProducts() async {
-    try {
-      setState(() => _isLoading = true);
-      final favorites = await ApiClient.getFavorites();
-      setState(() {
-        _favoritesProducts = favorites;
-        _filteredProducts = favorites;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
-  }
-
   void _onSearchChanged() {
-    final query = _searchController.text.trim();
-    ref.read(favoritesSearchQueryProvider.notifier).state = query;
-    
-    // Отменяем предыдущий таймер
-    _searchDebounce?.cancel();
-    
-    if (query.isEmpty) {
-      // Если запрос пустой, сразу показываем все товары
-      setState(() {
-        _filteredProducts = _favoritesProducts;
-        _isSearching = false;
-      });
-    } else {
-      // Сначала делаем быстрый локальный поиск
-      _performLocalSearch(query);
-      
-      // Затем через debounce делаем серверный поиск (если нужно)
-      _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-        _performServerSearch(query);
-      });
-    }
-  }
-
-  void _performLocalSearch(String query) {
-    setState(() {
-      _filteredProducts = _favoritesProducts.where((favorite) {
-        final product = favorite['product'];
-        final productName = product['name']?.toString().toLowerCase() ?? '';
-        return productName.contains(query.toLowerCase());
-      }).toList();
-      _isSearching = true;
-    });
-  }
-
-  Future<void> _performServerSearch(String query) async {
-    try {
-      // Только если локальный поиск не дал результатов или мы хотим актуальные данные
-      if (_filteredProducts.isEmpty || query.length >= 3) {
-        final searchResults = await ApiClient.getFavorites(search: query);
-        setState(() {
-          _filteredProducts = searchResults;
-          _isSearching = true;
-        });
-      }
-    } catch (e) {
-      // Игнорируем ошибки серверного поиска, оставляем локальные результаты
-      print('Server search error: $e');
-    }
+    context.read<FavoritesBloc>().add(
+      FavoritesSearchChanged(_searchController.text),
+    );
   }
 
   void _clearSearch() {
-    _searchDebounce?.cancel();
     _searchController.clear();
-    ref.read(favoritesSearchQueryProvider.notifier).state = '';
-    setState(() {
-      _filteredProducts = _favoritesProducts;
-      _isSearching = false;
-    });
+    context.read<FavoritesBloc>().add(const FavoritesSearchCleared());
   }
 
   String _getProductsCountText(int count) {
@@ -123,33 +54,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     }
   }
 
-  Future<void> _removeFromFavorites(int productId) async {
-    try {
-      await ref.read(favoritesProvider.notifier).toggleFavorite(productId, false);
-      
-      setState(() {
-        _favoritesProducts.removeWhere((fav) => fav['product_id'] == productId);
-        _filteredProducts.removeWhere((fav) => fav['product_id'] == productId);
-      });
-      
-      AppSnackbar.showInfo(context: context, message: 'Удалено из избранного');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка');
-    }
-  }
-
-  Future<void> _updateCartQuantity(int productId, int quantity) async {
-    try {
-      final currentQuantity = ref.read(cartProvider)[productId] ?? 0;
-      
-      if (currentQuantity == 0 && quantity > 0) {
-        await ref.read(cartProvider.notifier).addToCart(productId);
-      } else {
-        await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
-      }
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка обновления корзины');
-    }
+  void _removeFromFavorites(int productId) {
+    context.read<FavoritesBloc>().add(
+      FavoriteToggled(productId, false),
+    );
   }
 
   void _onProductTap(Map<String, dynamic> product) {
@@ -165,33 +73,91 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         actions: [
-          if (_favoritesProducts.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _isSearching 
-                      ? "${_getProductsCountText(_filteredProducts.length)}"
-                      : "${_getProductsCountText(_favoritesProducts.length)}",
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+          BlocBuilder<FavoritesBloc, FavoritesState>(
+            builder: (context, state) {
+              final displayCount = state.isSearching 
+                  ? state.filteredFavorites.length
+                  : state.favorites.length;
+              
+              if (displayCount > 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getProductsCountText(displayCount),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _favoritesProducts.isEmpty
-              ? _buildEmptyState()
-              : _buildFavoritesList(),
+      body: BlocConsumer<FavoritesBloc, FavoritesState>(
+        listener: (context, state) {
+          if (state.error != null) {
+            AppSnackbar.showError(context: context, message: state.error!);
+          }
+        },
+        builder: (context, state) {
+          if (state.status == FavoritesStatus.initial || 
+              state.status == FavoritesStatus.loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state.status == FavoritesStatus.error && state.favorites.isEmpty) {
+            return _buildErrorState(state.error!);
+          }
+
+          if (state.favorites.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          return _buildFavoritesList(context, state);
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+          const SizedBox(height: 16),
+          Text(
+            'Ошибка загрузки',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              error,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () => context.read<FavoritesBloc>().add(const FavoritesLoaded()),
+            child: const Text('Повторить'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -222,7 +188,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: () => ref.read(currentIndexProvider.notifier).state = 0,
+            onPressed: () {
+              // Навигация к главному экрану
+              context.go('/');
+            },
             icon: const Icon(Icons.shopping_bag),
             label: const Text('Перейти к покупкам'),
           ),
@@ -231,7 +200,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     );
   }
 
-  Widget _buildFavoritesList() {
+  Widget _buildFavoritesList(BuildContext context, FavoritesState state) {
     return Column(
       children: [
         // Поле поиска
@@ -290,7 +259,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           ),
         ),
 
-        if (_isSearching && _filteredProducts.isEmpty)
+        if (state.isSearching && state.filteredFavorites.isEmpty)
           Expanded(
             child: Center(
               child: Column(
@@ -323,25 +292,58 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
-              itemCount: _filteredProducts.length,
+              itemCount: state.filteredFavorites.length,
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final favorite = _filteredProducts[index];
+                final favorite = state.filteredFavorites[index];
                 final product = favorite['product'];
                 final productId = product['id'] as int;
-                final quantity = ref.watch(cartProvider)[productId] ?? 0;
                 
-                return _buildFavoriteItem(product, quantity);
+                return FavoriteItemCard(
+                  product: product,
+                  productId: productId,
+                  onRemove: () => _removeFromFavorites(productId),
+                  onTap: () => _onProductTap(product),
+                );
               },
             ),
           ),
       ],
     );
   }
+}
 
-  Widget _buildFavoriteItem(Map<String, dynamic> product, int quantity) {
-    final productId = product['id'] as int;
+class FavoriteItemCard extends StatelessWidget {
+  final Map<String, dynamic> product;
+  final int productId;
+  final VoidCallback onRemove;
+  final VoidCallback onTap;
+
+  const FavoriteItemCard({
+    super.key,
+    required this.product,
+    required this.productId,
+    required this.onRemove,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final price = (product['price'] as num?)?.toDouble() ?? 0.0;
+
+    // Получаем количество из корзины
+    final quantity = context.select<CartBloc, int>((bloc) {
+      // Если корзина еще загружается, показываем 0
+      if (bloc.state.status == CartStatus.loading) {
+        return 0;
+      }
+      
+      final item = bloc.state.cartItems.firstWhere(
+        (item) => item['product_id'] == productId,
+        orElse: () => null,
+      );
+      return item != null ? item['quantity'] : 0;
+    });
 
     return Card(
       margin: const EdgeInsets.only(bottom: 0),
@@ -354,10 +356,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProductImage(product),
+            _buildProductImage(context),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildProductInfo(product, price, productId, quantity),
+              child: _buildProductInfo(context, price, quantity),
             ),
           ],
         ),
@@ -365,9 +367,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     );
   }
 
-  Widget _buildProductImage(Map<String, dynamic> product) {
+  Widget _buildProductImage(BuildContext context) {
     return GestureDetector(
-      onTap: () => _onProductTap(product),
+      onTap: onTap,
       child: Container(
         width: 80,
         height: 80,
@@ -375,12 +377,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           borderRadius: BorderRadius.circular(8),
           color: Theme.of(context).colorScheme.surfaceVariant,
         ),
-        child: _buildProductImageContent(product),
+        child: _buildProductImageContent(context),
       ),
     );
   }
 
-  Widget _buildProductImageContent(Map<String, dynamic> product) {
+  Widget _buildProductImageContent(BuildContext context) {
     final imageUrl = product['image_url'];
     if (imageUrl == null || imageUrl.toString().isEmpty) {
       return Icon(
@@ -405,7 +407,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     );
   }
 
-  Widget _buildProductInfo(Map<String, dynamic> product, double price, int productId, int quantity) {
+  Widget _buildProductInfo(BuildContext context, double price, int quantity) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -414,7 +416,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => _onProductTap(product),
+                onTap: onTap,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -437,7 +439,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 ),
               ),
             ),
-            _buildFavoriteButton(productId),
+            _buildFavoriteButton(),
           ],
         ),
         const SizedBox(height: 8),
@@ -455,7 +457,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             QuantityControls(
               productId: productId,
               quantity: quantity,
-              onQuantityChanged: _updateCartQuantity,
+              onQuantityChanged: (productId, quantity) {
+                context.read<CartBloc>().add(CartItemQuantityUpdated(productId, quantity));
+              },
             ),
           ],
         ),
@@ -463,14 +467,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     );
   }
 
-  Widget _buildFavoriteButton(int productId) {
+  Widget _buildFavoriteButton() {
     return IconButton(
       icon: const Icon(
         Icons.favorite,
         color: Colors.red,
         size: 22,
       ),
-      onPressed: () => _removeFromFavorites(productId),
+      onPressed: onRemove,
       padding: const EdgeInsets.all(4),
     );
   }

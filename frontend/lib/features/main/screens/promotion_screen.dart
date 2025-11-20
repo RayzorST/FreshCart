@@ -1,35 +1,62 @@
-// features/promotions/screens/promotion_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:client/core/providers/promotions_provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:client/features/main/bloc/promotions_bloc.dart';
 
-class PromotionScreen extends ConsumerWidget {
+class PromotionScreen extends StatefulWidget {
   final int? promotionId;
   
   const PromotionScreen({super.key, required this.promotionId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (promotionId == null) {
-      return _buildErrorScreen(context, 'Неверный ID акции');
-    }
+  State<PromotionScreen> createState() => _PromotionScreenState();
+}
 
-    final promotionAsync = ref.watch(promotionProvider(promotionId!));
+class _PromotionScreenState extends State<PromotionScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Загружаем акцию при инициализации
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PromotionsBloc>().add(PromotionLoaded(widget.promotionId));
+    });
+  }
 
+  void _refreshPromotion() {
+    context.read<PromotionsBloc>().add(PromotionRefreshed(widget.promotionId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Детали акции'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.refresh(promotionProvider(promotionId!)),
+            onPressed: _refreshPromotion,
           ),
         ],
       ),
-      body: promotionAsync.when(
-        loading: () => _buildLoadingScreen(),
-        error: (error, stack) => _buildErrorScreen(context, 'Ошибка загрузки акции: $error'),
-        data: (promotion) => _buildPromotionContent(context, promotion),
+      body: BlocConsumer<PromotionsBloc, PromotionsState>(
+        listener: (context, state) {
+          // Можно добавить обработку ошибок через SnackBar если нужно
+        },
+        builder: (context, state) {
+          if (state.status == PromotionsStatus.initial || 
+              state.status == PromotionsStatus.loading) {
+            return _buildLoadingScreen();
+          }
+
+          if (state.status == PromotionsStatus.error) {
+            return _buildErrorScreen(context, state.error ?? 'Ошибка загрузки акции');
+          }
+
+          if (state.currentPromotion == null) {
+            return _buildErrorScreen(context, 'Акция не найдена');
+          }
+
+          return _buildPromotionContent(context, state.currentPromotion!);
+        },
       ),
     );
   }
@@ -352,9 +379,7 @@ class PromotionScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {
-                // Можно добавить повторную загрузку
-              },
+              onPressed: _refreshPromotion,
               child: const Text('Повторить'),
             ),
           ],
@@ -372,7 +397,7 @@ class PromotionScreen extends ConsumerWidget {
       case 'gift':
         return Colors.orange;
       default:
-        return Colors.blue; // Запасной цвет
+        return Colors.blue;
     }
   }
 

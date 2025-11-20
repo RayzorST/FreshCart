@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class AnalysisResultScreen extends ConsumerStatefulWidget {
   final String? imageData;
@@ -494,15 +495,11 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
     try {
       await ApiClient.addToCart(productId, 1);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Товар добавлен в корзину')),
-        );
+        AppSnackbar.showInfo(context: context, message: 'Товар добавлен в корзину');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
-        );
+        AppSnackbar.showError(context: context, message: 'Ошибка добавления');
       }
     }
   }
@@ -543,20 +540,16 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
       }
       
       if (mounted) {
-        String message = 'Добавлено $addedCount товаров в корзину';
         if (skippedCount > 0) {
-          message += ' (пропущено $skippedCount - нет в наличии)';
+          AppSnackbar.showWarning(context: context, message: 'Добавлено $addedCount товаров в корзину (пропущено $skippedCount - нет в наличии)');
         }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        else{
+          AppSnackbar.showSuccess(context: context, message: 'Добавлено $addedCount товаров в корзину');
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при добавлении: $e')),
-        );
+        AppSnackbar.showError(context: context, message: 'Ошибка при добавлении');
       }
     }
   }

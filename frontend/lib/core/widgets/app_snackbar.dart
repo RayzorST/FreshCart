@@ -1,4 +1,3 @@
-// app_snackbar.dart
 import 'package:flutter/material.dart';
 
 class AppSnackbar {
@@ -66,21 +65,23 @@ class AppSnackbar {
     required Duration duration,
   }) {
     final overlay = Overlay.of(context);
+    final isWideScreen = MediaQuery.of(context).size.width > 600;
     
-    // Создаем переменную заранее
     late OverlayEntry overlayEntry;
     
     overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         top: MediaQuery.of(context).padding.top + 16,
-        left: 16,
+        left: isWideScreen ? null : 16,
         right: 16,
+        width: isWideScreen ? 400 : null,
         child: _FloatingMaterialBanner(
           message: message,
           backgroundColor: backgroundColor,
           icon: icon,
           onDismiss: () => overlayEntry.remove(),
           duration: duration,
+          isWideScreen: isWideScreen,
         ),
       ),
     );
@@ -115,6 +116,7 @@ class _FloatingMaterialBanner extends StatefulWidget {
   final IconData icon;
   final VoidCallback onDismiss;
   final Duration duration;
+  final bool isWideScreen;
 
   const _FloatingMaterialBanner({
     required this.message,
@@ -122,6 +124,7 @@ class _FloatingMaterialBanner extends StatefulWidget {
     required this.icon,
     required this.onDismiss,
     required this.duration,
+    required this.isWideScreen,
   });
 
   @override
@@ -164,7 +167,6 @@ class _FloatingMaterialBannerState extends State<_FloatingMaterialBanner>
 
     _controller.forward();
 
-    // Авто-закрытие
     Future.delayed(widget.duration, () {
       if (mounted) {
         _controller.reverse().then((_) {
@@ -186,7 +188,10 @@ class _FloatingMaterialBannerState extends State<_FloatingMaterialBanner>
       animation: _controller,
       builder: (context, child) {
         return Transform.translate(
-          offset: Offset(0, _slideAnimation.value),
+          offset: Offset(
+            widget.isWideScreen ? _slideAnimation.value : 0,
+            widget.isWideScreen ? 0 : _slideAnimation.value
+          ),
           child: Opacity(
             opacity: _opacityAnimation.value,
             child: child,
@@ -198,6 +203,7 @@ class _FloatingMaterialBannerState extends State<_FloatingMaterialBanner>
         shadowColor: Colors.black.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
         child: Container(
+          width: widget.isWideScreen ? 400 : null,
           decoration: BoxDecoration(
             color: widget.backgroundColor,
             borderRadius: BorderRadius.circular(16),

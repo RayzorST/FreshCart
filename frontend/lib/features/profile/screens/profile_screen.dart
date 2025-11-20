@@ -1,160 +1,179 @@
-import 'package:client/core/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:client/api/client.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:client/features/profile/bloc/profile_bloc.dart';
+import 'package:client/features/auth/bloc/auth_bloc.dart';
 
-class ProfileScreen extends ConsumerStatefulWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
-  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => ProfileBloc()..add(LoadProfile()),
+      child: Scaffold(
+        body: MultiBlocListener(
+          listeners: [
+            BlocListener<ProfileBloc, ProfileState>(
+              listener: (context, state) {
+                if (state is LogoutSuccess) {
+                  context.read<AuthBloc>().add(LoggedOut());
+                  context.go('/login');
+                }
+              },
+            ),
+          ],
+          child: BlocBuilder<ProfileBloc, ProfileState>(
+            builder: (context, state) {
+              return _buildContent(context, state);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, ProfileState state) {
+    if (state is ProfileLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (state is ProfileLoaded) {
+      return _ProfileContent(user: state.user, orders: state.orders);
+    }
+
+    if (state is ProfileError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'Ошибка загрузки',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => context.read<ProfileBloc>().add(LoadProfile()),
+              child: const Text('Повторить'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const Center(child: CircularProgressIndicator());
+  }
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  Map<String, dynamic>? _userData;
-  List<dynamic>? _orders;
-  bool _isLoading = true;
+class _ProfileContent extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final List<dynamic> orders;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
-
-  Future<void> _loadUserData() async {
-    try {
-      final user = await ApiClient.getProfile();
-      final orders = await ApiClient.getMyOrders();
-      
-      setState(() {
-        _userData = user;
-        _orders = orders;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
-  }
+  const _ProfileContent({required this.user, required this.orders});
 
   String _getInitials() {
-    if (_userData == null) return 'U';
-    final firstName = _userData!['first_name'] ?? '';
-    final lastName = _userData!['last_name'] ?? '';
+    final firstName = user['first_name'] ?? '';
+    final lastName = user['last_name'] ?? '';
     if (firstName.isNotEmpty && lastName.isNotEmpty) {
       return '${firstName[0]}${lastName[0]}'.toUpperCase();
     }
-    return _userData!['username'][0].toUpperCase();
+    return (user['username']?[0] ?? 'U').toString().toUpperCase();
   }
 
   String _getDisplayName() {
-    if (_userData == null) return 'Пользователь';
-    final firstName = _userData!['first_name'] ?? '';
-    final lastName = _userData!['last_name'] ?? '';
+    final firstName = user['first_name'] ?? '';
+    final lastName = user['last_name'] ?? '';
     if (firstName.isNotEmpty && lastName.isNotEmpty) {
       return '$firstName $lastName';
     }
-    return _userData!['username'];
-  }
-
-  int _getOrdersCount() {
-    return _orders?.length ?? 0;
+    return user['username']?.toString() ?? 'Пользователь';
   }
 
   String _getMemberSince() {
-    if (_userData == null) return 'Недавно';
-    final createdAt = _userData!['created_at'];
+    final createdAt = user['created_at'];
     if (createdAt != null) {
-      final date = DateTime.parse(createdAt);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-      
-      if (difference.inDays < 30) return '${difference.inDays} д.';
-      if (difference.inDays < 365) return '${(difference.inDays / 30).floor()} мес.';
-      return '${(difference.inDays / 365).floor()} г.';
+      try {
+        final date = DateTime.parse(createdAt);
+        final now = DateTime.now();
+        final difference = now.difference(date);
+        
+        if (difference.inDays < 30) return '${difference.inDays} д.';
+        if (difference.inDays < 365) return '${(difference.inDays / 30).floor()} мес.';
+        return '${(difference.inDays / 365).floor()} г.';
+      } catch (e) {
+        return 'Недавно';
+      }
     }
     return 'Недавно';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildProfileHeader(context),
-                
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildSectionCard(
-                        context,
-                        title: 'Мои заказы',
-                        subtitle: '${_getOrdersCount()} заказов',
-                        icon: Icons.shopping_bag,
-                        onTap: () {
-                          context.push('/order-history');
-                        },
-                      ),
-                      
-                      _buildSectionCard(
-                        context,
-                        title: 'Адреса доставки',
-                        subtitle: 'Управление адресами',
-                        icon: Icons.location_on,
-                        onTap: () {
-                          context.push('/addresses');
-                        },
-                      ),
-                      
-                      _buildSectionCard(
-                        context,
-                        title: 'Настройки',
-                        subtitle: 'Персональные настройки',
-                        icon: Icons.settings,
-                        onTap: () {
-                          context.push('/settings');
-                        },
-                      ),
-                      
-                      _buildSectionCard(
-                        context,
-                        title: 'Помощь и поддержка',
-                        subtitle: 'FAQ и контакты',
-                        icon: Icons.help,
-                        onTap: () {
-                          context.push('/help');
-                        },
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      Card(
-                        elevation: 0,
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.logout,
-                            color: Colors.red[400],
-                          ),
-                          title: Text(
-                            'Выйти из аккаунта',
-                            style: TextStyle(
-                              color: Colors.red[400],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          onTap: () {
-                            _showLogoutDialog(context);
-                          },
-                        ),
-                      ),
-                    ],
+    return Column(
+      children: [
+        _buildProfileHeader(context),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _buildSectionCard(
+                context,
+                title: 'Мои заказы',
+                subtitle: '${orders.length} заказов',
+                icon: Icons.shopping_bag,
+                onTap: () => context.push('/order-history'),
+              ),
+              _buildSectionCard(
+                context,
+                title: 'Адреса доставки',
+                subtitle: 'Управление адресами',
+                icon: Icons.location_on,
+                onTap: () => context.push('/addresses'),
+              ),
+              _buildSectionCard(
+                context,
+                title: 'Настройки',
+                subtitle: 'Персональные настройки',
+                icon: Icons.settings,
+                onTap: () => context.push('/settings'),
+              ),
+              _buildSectionCard(
+                context,
+                title: 'Помощь и поддержка',
+                subtitle: 'FAQ и контакты',
+                icon: Icons.help,
+                onTap: () => context.push('/help'),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 0,
+                color: Colors.red.withOpacity(0.05),
+                child: ListTile(
+                  leading: Icon(Icons.logout, color: Colors.red[400]),
+                  title: Text(
+                    'Выйти из аккаунта',
+                    style: TextStyle(
+                      color: Colors.red[400],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
+                  onTap: () => _showLogoutDialog(context),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -171,8 +190,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
           ],
         ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: kIsWeb ? Radius.circular(24) : Radius.circular(0),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
       ),
@@ -203,33 +222,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
           ),
-          
           const SizedBox(height: 16),
-          
-          // Имя
           Text(
             _getDisplayName(),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
           ),
-          
           const SizedBox(height: 4),
-          
           Text(
-            _userData?['email'] ?? 'email@example.com',
+            user['email']?.toString() ?? 'email@example.com',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withOpacity(0.9),
-            ),
+                  color: Colors.white.withOpacity(0.9),
+                ),
           ),
-          
           const SizedBox(height: 16),
-          
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatItem(context, '${_getOrdersCount()}', 'Заказов'),
+              _buildStatItem(context, '${orders.length}', 'Заказов'),
               _buildStatItem(context, _getMemberSince(), 'С нами'),
             ],
           ),
@@ -270,6 +282,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Container(
           width: 40,
@@ -278,35 +291,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+          child: Icon(icon, color: Theme.of(context).colorScheme.primary),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 12,
-          ),
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: Colors.grey[400],
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+        subtitle: Text(subtitle, 
+            style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
         onTap: onTap,
       ),
     );
   }
 
+  void _showChangePasswordDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Сменить пароль'),
+          content: const Text('Эта функция будет доступна в следующем обновлении.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showLogoutDialog(BuildContext context) {
+    final profileBloc = context.read<ProfileBloc>(); // Получить до диалога
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -315,22 +331,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           content: const Text('Вы уверены, что хотите выйти?'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('Отмена'),
             ),
             TextButton(
               onPressed: () {
-                final authNotifier = ref.read(authProvider.notifier);
-                authNotifier.clearToken();
                 Navigator.of(context).pop();
-                context.go('/login');
+                profileBloc.add(Logout()); // Использовать сохраненный bloc
               },
-              child: const Text(
-                'Выйти', 
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('Выйти', style: TextStyle(color: Colors.red)),
             ),
           ],
         );

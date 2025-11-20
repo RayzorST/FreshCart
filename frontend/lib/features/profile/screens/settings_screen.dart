@@ -1,126 +1,132 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/api/client.dart';
-import 'package:client/core/providers/theme_provider.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
+import 'package:client/features/profile/bloc/settings_bloc.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _orderNotifications = true;
-  bool _promoNotifications = true;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotificationSettings();
-  }
-
-  Future<void> _loadNotificationSettings() async {
-    try {
-      final settings = await ApiClient.getNotificationSettings();
-      setState(() {
-        _orderNotifications = settings['order_notifications'] ?? true;
-        _promoNotifications = settings['promo_notifications'] ?? true;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading notification settings: $e');
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _updateNotificationSettings() async {
-    try {
-      await ApiClient.updateNotificationSettings({
-        'order_notifications': _orderNotifications,
-        'promo_notifications': _promoNotifications,
-      });
-    } catch (e) {
-      setState(() {
-        _orderNotifications = !_orderNotifications;
-        _promoNotifications = !_promoNotifications;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка сохранения настроек: $e')),
-      );
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final isDarkTheme = ref.watch(themeProvider);
-
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'Настройки',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildSectionHeader('Уведомления'),
-                _buildSettingItem(
-                  title: 'Уведомления о заказах',
-                  subtitle: 'Статус заказов и доставки',
-                  value: _orderNotifications,
-                  onChanged: (value) {
-                    setState(() {
-                      _orderNotifications = value;
-                    });
-                    _updateNotificationSettings();
-                  },
-                ),
-                _buildSettingItem(
-                  title: 'Акции и скидки', 
-                  subtitle: 'Уведомления о специальных предложениях',
-                  value: _promoNotifications,
-                  onChanged: (value) {
-                    setState(() {
-                      _promoNotifications = value;
-                    });
-                    _updateNotificationSettings();
-                  },
-                ),
-                
-                _buildSectionHeader('Профиль'),
-                _buildActionItem(
-                  title: 'Редактировать профиль',
-                  icon: Icons.person_outline,
-                  onTap: () {
-                    _navigateToEditProfile(context);
-                  },
-                ),
-                _buildActionItem(
-                  title: 'Сменить пароль',
-                  icon: Icons.lock_outline,
-                  onTap: () {
-                    _showChangePasswordDialog(context);
-                  },
-                ),
-                
-                _buildSectionHeader('Внешний вид'),
-                _buildSettingItem(
-                  title: 'Темная тема', 
-                  subtitle: 'Переключение между светлой и темной темой',
-                  value: isDarkTheme,
-                  onChanged: (value) {
-                    ref.read(themeProvider.notifier).toggleTheme(value);
-                  },
-                ),
-              ],
-            ),
+      body: BlocBuilder<SettingsBloc, SettingsState>( // ЗАМЕНИ BlocConsumer на BlocBuilder
+        builder: (context, state) {
+          if (state is SettingsInitial || state is SettingsLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state is SettingsLoaded) {
+            return _SettingsContent(
+              orderNotifications: state.orderNotifications,
+              promoNotifications: state.promoNotifications,
+              isDarkTheme: state.isDarkTheme,
+            );
+          }
+
+          if (state is SettingsError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.read<SettingsBloc>().add(LoadSettings()),
+                    child: const Text('Повторить'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return const Center(child: CircularProgressIndicator());
+        },
+      ),
     );
   }
+}
+
+class _SettingsContent extends StatelessWidget {
+  final bool orderNotifications;
+  final bool promoNotifications;
+  final bool isDarkTheme;
+
+  const _SettingsContent({
+    required this.orderNotifications,
+    required this.promoNotifications,
+    required this.isDarkTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildSectionHeader('Уведомления'),
+        _buildSettingItem(
+          context,
+          title: 'Уведомления о заказах',
+          subtitle: 'Статус заказов и доставки',
+          value: orderNotifications,
+          onChanged: (value) => context.read<SettingsBloc>().add(
+            UpdateNotificationSettings(
+              orderNotifications: value,
+              promoNotifications: promoNotifications,
+            ),
+          ),
+        ),
+        _buildSettingItem(
+          context,
+          title: 'Акции и скидки',
+          subtitle: 'Уведомления о специальных предложениях',
+          value: promoNotifications,
+          onChanged: (value) => context.read<SettingsBloc>().add(
+            UpdateNotificationSettings(
+              orderNotifications: orderNotifications,
+              promoNotifications: value,
+            ),
+          ),
+        ),
+        
+        _buildSectionHeader('Профиль'),
+        _buildActionItem(
+          context,
+          title: 'Редактировать профиль',
+          icon: Icons.person_outline,
+          onTap: () => _navigateToEditProfile(context),
+        ),
+        _buildActionItem(
+          context,
+          title: 'Сменить пароль',
+          icon: Icons.lock_outline,
+          onTap: () => _showChangePasswordDialog(context),
+        ),
+        
+        _buildSectionHeader('Внешний вид'),
+        _buildSettingItem(
+          context,
+          title: 'Темная тема',
+          subtitle: 'Переключение между светлой и темной темой',
+          value: isDarkTheme,
+          onChanged: (value) => context.read<SettingsBloc>().add(
+            UpdateThemeSettings(isDarkTheme: value),
+          ),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildSectionHeader(String title) {
     return Padding(
@@ -136,7 +142,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSettingItem({
+  Widget _buildSettingItem(
+    BuildContext context, {
     required String title,
     required String subtitle,
     required bool value,
@@ -148,15 +155,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: ListTile(
         title: Text(title),
         subtitle: Text(subtitle),
-        trailing: Switch(
-          value: value,
-          onChanged: onChanged,
-        ),
+        trailing: Switch(value: value, onChanged: onChanged),
       ),
     );
   }
 
-  Widget _buildActionItem({
+  Widget _buildActionItem(
+    BuildContext context, {
     required String title,
     required IconData icon,
     required VoidCallback onTap,
@@ -176,16 +181,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _navigateToEditProfile(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditProfileScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
     );
   }
 
   void _showChangePasswordDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => ChangePasswordDialog(),
+      builder: (context) => const ChangePasswordDialog(),
     );
   }
 }
@@ -221,10 +224,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка загрузки профиля: $e')),
-      );
-      setState(() => _isLoading = false);
+      if (mounted) {
+        AppSnackbar.showError(context: context, message: 'Ошибка загрузки профиля');
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -239,16 +242,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'email': _emailController.text,
         });
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Профиль успешно обновлен')),
-        );
-        Navigator.pop(context);
+        if (mounted) {
+          AppSnackbar.showSuccess(context: context, message: 'Профиль успешно обновлен');
+          Navigator.pop(context);
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка сохранения: $e')),
-        );
+        if (mounted) {
+          AppSnackbar.showError(context: context, message: 'Ошибка сохранения');
+        }
       } finally {
-        setState(() => _isSaving = false);
+        if (mounted) {
+          setState(() => _isSaving = false);
+        }
       }
     }
   }
@@ -261,7 +266,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         actions: [
           IconButton(
             icon: _isSaving 
-                ? const CircularProgressIndicator()
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.save),
             onPressed: _isSaving ? null : _saveProfile,
           ),
@@ -337,7 +346,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       child: ElevatedButton(
                         onPressed: _isSaving ? null : _saveProfile,
                         child: _isSaving 
-                            ? const CircularProgressIndicator()
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
                             : const Text('Сохранить изменения'),
                       ),
                     ),
@@ -376,16 +389,18 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
           newPassword: _newPasswordController.text,
         );
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Пароль успешно изменен')),
-        );
-        Navigator.pop(context);
+        if (mounted) {
+          AppSnackbar.showSuccess(context: context, message: 'Пароль успешно изменен');
+          Navigator.pop(context);
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка смены пароля: $e')),
-        );
+        if (mounted) {
+          AppSnackbar.showError(context: context, message: 'Ошибка смены пароля');
+        }
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
@@ -492,7 +507,11 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
         ElevatedButton(
           onPressed: _isLoading ? null : _changePassword,
           child: _isLoading 
-              ? const CircularProgressIndicator()
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Сменить пароль'),
         ),
       ],

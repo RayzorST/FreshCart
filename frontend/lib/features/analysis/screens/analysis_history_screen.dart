@@ -1,6 +1,7 @@
 // analysis_history_screen.dart
 import 'package:flutter/material.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class AnalysisHistoryScreen extends StatefulWidget {
   const AnalysisHistoryScreen({super.key});
@@ -658,58 +659,28 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
       }
       
       if (mounted) {
-        String message = 'Добавлено $addedCount товаров в корзину';
         if (skippedCount > 0) {
-          message += ' (пропущено $skippedCount - нет в наличии)';
+          AppSnackbar.showWarning(context: context, message: 'Добавлено $addedCount товаров в корзину (пропущено $skippedCount - нет в наличии)');
         }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        else{
+          AppSnackbar.showSuccess(context: context, message: 'Добавлено $addedCount товаров в корзину');
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка при добавлении: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        AppSnackbar.showError(context: context, message: 'Ошибка при добавлении');
       }
     }
   }
 
   void _deleteAnalysis(int analysisId) async {
     try {
+      AppSnackbar.showInfo(context: context, message: 'Анализ удален');
+      _loadMyAnalysisHistory();
       //await ApiClient.deleteAnalysisRecord(analysisId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Анализ удален'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-          ),
-        );
-        _loadMyAnalysisHistory(); // Обновляем список
-      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка удаления: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        AppSnackbar.showError(context: context, message: 'Ошибка удаления');
       }
     }
   }

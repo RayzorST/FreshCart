@@ -41,7 +41,8 @@ async def get_favorites(
                 "category": {
                     "id": favorite.product.category.id,
                     "name": favorite.product.category.name
-                }
+                },
+                "stock_quantity": favorite.product.stock_quantity,
             }
         }
         result.append(favorite_data)

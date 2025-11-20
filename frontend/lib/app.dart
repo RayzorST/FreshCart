@@ -1,157 +1,153 @@
+import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
 import 'package:client/core/theme/app_theme.dart';
-import 'package:client/core/providers/theme_provider.dart';
 import 'package:client/core/widgets/splash_screen.dart';
+
+// Auth BLoC
+import 'package:client/features/auth/bloc/auth_bloc.dart';
+import 'package:client/features/auth/bloc/login_bloc.dart';
+import 'package:client/features/auth/bloc/register_bloc.dart';
 import 'package:client/features/auth/screens/login_screen.dart';
 import 'package:client/features/auth/screens/register_screen.dart';
+
+// Main BLoC
+import 'package:client/features/main/bloc/main_bloc.dart';
+import 'package:client/features/main/bloc/favorites_bloc.dart';
+import 'package:client/features/main/bloc/promotions_bloc.dart';
+
+// Profile BLoC
+import 'package:client/features/profile/bloc/profile_bloc.dart';
+import 'package:client/features/profile/bloc/order_history_bloc.dart';
+import 'package:client/features/profile/bloc/settings_bloc.dart';
+import 'package:client/features/profile/bloc/addresses_bloc.dart';
+
+// Screens
 import 'package:client/features/main/screens/main_screen.dart';
 import 'package:client/features/main/screens/promotion_screen.dart';
 import 'package:client/features/analysis/screens/analysis_screen.dart';
 import 'package:client/features/analysis/screens/image_picker_screen.dart';
 import 'package:client/features/analysis/screens/analysis_history_screen.dart';
 import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/features/profile/screens/profile_screen.dart';
 import 'package:client/features/profile/screens/addresses_screen.dart';
 import 'package:client/features/profile/screens/help_screen.dart';
 import 'package:client/features/profile/screens/settings_screen.dart';
 import 'package:client/features/profile/screens/order_history_screen.dart';
-import 'package:client/core/providers/auth_provider.dart';
 
-class FreshCartApp extends StatelessWidget {
+class FreshCartApp extends StatefulWidget {
   const FreshCartApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ProviderScope(
-      child: MaterialApp(
-        title: 'FreshCart',
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        debugShowCheckedModeBanner: false,
-        home: const AppInitializer(),
-      ),
-    );
-  }
+  State<FreshCartApp> createState() => _FreshCartAppState();
 }
 
-class AppInitializer extends ConsumerStatefulWidget {
-  const AppInitializer({super.key});
-
-  @override
-  ConsumerState<AppInitializer> createState() => _AppInitializerState();
-}
-
-class _AppInitializerState extends ConsumerState<AppInitializer> {
-  bool _showSplash = true;
+class _FreshCartAppState extends State<FreshCartApp> {
+  late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    _router = _createRouter();
   }
 
-  Future<void> _initializeApp() async {
-    if (mounted) {
-      setState(() {
-        _showSplash = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_showSplash) {
-      return Container(color: Colors.black);
-    }
-
-    return _MainApp();
-  }
-}
-
-class _MainApp extends ConsumerStatefulWidget {
-  const _MainApp();
-
-  @override
-  ConsumerState<_MainApp> createState() => _MainAppState();
-}
-
-class _MainAppState extends ConsumerState<_MainApp> {
-  bool _isAppInitialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeApp();
-  }
-
-  Future<void> _initializeApp() async {
-    await Future.wait([
-      _waitForAuth(),
-      Future.delayed(const Duration(seconds: 2)),
-    ]);
-
-    if (mounted) {
-      setState(() {
-        _isAppInitialized = true;
-      });
-    }
-  }
-
-  Future<void> _waitForAuth() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final authState = ref.read(authProvider);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_isAppInitialized) {
-      return const SplashScreen();
-    }
-
-    return _AppWithRouter();
-  }
-}
-
-class _AppWithRouter extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    final isDarkTheme = ref.watch(themeProvider);
-
-    final router = GoRouter(
-      initialLocation: authState != null ? '/' : '/login',
-      
-      redirect: (context, state) {
-        final isAuthenticated = authState != null;
-        final isGoingToAuth = state.uri.path == '/login' || state.uri.path == '/register';
-        
-        if (!isAuthenticated && !isGoingToAuth) {
-          return '/login';
-        }
-        
-        if (isAuthenticated && isGoingToAuth) {   
-          return '/';
-        }
-        
-        return null;
-      },
-      
+  GoRouter _createRouter() {
+    return GoRouter(
+      initialLocation: '/splash',
       routes: [
         GoRoute(
-          path: '/login',   
+          path: '/splash',
+          name: 'splash',
+          pageBuilder: (context, state) => MaterialPage(
+            child: SplashScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/login',
           name: 'login',
-          builder: (context, state) => const LoginScreen(),
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider(
+              create: (context) => LoginBloc(),
+              child: const LoginScreen(),
+            ),
+          ),
         ),
         GoRoute(
           path: '/register',
           name: 'register',
-          builder: (context, state) => const RegisterScreen(),
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider(
+              create: (context) => RegisterBloc(),
+              child: const RegisterScreen(),
+            ),
+          ),
         ),
         GoRoute(
           path: '/',
           name: 'home',
-          builder: (context, state) => const MainScreen(),
+          pageBuilder: (context, state) => MaterialPage(
+            child: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: context.read<MainBloc>()),
+                BlocProvider.value(value: context.read<FavoritesBloc>()),
+                BlocProvider.value(value: context.read<PromotionsBloc>()),
+                BlocProvider.value(value: context.read<AuthBloc>()),
+              ],
+              child: const MainScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/profile',
+          name: 'profile',
+          pageBuilder: (context, state) => MaterialPage(
+            child: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: context.read<AuthBloc>()),
+                BlocProvider(
+                  create: (context) => context.read<ProfileBloc>(),
+                ),
+              ],
+              child: const ProfileScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/order-history',
+          name: 'order-history',
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider(
+              create: (context) => OrderHistoryBloc()..add(LoadOrders()),
+              child: const OrderHistoryScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/addresses',
+          name: 'addresses',
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider(
+              create: (context) => AddressesBloc()..add(LoadAddresses()),
+              child: const AddressesScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/settings',
+          name: 'settings',
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider.value(
+              value: context.read<SettingsBloc>(),
+              child: const SettingsScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/help',
+          name: 'help',
+          builder: (context, state) => const HelpScreen(),
         ),
         GoRoute(
           path: '/analysis/camera',
@@ -160,63 +156,138 @@ class _AppWithRouter extends ConsumerWidget {
         ),
         GoRoute(
           path: '/analysis/history',
+          name: 'analysis-history',
           builder: (context, state) => const AnalysisHistoryScreen(),
         ),
         GoRoute(
           path: '/analysis/result',
+          name: 'analysis-result',
           builder: (context, state) {
             final imageData = state.extra as String?;
-            
-            return AnalysisResultScreen(
-              imageData: imageData,
-            );
+            if (imageData == null) {
+              return const Scaffold(
+                body: Center(child: Text('Ошибка: изображение не найдено')),
+              );
+            }
+            return AnalysisResultScreen(imageData: imageData);
           },
         ),
         GoRoute(
           path: '/product/:id',
+          name: 'product',
           builder: (context, state) {
             try {
-              final product = state.extra as Map<String, dynamic>;
+              final product = state.extra as Map<String, dynamic>?;
+              if (product == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Ошибка загрузки товара')),
+                );
+              }
               return ProductScreen(product: product);
             } catch (e) {
-              return const Scaffold(body: Center(child: Text('Ошибка загрузки товара')));
+              return const Scaffold(
+                body: Center(child: Text('Ошибка загрузки товара')),
+              );
             }
           },
         ),
         GoRoute(
           path: '/promotion/:promotionId',
           name: 'promotion',
-          builder: (context, state) {
-            final promotionId = int.tryParse(state.pathParameters['promotionId'] ?? '');
-            return PromotionScreen(promotionId: promotionId);
-          },
-        ),
-        GoRoute(
-          path: '/addresses',
-          builder: (context, state) => const AddressesScreen(),
-        ),
-        GoRoute(
-          path: '/settings',
-          builder: (context, state) => const SettingsScreen(),
-        ),
-        GoRoute(
-          path: '/help',
-          builder: (context, state) => const HelpScreen(),
-        ),
-        GoRoute(
-          path: '/order-history',
-          builder: (context, state) => const OrderHistoryScreen(),
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider.value(
+              value: context.read<PromotionsBloc>(),
+              child: PromotionScreen(
+                promotionId: int.tryParse(state.pathParameters['promotionId'] ?? '') ?? 0,
+              ),
+            ),
+          ),
         ),
       ],
-    );
+      redirect: (context, state) {
+        final authBloc = context.read<AuthBloc>();
+        final authState = authBloc.state;
 
-    return MaterialApp.router(
-      title: 'FreshCart',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: isDarkTheme ? ThemeMode.dark : ThemeMode.light,
-      routerConfig: router,
-      debugShowCheckedModeBanner: false,
+        if (authState is AuthLoading || authState is AuthInitial) {
+          return null;
+        }
+
+        final isAuthenticated = authState is AuthAuthenticated;
+        final isSplash = state.uri.path == '/splash';
+        final isAuthPage = state.uri.path == '/login' || state.uri.path == '/register';
+
+        if (isSplash) {
+          return null;
+        }
+
+        if (!isAuthenticated && !isAuthPage) {
+          return '/login';
+        }
+
+        if (isAuthenticated && isAuthPage) {
+          return '/';
+        }
+
+        return null;
+      },
     );
+  }
+
+ @override
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => AuthBloc()..add(AppStarted()),
+          lazy: false,
+        ),
+        BlocProvider(
+          create: (context) => SettingsBloc()..add(LoadThemeSettings()),
+          lazy: false,
+        ),
+        BlocProvider(create: (context) => MainBloc()),
+        BlocProvider(create: (context) => FavoritesBloc()..add(const FavoritesLoaded())),
+        BlocProvider(create: (context) => PromotionsBloc()),
+        BlocProvider(create: (context) => CartBloc()..add(const CartLoaded())),
+      ],
+      child: Builder(
+        builder: (context) {
+          return BlocListener<AuthBloc, AuthState>(
+            listener: (context, authState) {
+
+              if (authState is AuthAuthenticated) {
+                context.read<SettingsBloc>().add(LoadNotificationSettings());
+                Future.microtask(() => _router.go('/'));
+              } else if (authState is AuthUnauthenticated) {
+                Future.microtask(() => _router.go('/login'));
+              }
+            },
+            child: BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, authState) {
+                return BlocBuilder<SettingsBloc, SettingsState>(
+                  builder: (context, settingsState) {
+                    final theme = _getTheme(settingsState);
+                    
+                    return MaterialApp.router(
+                      title: 'FreshCart',
+                      theme: theme,
+                      routerConfig: _router,
+                      debugShowCheckedModeBanner: false,
+                    );
+                  },
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  ThemeData _getTheme(SettingsState state) {
+    if (state is SettingsLoaded) {
+      return state.isDarkTheme ? AppTheme.darkTheme : AppTheme.lightTheme;
+    }
+    return AppTheme.lightTheme;
   }
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:client/core/providers/promotions_provider.dart';
+import 'package:client/features/main/bloc/main_bloc.dart';
 
-class PromotionsSection extends ConsumerWidget {
+class PromotionsSection extends StatelessWidget {
   const PromotionsSection({super.key});
 
   String _getPromotionsCountText(int count) {
@@ -17,18 +17,20 @@ class PromotionsSection extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final promotionsAsync = ref.watch(promotionsListProvider);
-
-    return Column(
-      children: [
-        _buildPromotionsHeader(promotionsAsync, context),
-        _buildPromotionsContent(promotionsAsync, context),
-      ],
+  Widget build(BuildContext context) {
+    return BlocBuilder<MainBloc, MainState>(
+      builder: (context, state) {
+        return Column(
+          children: [
+            _buildPromotionsHeader(state, context),
+            _buildPromotionsContent(state, context),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildPromotionsHeader(AsyncValue<List<dynamic>> promotionsAsync, BuildContext context) {
+  Widget _buildPromotionsHeader(MainState state, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -38,29 +40,50 @@ class PromotionsSection extends ConsumerWidget {
             'Акции',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
-          promotionsAsync.when(
-            loading: () => const Text('... акций'),
-            error: (error, stack) => const Text('0 акций'),
-            data: (promotions) => Text(
-              _getPromotionsCountText(promotions.length),
+          if (state.promotionsStatus == MainStatus.loading)
+            const Text('... акций')
+          else if (state.promotionsStatus == MainStatus.error)
+            const Text('0 акций')
+          else
+            Text(
+              _getPromotionsCountText(state.promotions.length),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                   ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildPromotionsContent(AsyncValue<List<dynamic>> promotionsAsync, BuildContext context) {
+  Widget _buildPromotionsContent(MainState state, BuildContext context) {
     return SizedBox(
       height: 85,
-      child: promotionsAsync.when(
-        loading: () => _buildPromotionsLoading(),
-        error: (error, stack) => _buildPromotionsError(error, context),
-        data: (promotions) => _buildPromotionsList(promotions, context),
-      ),
+      child: _buildPromotionsList(state, context),
+    );
+  }
+
+  Widget _buildPromotionsList(MainState state, BuildContext context) {
+    if (state.promotionsStatus == MainStatus.loading) {
+      return _buildPromotionsLoading();
+    }
+
+    if (state.promotionsStatus == MainStatus.error) {
+      return _buildPromotionsError(state.promotionsError ?? 'Ошибка загрузки', context);
+    }
+
+    if (state.promotions.isEmpty) {
+      return _buildNoPromotions(context);
+    }
+
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.only(left: 20, right: 20),
+      itemCount: state.promotions.length,
+      itemBuilder: (context, index) {
+        final promotion = state.promotions[index];
+        return _buildPromotionCard(promotion, context);
+      },
     );
   }
 
@@ -85,7 +108,7 @@ class PromotionsSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildPromotionsError(Object error, BuildContext context) {
+  Widget _buildPromotionsError(String error, BuildContext context) {
     return ListView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -119,49 +142,37 @@ class PromotionsSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildPromotionsList(List<dynamic> promotions, BuildContext context) {
-    if (promotions.isEmpty) {
-      return ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          Container(
-            width: 200,
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.withOpacity(0.3)),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.local_offer_outlined, color: Colors.grey[400], size: 32),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Нет активных акций',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+  Widget _buildNoPromotions(BuildContext context) {
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        Container(
+          width: 200,
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.local_offer_outlined, color: Colors.grey[400], size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  'Нет активных акций',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
-        ],
-      );
-    }
-
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(left: 20, right: 20),
-      itemCount: promotions.length,
-      itemBuilder: (context, index) {
-        final promotion = promotions[index];
-        return _buildPromotionCard(promotion, context);
-      },
+        ),
+      ],
     );
   }
 

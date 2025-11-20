@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:client/core/providers/products_provider.dart';
-import 'package:client/core/providers/cart_provider.dart';
-import 'package:client/core/providers/favorites_provider.dart';
-import 'package:client/core/widgets/quantity_controls.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/quantity_controls.dart';
+import 'package:client/features/main/bloc/main_bloc.dart';
+import 'package:client/features/main/bloc/cart_bloc.dart';
+import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:client/core/widgets/app_snackbar.dart';
 
-class ProductGridSection extends ConsumerStatefulWidget {
-  const ProductGridSection({
-    super.key,
-  });
+class ProductGridSection extends StatefulWidget {
+  const ProductGridSection({super.key});
 
   @override
-  ConsumerState<ProductGridSection> createState() => _ProductGridSectionState();
+  State<ProductGridSection> createState() => _ProductGridSectionState();
 }
 
-class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
-  late TextEditingController _searchController;
-  bool _isControllerInitialized = false;
+class _ProductGridSectionState extends State<ProductGridSection> {
+  final TextEditingController _searchController = TextEditingController();
 
   String _getProductsCountText(int count) {
     if (count % 10 == 1 && count % 100 != 11) {
@@ -34,17 +30,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isControllerInitialized) {
-      final searchQuery = ref.read(searchQueryProvider);
-      _searchController.text = searchQuery;
-      _isControllerInitialized = true;
-    }
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
@@ -53,39 +39,34 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
     super.dispose();
   }
 
-  void _onSearchChanged(String value) {
-    ref.read(searchQueryProvider.notifier).state = value;
-    ref.read(productsProvider.notifier).refresh();
+  void _onSearchChanged() {
+    context.read<MainBloc>().add(SearchQueryChanged(_searchController.text));
   }
 
   void _clearSearch() {
     _searchController.clear();
-    ref.read(searchQueryProvider.notifier).state = '';
-    ref.read(productsProvider.notifier).refresh();
+    context.read<MainBloc>().add(const SearchQueryChanged(''));
   }
 
   void _loadMoreProducts() {
-    ref.read(productsProvider.notifier).loadMore();
+    context.read<MainBloc>().add(const MoreProductsLoaded());
   }
 
   @override
   Widget build(BuildContext context) {
-    final productsState = ref.watch(productsProvider);
-
-    return Column(
-      children: [
-        _buildProductsHeader(productsState, context),
-        _buildProductsGrid(productsState, context, ref),
-      ],
+    return BlocBuilder<MainBloc, MainState>(
+      builder: (context, state) {
+        return Column(
+          children: [
+            _buildProductsHeader(state, context),
+            _buildProductsGrid(state, context),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildProductsHeader(
-    ProductsState productsState,
-    BuildContext context,
-  ) {
-    final searchQuery = ref.watch(searchQueryProvider);
-
+  Widget _buildProductsHeader(MainState state, BuildContext context) {
     return Column(
       children: [
         Padding(
@@ -97,13 +78,13 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
                 'Все продукты',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
-              if (productsState.isLoading && productsState.products.isEmpty)
+              if (state.productsStatus == MainStatus.loading && state.products.isEmpty)
                 const Text('... товаров')
-              else if (productsState.error != null && productsState.products.isEmpty)
+              else if (state.productsStatus == MainStatus.error && state.products.isEmpty)
                 const Text('0 товаров')
               else
                 Text(
-                  _getProductsCountText(productsState.products.length),
+                  _getProductsCountText(state.products.length),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                       ),
@@ -137,7 +118,6 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      onChanged: _onSearchChanged,
                       decoration: InputDecoration(
                         hintText: 'Поиск продуктов...',
                         border: InputBorder.none,
@@ -151,7 +131,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
                       ),
                     ),
                   ),
-                  if (searchQuery.isNotEmpty)
+                  if (state.searchQuery.isNotEmpty)
                     IconButton(
                       icon: Icon(
                         Icons.close,
@@ -171,19 +151,12 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
     );
   }
 
-  Widget _buildProductsGrid(
-    ProductsState productsState,
-    BuildContext context,
-    WidgetRef ref,
-  ) {
-    final isLoadingMore = ref.watch(productsLoadingMoreProvider);
-    final hasMore = ref.watch(hasMoreProductsProvider);
-
-    if (productsState.isLoading && productsState.products.isEmpty) {
+  Widget _buildProductsGrid(MainState state, BuildContext context) {
+    if (state.productsStatus == MainStatus.loading && state.products.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (productsState.error != null && productsState.products.isEmpty) {
+    if (state.productsStatus == MainStatus.error && state.products.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -196,7 +169,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
             ),
             const SizedBox(height: 8),
             Text(
-              productsState.error!,
+              state.productsError ?? 'Неизвестная ошибка',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[500],
@@ -204,7 +177,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.read(productsProvider.notifier).refresh(),
+              onPressed: () => context.read<MainBloc>().add(const ProductsLoaded()),
               child: const Text('Повторить'),
             ),
           ],
@@ -212,7 +185,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
       );
     }
 
-    if (productsState.products.isEmpty) {
+    if (state.products.isEmpty) {
       return const Center(
         child: Column(
           children: [
@@ -228,23 +201,22 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
       children: [
         GridView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
             maxCrossAxisExtent: 200, 
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             childAspectRatio: 0.65,
           ),
-          itemCount: productsState.products.length,
+          itemCount: state.products.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
-            final product = productsState.products[index];
-            return _buildProductCard(product, context, ref);
+            final product = state.products[index];
+            return ProductCard(product: product);
           },
         ),
         
-        // Индикатор загрузки следующих товаров
-        if (isLoadingMore)
+        if (state.productsStatus == MainStatus.loadingMore)
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Center(
@@ -252,8 +224,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
             ),
           ),
         
-        // Кнопка для загрузки следующих товаров
-        if (hasMore && !isLoadingMore && productsState.products.isNotEmpty)
+        if (state.hasMoreProducts && state.productsStatus != MainStatus.loadingMore && state.products.isNotEmpty)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton(
@@ -267,8 +238,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
             ),
           ),
         
-        // Сообщение что товары закончились
-        if (!hasMore && productsState.products.isNotEmpty)
+        if (!state.hasMoreProducts && state.products.isNotEmpty)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
@@ -281,11 +251,34 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
       ],
     );
   }
+}
 
-  Widget _buildProductCard(Map<String, dynamic> product, BuildContext context, WidgetRef ref) {
+class ProductCard extends StatelessWidget {
+  final Map<String, dynamic> product;
+
+  const ProductCard({super.key, required this.product});
+
+  void _onProductTap(BuildContext context) {
+    context.push('/product/${product['id']}', extra: product);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final productId = product['id'] as int;
-    final quantity = ref.watch(cartProvider)[productId] ?? 0;
-    final isFavorite = ref.watch(favoritesProvider)[productId] ?? false;
+    
+    // Получаем количество из корзины
+    final quantity = context.select<CartBloc, int>((bloc) {
+      final item = bloc.state.cartItems.firstWhere(
+        (item) => item['product_id'] == productId,
+        orElse: () => null,
+      );
+      return item != null ? item['quantity'] : 0;
+    });
+
+    // Получаем статус избранного
+    final isFavorite = context.select<FavoritesBloc, bool>((bloc) {
+      return bloc.state.favorites.any((fav) => fav['product_id'] == productId);
+    });
 
     return Card(
       elevation: 0,
@@ -294,7 +287,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _onProductTap(product, context),
+        onTap: () => _onProductTap(context),
         child: Stack(
           children: [
             Padding(
@@ -362,7 +355,9 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
                   QuantityControls(
                     productId: productId,
                     quantity: quantity,
-                    onQuantityChanged: (productId, quantity) => _updateCartQuantity(productId, quantity, context, ref),
+                    onQuantityChanged: (productId, quantity) {
+                      context.read<CartBloc>().add(CartItemQuantityUpdated(productId, quantity));
+                    },
                     fullWidth: true,
                   ),
                 ],
@@ -379,7 +374,7 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
                   size: 20,
                 ),
                 onPressed: () {
-                  _toggleFavorite(productId, !isFavorite, context, ref);
+                  context.read<FavoritesBloc>().add(FavoriteToggled(productId, !isFavorite));
                 },
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(
@@ -392,32 +387,5 @@ class _ProductGridSectionState extends ConsumerState<ProductGridSection> {
         ),
       ),
     );
-  }
-
-  void _onProductTap(Map<String, dynamic> product, BuildContext context) {
-    context.push('/product/${product['id']}', extra: product);
-  }
-
-  Future<void> _updateCartQuantity(int productId, int quantity, BuildContext context, WidgetRef ref) async {
-    try {
-      final currentQuantity = ref.read(cartProvider)[productId] ?? 0;
-      
-      if (currentQuantity == 0 && quantity > 0) {
-        await ref.read(cartProvider.notifier).addToCart(productId);
-      } else {
-        await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
-      }
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка обновления корзины');  
-    }
-  }
-
-  Future<void> _toggleFavorite(int productId, bool isFavorite, BuildContext context, WidgetRef ref) async {
-    try {
-      await ref.read(favoritesProvider.notifier).toggleFavorite(productId, isFavorite);  
-      AppSnackbar.showInfo(context: context, message: isFavorite ? 'Добавлено в избранное' : 'Удалено из избранного');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка добавления в избранное');
-    }
   }
 }

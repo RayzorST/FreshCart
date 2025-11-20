@@ -1,31 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/api/client.dart';
-import 'package:client/core/providers/cart_provider.dart';
-import 'package:client/core/widgets/navigation_bar.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
+import 'package:client/features/main/bloc/cart_bloc.dart';
 
-class CartScreen extends ConsumerStatefulWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
   @override
-  ConsumerState<CartScreen> createState() => _CartScreenState();
+  State<CartScreen> createState() => _CartScreenState();
 }
 
-class _CartScreenState extends ConsumerState<CartScreen> {
-  List<dynamic> _cartItems = [];
-  double _totalAmount = 0.0;
-  double _originalTotalAmount = 0.0;
-  bool _isLoading = true;
-  bool _isCreatingOrder = false;
-  String? _error;
-
+class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCart();
+    // Загружаем корзину и адреса при инициализации
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bloc = context.read<CartBloc>();
+      bloc.add(const CartLoaded());
+      bloc.add(const AddressesLoaded());
+    });
   }
 
   String _getProductsCountText(int count) {
@@ -38,167 +35,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
   }
 
-  Future<void> _loadCart() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-
-      final cartData = await ApiClient.getCart();
-
-      if (cartData['items'] != null && cartData['items'] is List) {
-        final items = await _enrichCartItems(cartData['items']);
-        setState(() {
-          _cartItems = items;
-          _totalAmount = (cartData['final_price'] as num?)?.toDouble() ?? 0.0;
-          _originalTotalAmount = (cartData['total_price'] as num?)?.toDouble() ?? _totalAmount;
-        });
-      } else {
-        setState(() {
-          _cartItems = [];
-          _totalAmount = 0.0;
-          _originalTotalAmount = 0.0;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Ошибка загрузки корзины: $e';
-        _cartItems = [];
-      });
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<List<dynamic>> _enrichCartItems(List<dynamic> items) async {
-    if (items.isEmpty) return [];
-
-    try {
-      final products = await ApiClient.getProducts();
-      final enrichedItems = <dynamic>[];
-
-      for (var item in items) {
-        final itemMap = _convertToSafeMap(item);
-        final productId = itemMap['product_id'];
-        
-        Map<String, dynamic>? foundProduct;
-        for (var product in products) {
-          final productMap = _convertToSafeMap(product);
-          if (productMap['id'] == productId) {
-            foundProduct = productMap;
-            break;
-          }
-        }
-
-        final originalPrice = foundProduct?['price'] ?? itemMap['price'] ?? 0.0;
-        final discountedPrice = itemMap['discount_price'] ?? itemMap['display_price'] ?? originalPrice;
-        final hasDiscount = discountedPrice < originalPrice;
-        final appliedPromotions = itemMap['applied_promotions'] ?? [];
-
-        enrichedItems.add({
-          ...itemMap,
-          'product': foundProduct,
-          'display_price': discountedPrice,
-          'original_price': originalPrice,
-          'has_discount': hasDiscount,
-          'discount_amount': originalPrice - discountedPrice,
-          'applied_promotions': appliedPromotions,
-        });
-      }
-
-      return enrichedItems;
-    } catch (e) {
-      return items.map((item) => _convertToSafeMap(item)).toList();
-    }
-  }
-
-  Map<String, dynamic> _convertToSafeMap(dynamic data) {
-    if (data == null) return {};
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) {
-      try {
-        return Map<String, dynamic>.from(data);
-      } catch (e) {
-        return {};
-      }
-    }
-    return {};
-  }
-
-  Future<void> _updateCartItem(int productId, int quantity) async {
-    final previousQuantity = _getCurrentQuantity(productId);
-    try {
-      // Сохраняем предыдущее значение для отката
-      
-      // Оптимистичное обновление UI
-      setState(() {
-        _updateLocalQuantity(productId, quantity);
-        _updateTotalAmount();
-      });
-
-      if (quantity == 0) {
-        await ref.read(cartProvider.notifier).removeFromCart(productId);
-      } else {
-        await ref.read(cartProvider.notifier).updateQuantity(productId, quantity);
-      }
-
-    } catch (e) {
-      // Откатываем изменения при ошибке
-      setState(() {
-        _updateLocalQuantity(productId, previousQuantity);
-        _updateTotalAmount();
-      });
-
-      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
-    }
-  }
-
-  void _updateLocalQuantity(int productId, int quantity) {
-    final index = _cartItems.indexWhere(
-      (item) => _convertToSafeMap(item)['product_id'] == productId
-    );
-    
-    if (index != -1) {
-      final item = _convertToSafeMap(_cartItems[index]);
-      if (quantity == 0) {
-        _cartItems.removeAt(index);
-      } else {
-        _cartItems[index] = {...item, 'quantity': quantity};
-      }
-    }
-  }
-
-  int _getCurrentQuantity(int productId) {
-    final index = _cartItems.indexWhere(
-      (item) => _convertToSafeMap(item)['product_id'] == productId
-    );
-    if (index != -1) {
-      return (_convertToSafeMap(_cartItems[index])['quantity'] as num).toInt();
-    }
-    return 0;
-  }
-
-  void _updateTotalAmount() {
-    double newTotal = 0.0;
-    double newOriginalTotal = 0.0;
-    
-    for (var item in _cartItems) {
-      final itemMap = _convertToSafeMap(item);
-      final quantity = (itemMap['quantity'] as num).toInt();
-      final price = (itemMap['display_price'] as num).toDouble();
-      final originalPrice = (itemMap['original_price'] as num?)?.toDouble() ?? price;
-      
-      newTotal += price * quantity;
-      newOriginalTotal += originalPrice * quantity;
-    }
-    
-    setState(() {
-      _totalAmount = newTotal;
-      _originalTotalAmount = newOriginalTotal;
-    });
-  }
-
   void _navigateToPromotionScreen(List<dynamic> appliedPromotions, BuildContext context) {
     if (appliedPromotions.isEmpty) return;
 
@@ -206,7 +42,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       _showPromotionsDialog(appliedPromotions, 'Примененные акции');
     } else {
       final promotion = appliedPromotions.first;
-      print(promotion);
       context.push('/promotion/${promotion['promotion_id']}', extra: promotion);
     }
   }
@@ -251,7 +86,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       )
                     : null,
                 onTap: () {
-                  Navigator.pop(context); // Закрываем диалог
+                  Navigator.pop(context);
                   context.push('/promotion', extra: promotion);
                 },
               );
@@ -268,52 +103,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Future<void> _createOrder() async {
-    if (_cartItems.isEmpty) return;
-
-    final selectedAddress = ref.read(selectedAddressProvider);
-    if (selectedAddress == null) {
-      _showAddAddressDialog();
-      return;
-    }
-
-    setState(() => _isCreatingOrder = true);
-    
-    try {
-      final orderItems = _cartItems.map<Map<String, dynamic>>((item) {
-        final itemMap = _convertToSafeMap(item);
-        return {
-          'product_id': itemMap['product_id'],
-          'quantity': itemMap['quantity'],
-          'price': (itemMap['display_price'] as num).toDouble(),
-        };
-      }).toList();
-      
-      await ApiClient.createOrder(
-        selectedAddress['address_line'],
-        '',
-        orderItems,
-      );
-
-      for (var item in _cartItems) {
-        final itemMap = _convertToSafeMap(item);
-        await ref.read(cartProvider.notifier).removeFromCart(itemMap['product_id']);
-      }
-
-      await _loadCart();
-
-      AppSnackbar.showSuccess(context: context, message: 'Заказ успешно создан!');
-
-      context.push('/order-history');
-      
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка создания заказа');
-    } finally {
-      setState(() => _isCreatingOrder = false);
-    }
+  void _createOrder(BuildContext context) {
+    context.read<CartBloc>().add(const CartOrderCreated());
   }
 
-  void _showAddAddressDialog() {
+  void _showAddAddressDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -321,12 +115,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         content: const Text('Для оформления заказа необходимо добавить адрес доставки.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<CartBloc>().add(const AddressDialogDismissed());
+            },
             child: const Text('Отмена'),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+              context.read<CartBloc>().add(const AddressDialogDismissed());
               context.push('/addresses');
             },
             child: const Text('Добавить адрес'),
@@ -336,11 +134,24 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  void _onProductTap(dynamic product) {
+  void _onProductTap(dynamic product, BuildContext context) {
     final safeProduct = _convertToSafeMap(product);
     if (safeProduct['id'] != null) {
       context.push('/product/${safeProduct['id']}', extra: safeProduct);
     }
+  }
+
+  Map<String, dynamic> _convertToSafeMap(dynamic data) {
+    if (data == null) return {};
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) {
+      try {
+        return Map<String, dynamic>.from(data);
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
   }
 
   @override
@@ -349,50 +160,75 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       appBar: AppBar(
         title: Text(
           'Корзина',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         actions: [
-          if (_cartItems.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    "${_getProductsCountText(_cartItems.length)}",
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+          BlocBuilder<CartBloc, CartState>(
+            builder: (context, state) {
+              if (state.cartItems.isNotEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getProductsCountText(state.cartItems.length),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
         ],
       ),
-      body: _buildBody(),
+      body: BlocConsumer<CartBloc, CartState>(
+        listener: (context, state) {
+          // Обработка состояний, требующих действий
+          if (state.status == CartStatus.orderCreated) {
+            AppSnackbar.showSuccess(context: context, message: 'Заказ успешно создан!');
+            context.push('/order-history');
+          }
+          
+          if (state.status == CartStatus.error && state.error != null) {
+            AppSnackbar.showError(context: context, message: state.error!);
+          }
+
+          if (state.showAddressDialog) {
+            _showAddAddressDialog(context);
+          }
+        },
+        builder: (context, state) {
+          return _buildBody(context, state);
+        },
+      ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
+  Widget _buildBody(BuildContext context, CartState state) {
+    if (state.status == CartStatus.initial || state.status == CartStatus.loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error != null) {
-      return _buildErrorState();
+    if (state.status == CartStatus.error && state.cartItems.isEmpty) {
+      return _buildErrorState(context, state.error!);
     }
 
-    if (_cartItems.isEmpty) {
-      return _buildEmptyState();
+    if (state.cartItems.isEmpty) {
+      return _buildEmptyState(context);
     }
 
-    return _buildCartWithItems();
+    return _buildCartWithItems(context, state);
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(BuildContext context, String error) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -407,7 +243,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              _error!,
+              error,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[600],
@@ -416,7 +252,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _loadCart,
+            onPressed: () => context.read<CartBloc>().add(const CartReloaded()),
             child: const Text('Повторить'),
           ),
         ],
@@ -424,7 +260,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -450,9 +286,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
           ),
           const SizedBox(height: 24),
-          
           FilledButton.icon(
-            onPressed: () => ref.read(currentIndexProvider.notifier).state = 0,
+            onPressed: () {
+              // Навигация к главному экрану
+              // Можно добавить через BLoC навигации или напрямую
+              if (context.canPop()) {
+                context.pop();
+              }
+            },
             icon: const Icon(Icons.shopping_bag),
             label: const Text('Перейти к покупкам'),
           ),
@@ -461,24 +302,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Widget _buildCartWithItems() {
+  Widget _buildCartWithItems(BuildContext context, CartState state) {
     return ListView(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12, top: 12),
       children: [
-        _buildAddressSelector(),
-        ..._cartItems.map((item) {
+        _buildAddressSelector(context, state),
+        ...state.cartItems.map((item) {
           final itemMap = _convertToSafeMap(item);
-          return _buildCartItem(itemMap);
+          return _buildCartItem(context, itemMap);
         }).toList(),
-        
-        _buildOrderSummary(),
-        
+        _buildOrderSummary(context, state),
         const SizedBox(height: 20),
       ],
     );
   }
 
-  Widget _buildCartItem(Map<String, dynamic> item) {
+  Widget _buildCartItem(BuildContext context, Map<String, dynamic> item) {
     final product = _convertToSafeMap(item['product']);
     final productId = item['product_id'];
     final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
@@ -496,10 +335,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProductImage(product),
+            _buildProductImage(context, product),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildProductInfo(product, price, productId, quantity, appliedPromotions),
+              child: _buildProductInfo(context, product, price, productId, quantity, appliedPromotions),
             ),
           ],
         ),
@@ -507,9 +346,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Widget _buildProductImage(Map<String, dynamic> product) {
+  Widget _buildProductImage(BuildContext context, Map<String, dynamic> product) {
     return GestureDetector(
-      onTap: () => _onProductTap(product),
+      onTap: () => _onProductTap(product, context),
       child: Container(
         width: 80,
         height: 80,
@@ -517,12 +356,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           borderRadius: BorderRadius.circular(8),
           color: Theme.of(context).colorScheme.surfaceVariant,
         ),
-        child: _buildProductImageContent(product),
+        child: _buildProductImageContent(context, product),
       ),
     );
   }
 
-  Widget _buildProductImageContent(Map<String, dynamic> product) {
+  Widget _buildProductImageContent(BuildContext context, Map<String, dynamic> product) {
     final imageUrl = product['image_url'];
     if (imageUrl == null || imageUrl.toString().isEmpty) {
       return Icon(
@@ -547,7 +386,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Widget _buildProductInfo(Map<String, dynamic> product, double price, int productId, int quantity, List<dynamic> appliedPromotions) {
+  Widget _buildProductInfo(
+    BuildContext context, 
+    Map<String, dynamic> product, 
+    double price, 
+    int productId, 
+    int quantity, 
+    List<dynamic> appliedPromotions
+  ) {
     final item = _convertToSafeMap(product);
     final hasDiscount = item['price'] != price;
     final originalPrice = (item['price'] as num?)?.toDouble() ?? price;
@@ -562,7 +408,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => _onProductTap(product),
+                onTap: () => _onProductTap(product, context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -599,7 +445,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   minHeight: 36,
                 ),
               ),
-            _buildDeleteButton(productId),
+            _buildDeleteButton(context, productId),
           ],
         ),
         const SizedBox(height: 8),
@@ -636,7 +482,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             QuantityControls(
               productId: productId,
               quantity: quantity,
-              onQuantityChanged: _updateCartItem,
+              onQuantityChanged: (productId, quantity) {
+                context.read<CartBloc>().add(CartItemQuantityUpdated(productId, quantity));
+              },
             ),
           ],
         ),
@@ -644,21 +492,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Widget _buildDeleteButton(int productId) {
+  Widget _buildDeleteButton(BuildContext context, int productId) {
     return IconButton(
       icon: const Icon(
         Icons.delete_outline,
         color: Colors.red,
         size: 22,
       ),
-      onPressed: () => _updateCartItem(productId, 0),
+      onPressed: () => context.read<CartBloc>().add(CartItemRemoved(productId)),
       padding: const EdgeInsets.all(4),
     );
   }
 
-  Widget _buildOrderSummary() {
-    final hasDiscount = _originalTotalAmount > _totalAmount;
-    final totalSavings = _originalTotalAmount - _totalAmount;
+  Widget _buildOrderSummary(BuildContext context, CartState state) {
+    final hasDiscount = state.originalTotalAmount > state.totalAmount;
+    final totalSavings = state.originalTotalAmount - state.totalAmount;
+    final isCreatingOrder = state.status == CartStatus.creatingOrder;
 
     return Card(
       margin: const EdgeInsets.all(0),
@@ -671,7 +520,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Заголовок раздела
             Row(
               children: [
                 Icon(
@@ -690,24 +538,24 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Разделитель
             Divider(
               color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
               height: 1,
             ),
             const SizedBox(height: 16),
             
-            // Список стоимостей
             Column(
               children: [
                 if (hasDiscount) ...[
                   _buildSummaryRow(
+                    context,
                     'Сумма товаров',
-                    '${_originalTotalAmount.toStringAsFixed(2)} ₽',
+                    '${state.originalTotalAmount.toStringAsFixed(2)} ₽',
                     icon: Icons.shopping_cart_outlined,
                   ),
                   const SizedBox(height: 12),
                   _buildSummaryRow(
+                    context,
                     'Ваша скидка',
                     '-${totalSavings.toStringAsFixed(2)} ₽',
                     valueColor: Colors.green,
@@ -721,8 +569,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   const SizedBox(height: 12),
                 ],
                 _buildSummaryRow(
+                  context,
                   'Итого к оплате',
-                  '${_totalAmount.toStringAsFixed(2)} ₽',
+                  '${state.totalAmount.toStringAsFixed(2)} ₽',
                   isTotal: true,
                   valueColor: Theme.of(context).colorScheme.primary,
                   icon: Icons.shopping_cart_outlined,
@@ -735,7 +584,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _isCreatingOrder ? null : _createOrder,
+                onPressed: isCreatingOrder ? null : () => _createOrder(context),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   backgroundColor: Theme.of(context).colorScheme.primaryContainer,
@@ -745,7 +594,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   ),
                   elevation: 1,
                 ),
-                child: _isCreatingOrder
+                child: isCreatingOrder
                     ? const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -790,6 +639,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   }
 
   Widget _buildSummaryRow(
+    BuildContext context,
     String label,
     String value, {
     bool isTotal = false,
@@ -827,13 +677,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Widget _buildAddressSelector() {
-    final addressesAsync = ref.watch(addressesListProvider);
-    final selectedAddress = ref.watch(selectedAddressProvider);
-    final isExpanded = ref.watch(isAddressExpandedProvider);
-
-    return addressesAsync.when(
-      loading: () => Card(
+  Widget _buildAddressSelector(BuildContext context, CartState state) {
+    if (state.addressesStatus == CartStatus.loading) {
+      return Card(
         margin: const EdgeInsets.only(bottom: 12),
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -849,8 +695,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ],
           ),
         ),
-      ),
-      error: (error, stack) => Card(
+      );
+    }
+
+    if (state.addressesStatus == CartStatus.error) {
+      return Card(
         margin: const EdgeInsets.only(bottom: 12),
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -860,154 +709,145 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(Icons.error_outline, color: Colors.red),
-              SizedBox(width: 12),
+              const Icon(Icons.error_outline, color: Colors.red),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Ошибка загрузки адресов',
-                  style: TextStyle(color: Colors.red),
+                  state.addressesError ?? 'Ошибка загрузки адресов',
+                  style: const TextStyle(color: Colors.red),
                 ),
               ),
             ],
           ),
         ),
-      ),
-      data: (addresses) {
-        if (addresses.isEmpty) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      );
+    }
+
+    if (state.addresses.isEmpty) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      SizedBox(width: 12),
-                      Text(
-                        'Адрес доставки',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
+                  Icon(
+                    Icons.location_on_outlined,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(width: 12),
                   Text(
-                    'Адрес не указан',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[600],
+                    'Адрес доставки',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
                   ),
-                  SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => context.push('/addresses'),
-                    child: Text('Добавить адрес'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Адрес не указан',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => context.push('/addresses'),
+                child: const Text('Добавить адрес'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () {
+                context.read<CartBloc>().add(
+                  AddressExpandedToggled(!state.isAddressExpanded),
+                );
+              },
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Адрес доставки',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        if (state.selectedAddress != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            state.selectedAddress!['address_line'] ?? 'Адрес не указан',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    state.isAddressExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey[600],
                   ),
                 ],
               ),
             ),
-          );
-        }
 
-        if (selectedAddress == null && addresses.isNotEmpty) {
-          final defaultAddress = addresses.firstWhere(
-            (addr) => addr['is_default'] == true,
-            orElse: () => addresses.first,
-          );
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(selectedAddressProvider.notifier).state = defaultAddress;
-          });
-        }
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    ref.read(isAddressExpandedProvider.notifier).state = !isExpanded;
-                  },
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Адрес доставки',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            if (selectedAddress != null) ...[
-                              SizedBox(height: 4),
-                              Text(
-                                selectedAddress['address_line'] ?? 'Адрес не указан',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Colors.grey[600],
-                                    ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        isExpanded ? Icons.expand_less : Icons.expand_more,
-                        color: Colors.grey[600],
-                      ),
-                    ],
-                  ),
-                ),
-
-                if (isExpanded) ...[
-                  SizedBox(height: 16),
-                  ...addresses.map((address) {
-                    final isSelected = selectedAddress?['id'] == address['id'];
-                    return _buildAddressItem(address, isSelected);
-                  }).toList(),
-                  
-                  SizedBox(height: 12),
-                  Divider(height: 1),
-                  SizedBox(height: 12),
-                  
-                  TextButton.icon(
-                    onPressed: () => context.push('/addresses'),
-                    icon: Icon(Icons.add, size: 18),
-                    label: Text('Добавить новый адрес'),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
+            if (state.isAddressExpanded) ...[
+              const SizedBox(height: 16),
+              ...state.addresses.map((address) {
+                final isSelected = state.selectedAddress?['id'] == address['id'];
+                return _buildAddressItem(context, address, isSelected);
+              }).toList(),
+              
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              
+              TextButton.icon(
+                onPressed: () => context.push('/addresses'),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Добавить новый адрес'),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildAddressItem(Map<String, dynamic> address, bool isSelected) {
+  Widget _buildAddressItem(BuildContext context, Map<String, dynamic> address, bool isSelected) {
     return Card(
       elevation: 0,
       color: isSelected 
@@ -1038,7 +878,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             : null,
         trailing: address['is_default'] == true
             ? Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -1054,10 +894,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               )
             : null,
         onTap: () {
-          ref.read(selectedAddressProvider.notifier).state = address;
-          ref.read(isAddressExpandedProvider.notifier).state = false;
+          context.read<CartBloc>().add(AddressSelected(address));
         },
-        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       ),
     );
   }

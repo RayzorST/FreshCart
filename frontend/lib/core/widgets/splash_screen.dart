@@ -25,7 +25,6 @@ class SplashScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-
             Text(
               'FreshCart',
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -33,18 +32,14 @@ class SplashScreen extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-            
             const SizedBox(height: 8),
-            
             Text(
               'Свежие продукты с доставкой',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-            
             const SizedBox(height: 48),
-            
             const SizedBox(
               width: 40,
               height: 40,

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:client/api/client.dart';
+import 'package:client/core/widgets/app_snackbar.dart';
 
 class UserManagement extends ConsumerStatefulWidget {
   const UserManagement({super.key});
@@ -28,7 +29,6 @@ class _UserManagementState extends ConsumerState<UserManagement> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading users: $e');
       setState(() {
         _isLoading = false;
       });
@@ -38,42 +38,30 @@ class _UserManagementState extends ConsumerState<UserManagement> {
   Future<void> _blockUser(int userId) async {
     try {
       await ApiClient.blockUser(userId);
-      _loadUsers(); // Перезагружаем список
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Пользователь заблокирован')),
-      );
+      _loadUsers();
+      AppSnackbar.showInfo(context: context, message: 'Пользователь заблокирован');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка при блокировке');
     }
   }
 
   Future<void> _unblockUser(int userId) async {
     try {
       await ApiClient.unblockUser(userId);
-      _loadUsers(); // Перезагружаем список
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Пользователь разблокирован')),
-      );
+      _loadUsers();
+      AppSnackbar.showInfo(context: context, message: 'Пользователь разблокирован');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка при разблокировке');
     }
   }
 
   Future<void> _changeUserRole(int userId, String newRole) async {
     try {
       await ApiClient.setUserRole(userId, newRole);
-      _loadUsers(); // Перезагружаем список
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Роль изменена на $newRole')),
-      );
+      _loadUsers();
+      AppSnackbar.showInfo(context: context, message: 'Роль изменена на $newRole');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e')),
-      );
+      AppSnackbar.showError(context: context, message: 'Ошибка при смене роли');
     }
   }
 

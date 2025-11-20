@@ -1,158 +1,79 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:client/core/providers/products_provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/api/client.dart';
+import 'package:client/features/main/bloc/main_bloc.dart';
 
-class CategoryFilterWidget extends ConsumerWidget {
+class CategoryFilterWidget extends StatelessWidget {
   const CategoryFilterWidget({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final categoriesAsync = ref.watch(categoriesProvider);
-    final selectedCategory = ref.watch(selectedCategoryProvider);
-    final sharedPrefsAsync = ref.watch(sharedPreferencesProvider);
+  Widget build(BuildContext context) {
     final isWideScreen = MediaQuery.of(context).size.width > 600;
-    final isExpanded = isWideScreen ? true : ref.watch(isCategoriesExpandedProvider);
+    
+    return BlocBuilder<MainBloc, MainState>(
+      builder: (context, state) {
+        final isExpanded = isWideScreen ? true : state.isCategoriesExpanded;
 
-    if (!isWideScreen) {
-      final sharedPrefsAsync = ref.watch(sharedPreferencesProvider);
-      sharedPrefsAsync.whenData((sharedPrefs) {
-        final savedState = sharedPrefs.getBool('categories_expanded');
-        if (savedState != null) {
-          final currentState = ref.read(isCategoriesExpandedProvider);
-          if (currentState != savedState) {
-            ref.read(isCategoriesExpandedProvider.notifier).state = savedState;
-          }
-        }
-      });
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      spacing: 0,
-      children: [   
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-          child: Row(
-            children: [
-              Text(
-                'Категории',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const Spacer(),
-              if (!isWideScreen)
-                IconButton(
-                  icon: Icon(
-                    isExpanded ? Icons.expand_less : Icons.expand_more,
-                    size: 20,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [   
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              child: Row(
+                children: [
+                  Text(
+                    'Категории',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  onPressed: () {
-                    _toggleExpandedState(ref, !isExpanded, sharedPrefsAsync);
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                ),
-            ],
-          ),
-        ),
-        
-        
-        if (isExpanded)
-          categoriesAsync.when(
-            loading: () => _buildCategoriesLoading(),
-            error: (error, stack) => _buildCategoriesError(error, context),
-            data: (categories) => _buildCategoriesGrid(categories, selectedCategory, ref, context),
-          )
-        else
-          _buildCollapsedCategory(categoriesAsync, selectedCategory, ref, context),
-      ],
+                  const Spacer(),
+                  if (!isWideScreen)
+                    IconButton(
+                      icon: Icon(
+                        isExpanded ? Icons.expand_less : Icons.expand_more,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        context.read<MainBloc>().add(
+                          CategoriesExpandedToggled(!isExpanded),
+                        );
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    ),
+                ],
+              ),
+            ),
+            
+            if (isExpanded)
+              _buildCategoriesContent(state, context)
+            else
+              _buildCollapsedCategory(state, context),
+          ],
+        );
+      },
     );
   }
-  
-  void _toggleExpandedState(WidgetRef ref, bool newState, AsyncValue<SharedPreferences> sharedPrefsAsync) {
-    //if (isWideScreen) return;
-    
-    ref.read(isCategoriesExpandedProvider.notifier).state = newState;
-    
-    sharedPrefsAsync.whenData((sharedPrefs) {
-      sharedPrefs.setBool('categories_expanded', newState);
-    });
-  }
-  
-  Widget _buildCollapsedCategory(
-    AsyncValue<List<dynamic>> categoriesAsync,
-    String selectedCategory,
-    WidgetRef ref,
-    BuildContext context,
-  ) {
+
+  Widget _buildCollapsedCategory(MainState state, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4, top: 0),
-      child: categoriesAsync.when(
-        loading: () => _buildCollapsedLoading(),
-        error: (error, stack) => Container(),
-        data: (categories) => _buildSelectedCategoryCard(categories, selectedCategory, ref, context),
-      ),
+      child: _buildSelectedCategoryCard(state, context),
     );
   }
 
-  
-  Widget _buildCollapsedLoading() {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-            const SizedBox(width: 16),
-            
-            Expanded(
-              child: Text(
-                'Загрузка категорий...',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-            
-            Icon(Icons.arrow_drop_down, size: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  
-  Widget _buildSelectedCategoryCard(
-    List<dynamic> categories,
-    String selectedCategory,
-    WidgetRef ref,
-    BuildContext context,
-  ) {
-    
+  Widget _buildSelectedCategoryCard(MainState state, BuildContext context) {
     Map<String, dynamic> selectedCategoryData;
     
-    if (selectedCategory == '0') {
-      
+    if (state.selectedCategoryId == '0') {
       selectedCategoryData = {
         'id': 0,
         'name': 'Все',
         'image_url': null,
       };
     } else {
-      
-      final category = categories.firstWhere(
-        (cat) => cat['id'].toString() == selectedCategory,
+      final category = state.categories.firstWhere(
+        (cat) => cat['id'].toString() == state.selectedCategoryId,
         orElse: () => {
           'id': 0,
           'name': 'Все',
@@ -167,19 +88,16 @@ class CategoryFilterWidget extends ConsumerWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+      color: null,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          
-          final sharedPrefsAsync = ref.read(sharedPreferencesProvider);
-          _toggleExpandedState(ref, true, sharedPrefsAsync);
+          context.read<MainBloc>().add(const CategoriesExpandedToggled(true));
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              
               Container(
                 width: 40,
                 height: 40,
@@ -221,7 +139,6 @@ class CategoryFilterWidget extends ConsumerWidget {
                           ),
               ),
               const SizedBox(width: 16),
-              
               Expanded(
                 child: Text(
                   selectedCategoryData['name'],
@@ -238,15 +155,26 @@ class CategoryFilterWidget extends ConsumerWidget {
     );
   }
 
-  
+  Widget _buildCategoriesContent(MainState state, BuildContext context) {
+    if (state.categoriesStatus == MainStatus.loading) {
+      return _buildCategoriesLoading();
+    }
+
+    if (state.categoriesStatus == MainStatus.error) {
+      return _buildCategoriesError(state.categoriesError ?? 'Ошибка загрузки', context);
+    }
+
+    return _buildCategoriesGrid(state, context);
+  }
+
   Widget _buildCategoriesLoading() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 120, // Максимальная ширина категории
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 120,
           crossAxisSpacing: 3,
           mainAxisSpacing: 3,
           childAspectRatio: 1.0,
@@ -285,7 +213,7 @@ class CategoryFilterWidget extends ConsumerWidget {
     );
   }
 
-  Widget _buildCategoriesError(Object error, BuildContext context) {
+  Widget _buildCategoriesError(String error, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -315,20 +243,14 @@ class CategoryFilterWidget extends ConsumerWidget {
     );
   }
 
-  Widget _buildCategoriesGrid(
-    List<dynamic> categories, 
-    String selectedCategory, 
-    WidgetRef ref, 
-    BuildContext context,
-  ) {
-    
+  Widget _buildCategoriesGrid(MainState state, BuildContext context) {
     final allCategories = [
       {
         'id': 0,
         'name': 'Все',
         'image_url': null,
       },
-      ...categories,
+      ...state.categories,
     ];
 
     return Padding(
@@ -336,7 +258,7 @@ class CategoryFilterWidget extends ConsumerWidget {
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 120,
           crossAxisSpacing: 7,
           mainAxisSpacing: 7,
@@ -345,10 +267,8 @@ class CategoryFilterWidget extends ConsumerWidget {
         itemCount: allCategories.length,
         itemBuilder: (context, index) {
           final category = allCategories[index];
-          
-          final isSelected = selectedCategory == category['id'].toString();
-          
-          return _buildCategoryCard(category, isSelected, ref, context);
+          final isSelected = state.selectedCategoryId == category['id'].toString();
+          return _buildCategoryCard(category, isSelected, context);
         },
       ),
     );
@@ -357,7 +277,6 @@ class CategoryFilterWidget extends ConsumerWidget {
   Widget _buildCategoryCard(
     Map<String, dynamic> category, 
     bool isSelected, 
-    WidgetRef ref, 
     BuildContext context,
   ) {
     return Card(
@@ -371,9 +290,7 @@ class CategoryFilterWidget extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          ref.read(selectedCategoryProvider.notifier).state = category['id'].toString();
-          ref.read(searchQueryProvider.notifier).state = '';
-          ref.refresh(productsProvider);
+          context.read<MainBloc>().add(CategorySelected(category['id'].toString()));
         },
         child: Padding(
           padding: const EdgeInsets.all(8),
