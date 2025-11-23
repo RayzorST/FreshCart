@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:client/api/client.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
+import 'package:client/features/analysis/bloc/analysis_result_bloc.dart';
 
-class AnalysisResultScreen extends ConsumerStatefulWidget {
+class AnalysisResultScreen extends StatelessWidget {
   final String? imageData;
   
   const AnalysisResultScreen({
@@ -13,93 +13,96 @@ class AnalysisResultScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<AnalysisResultScreen> createState() => _AnalysisResultScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => AnalysisResultBloc()
+        ..add(AnalysisResultStarted(imageData!)),
+      child: const _AnalysisResultView(),
+    );
+  }
 }
 
-class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
-  bool _isAnalyzing = true;
-  Map<String, dynamic>? _analysisResult;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _startAnalysis();
-  }
-
-  void _startAnalysis() async {
-    try {
-      Map<String, dynamic> result;
-      
-      if (widget.imageData != null) {
-        result = await ApiClient.analyzeFoodImage(widget.imageData!);
-      } else {
-        throw Exception('No image data provided');
-      }
-      
-      if (mounted) {
-        setState(() {
-          _isAnalyzing = false;
-          _analysisResult = result;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isAnalyzing = false;
-          _errorMessage = 'Ошибка анализа: ${e.toString()}';
-        });
-      }
-    }
-  }
-
-  void _retryAnalysis() {
-    setState(() {
-      _isAnalyzing = true;
-      _errorMessage = null;
-      _analysisResult = null;
-    });
-    _startAnalysis();
-  }
+class _AnalysisResultView extends StatelessWidget {
+  const _AnalysisResultView();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Результат анализа'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
-        actions: [
-          if (_analysisResult != null)
-            IconButton(
-              icon: const Icon(Icons.shopping_cart),
-              onPressed: _addAllToCart,
-              tooltip: 'Добавить все в корзину',
-            ),
-          if (_errorMessage != null)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _retryAnalysis,
-              tooltip: 'Повторить анализ',
-            ),
-        ],
+    return BlocListener<AnalysisResultBloc, AnalysisResultState>(
+      listener: (context, state) {
+        if (state is AnalysisResultCartAction) {
+          if (state.isSuccess) {
+            AppSnackbar.showSuccess(context: context, message: state.message);
+          } else {
+            AppSnackbar.showError(context: context, message: state.message);
+          }
+        } else if (state is AnalysisResultNavigateBack) {
+          context.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: _buildAppBar(context),
+        body: _buildBody(context),
       ),
-      body: _buildBody(),
     );
   }
 
-  Widget _buildBody() {
-    if (_isAnalyzing) {
-      return _buildLoading();
-    }
-    
-    if (_errorMessage != null) {
-      return _buildError();
-    }
-    
-    return _buildResults();
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      title: const Text('Результат анализа'),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () {
+          context.read<AnalysisResultBloc>().add(AnalysisResultBackPressed());
+        },
+      ),
+      actions: [
+        BlocBuilder<AnalysisResultBloc, AnalysisResultState>(
+          builder: (context, state) {
+            if (state is AnalysisResultSuccess) {
+              return IconButton(
+                icon: const Icon(Icons.shopping_cart),
+                onPressed: () {
+                  context.read<AnalysisResultBloc>().add(AnalysisResultAddAllToCart());
+                },
+                tooltip: 'Добавить все в корзину',
+              );
+            }
+            
+            if (state is AnalysisResultError) {
+              return IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  context.read<AnalysisResultBloc>().add(AnalysisResultRetried());
+                },
+                tooltip: 'Повторить анализ',
+              );
+            }
+            
+            return const SizedBox.shrink();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return BlocBuilder<AnalysisResultBloc, AnalysisResultState>(
+      builder: (context, state) {
+        if (state is AnalysisResultLoading) {
+          return _buildLoading();
+        }
+        
+        if (state is AnalysisResultError) {
+          return _buildError(context, state.message);
+        }
+        
+        if (state is AnalysisResultSuccess) {
+          return _buildResults(context, state);
+        }
+        
+        return const SizedBox.shrink();
+      },
+    );
   }
 
   Widget _buildLoading() {
@@ -120,7 +123,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
     );
   }
 
-  Widget _buildError() {
+  Widget _buildError(BuildContext context, String message) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -130,7 +133,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
             const Icon(Icons.error_outline, size: 64, color: Colors.red),
             const SizedBox(height: 16),
             Text(
-              _errorMessage!,
+              message,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
@@ -139,12 +142,16 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 FilledButton(
-                  onPressed: _retryAnalysis,
+                  onPressed: () {
+                    context.read<AnalysisResultBloc>().add(AnalysisResultRetried());
+                  },
                   child: const Text('Повторить'),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton(
-                  onPressed: () => context.pop(),
+                  onPressed: () {
+                    context.read<AnalysisResultBloc>().add(AnalysisResultBackPressed());
+                  },
                   child: const Text('Назад'),
                 ),
               ],
@@ -155,13 +162,8 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
     );
   }
 
-  Widget _buildResults() {
-    final result = _analysisResult!;
-    
-    if (result['success'] == false) {
-      return _buildError();
-    }
-    
+  Widget _buildResults(BuildContext context, AnalysisResultSuccess state) {
+    final result = state.result;
     final dishName = result['detected_dish'] ?? 'Неизвестное блюдо';
     final confidence = (result['confidence'] ?? 0.0).toDouble();
     final recommendations = List<String>.from(result['recommendations'] ?? []);
@@ -252,7 +254,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ..._buildIngredientSections(basicAlternatives),
+            ..._buildIngredientSections(context, basicAlternatives),
           ] else if (result['basic_ingredients'] != null) ...[
             const Text(
               'Основные ингредиенты:',
@@ -281,7 +283,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ..._buildIngredientSections(additionalAlternatives),
+            ..._buildIngredientSections(context, additionalAlternatives),
           ] else if (result['additional_ingredients'] != null && 
                     (result['additional_ingredients'] as List).isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -304,7 +306,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
           
           const SizedBox(height: 32),
           
-          _buildActionButtons(),
+          _buildActionButtons(context, state.hasAvailableProducts),
         ],
       ),
     );
@@ -358,7 +360,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
     return Colors.grey;
   }
 
-  List<Widget> _buildIngredientSections(List<dynamic> alternatives) {
+  List<Widget> _buildIngredientSections(BuildContext context, List<dynamic> alternatives) {
     return alternatives.map<Widget>((alt) {
       final ingredient = alt['ingredient'] ?? 'Неизвестный ингредиент';
       final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
@@ -379,7 +381,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
               ),
               const SizedBox(height: 8),
               if (products.isNotEmpty) 
-                ...products.map((product) => _buildProductItem(product))
+                ...products.map((product) => _buildProductItem(context, product))
               else
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -395,7 +397,7 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
     }).toList();
   }
 
-  Widget _buildProductItem(Map<String, dynamic> product) {
+  Widget _buildProductItem(BuildContext context, Map<String, dynamic> product) {
     final productId = product['id'] ?? 0;
     final productName = product['name'] ?? 'Неизвестный товар';
     final price = (product['price'] ?? 0.0).toDouble();
@@ -441,23 +443,27 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
               isOutOfStock ? Icons.remove_shopping_cart : Icons.add_shopping_cart,
               color: isOutOfStock ? Colors.grey : Theme.of(context).primaryColor,
             ),
-            onPressed: isOutOfStock ? null : () => _addToCart(productId),
+            onPressed: isOutOfStock ? null : () {
+              context.read<AnalysisResultBloc>().add(
+                AnalysisResultAddToCart(productId),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons() {
-    final hasProducts = _hasAvailableProducts();
-    
+  Widget _buildActionButtons(BuildContext context, bool hasProducts) {
     return Column(
       children: [
         if (hasProducts) ...[
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _addAllToCart,
+              onPressed: () {
+                context.read<AnalysisResultBloc>().add(AnalysisResultAddAllToCart());
+              },
               child: const Text('Добавить все в корзину'),
             ),
           ),
@@ -466,91 +472,13 @@ class _AnalysisResultScreenState extends ConsumerState<AnalysisResultScreen> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () => context.pop(),
+            onPressed: () {
+              context.read<AnalysisResultBloc>().add(AnalysisResultBackPressed());
+            },
             child: const Text('Сделать новый анализ'),
           ),
         ),
       ],
     );
-  }
-
-  bool _hasAvailableProducts() {
-    final result = _analysisResult!;
-    final basicAlts = List<dynamic>.from(result['basic_alternatives'] ?? []);
-    final additionalAlts = List<dynamic>.from(result['additional_alternatives'] ?? []);
-    
-    for (final alt in [...basicAlts, ...additionalAlts]) {
-      final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
-      for (final product in products) {
-        final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
-        if (stockQuantity > 0) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  void _addToCart(int productId) async {
-    try {
-      await ApiClient.addToCart(productId, 1);
-      if (mounted) {
-        AppSnackbar.showInfo(context: context, message: 'Товар добавлен в корзину');
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.showError(context: context, message: 'Ошибка добавления');
-      }
-    }
-  }
-
-  void _addAllToCart() async {
-    try {
-      final result = _analysisResult!;
-      final basicAlts = List<dynamic>.from(result['basic_alternatives'] ?? []);
-      final additionalAlts = List<dynamic>.from(result['additional_alternatives'] ?? []);
-      
-      int addedCount = 0;
-      int skippedCount = 0;
-      
-      for (final alt in basicAlts) {
-        final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
-        for (final product in products) {
-          final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
-          if (stockQuantity > 0) {
-            await ApiClient.addToCart(product['id'], 1);
-            addedCount++;
-          } else {
-            skippedCount++;
-          }
-        }
-      }
-      
-      for (final alt in additionalAlts) {
-        final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
-        for (final product in products) {
-          final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
-          if (stockQuantity > 0) {
-            await ApiClient.addToCart(product['id'], 1);
-            addedCount++;
-          } else {
-            skippedCount++;
-          }
-        }
-      }
-      
-      if (mounted) {
-        if (skippedCount > 0) {
-          AppSnackbar.showWarning(context: context, message: 'Добавлено $addedCount товаров в корзину (пропущено $skippedCount - нет в наличии)');
-        }
-        else{
-          AppSnackbar.showSuccess(context: context, message: 'Добавлено $addedCount товаров в корзину');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.showError(context: context, message: 'Ошибка при добавлении');
-      }
-    }
   }
 }

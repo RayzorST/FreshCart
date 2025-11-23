@@ -1,78 +1,60 @@
 // product_management.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:client/api/client.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
+import 'package:client/features/admin/bloc/product_management_bloc.dart';
 
-class ProductManagement extends ConsumerStatefulWidget {
+class ProductManagement extends StatelessWidget {
   const ProductManagement({super.key});
 
   @override
-  ConsumerState<ProductManagement> createState() => _ProductManagementState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => ProductManagementBloc()..add(const LoadProductData()),
+      child: const _ProductManagementView(),
+    );
+  }
 }
 
-class _ProductManagementState extends ConsumerState<ProductManagement> {
-  List<dynamic> _products = [];
-  List<dynamic> _categories = [];
-  List<dynamic> _tags = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    try {
-      final [products, categories, tags] = await Future.wait([
-        ApiClient.getAdminProducts(includeInactive: true),
-        ApiClient.getAdminCategories(),
-        ApiClient.getAdminTags(),
-      ]);
-      
-      setState(() {
-        _products = products;
-        _categories = categories;
-        _tags = tags;
-        _isLoading = false;
-      });
-      
-      print('Loaded ${_products.length} products, ${_categories.length} categories, ${_tags.length} tags');
-    } catch (e) {
-      print('Error loading data: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
+class _ProductManagementView extends StatelessWidget {
+  const _ProductManagementView();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Основной контент - товары
-          Expanded(
-            flex: 3,
-            child: _buildProductsContent(),
-          ),
-          const SizedBox(width: 16),
-          // Боковая панель с категориями и тегами
-          Expanded(
-            flex: 1,
-            child: _buildSidebar(),
-          ),
-        ],
+    return BlocListener<ProductManagementBloc, ProductManagementState>(
+      listener: (context, state) {
+        if (state is ProductManagementError) {
+          AppSnackbar.showError(context: context, message: state.message);
+        } else if (state is ProductManagementOperationSuccess) {
+          AppSnackbar.showInfo(context: context, message: state.message);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Основной контент - товары
+            Expanded(
+              flex: 3,
+              child: _buildProductsContent(context),
+            ),
+            const SizedBox(width: 16),
+            // Боковая панель с категориями и тегами
+            Expanded(
+              flex: 1,
+              child: _buildSidebar(context),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProductsContent() {
+  Widget _buildProductsContent(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -86,7 +68,7 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
               ),
             ),
             ElevatedButton.icon(
-              onPressed: () => _showCreateProductDialog(),
+              onPressed: () => _showCreateProductDialog(context),
               icon: const Icon(Icons.add),
               label: const Text('Добавить товар'),
             ),
@@ -94,374 +76,368 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
         ),
         const SizedBox(height: 16),
         Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _products.isEmpty
-                  ? const Center(child: Text('Товары не найдены'))
-                  : _buildProductsList(),
+          child: BlocBuilder<ProductManagementBloc, ProductManagementState>(
+            builder: (context, state) {
+              if (state is ProductManagementLoading) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (state is ProductManagementLoaded) {
+                return _buildProductsList(context, state.products, state.categories, state.tags);
+              } else if (state is ProductManagementError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        state.message,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          context.read<ProductManagementBloc>().add(const LoadProductData());
+                        },
+                        child: const Text('Повторить'),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                return const Center(child: Text('Загрузка...'));
+              }
+            },
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildProductsList() {
+  Widget _buildProductsList(BuildContext context, List<dynamic> products, List<dynamic> categories, List<dynamic> tags) {
+    if (products.isEmpty) {
+      return const Center(child: Text('Товары не найдены'));
+    }
+
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 300, // Максимальная ширина карточки
+        maxCrossAxisExtent: 300,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.8, // Соотношение сторон карточки
+        childAspectRatio: 0.8,
       ),
-      itemCount: _products.length,
+      itemCount: products.length,
       itemBuilder: (context, index) {
-        final product = _products[index];
+        final product = products[index];
         return ProductCard(
           product: product,
-          categories: _categories,
-          tags: _tags,
-          onEdit: () => _showEditProductDialog(product),
-          onDelete: () => _deleteProduct(product['id']),
-          onToggleActive: () => _updateProduct(
-            product['id'],
-            {'is_active': !product['is_active']},
-          ),
+          categories: categories,
+          tags: tags,
+          onEdit: () => _showEditProductDialog(context, product, categories, tags),
+          onDelete: () => _deleteProduct(context, product['id']),
+          onToggleActive: () => _toggleProductActive(context, product['id'], !product['is_active']),
         );
       },
     );
   }
 
-  Widget _buildSidebar() {
-    return Column(
-      children: [
-        // Категории
-        Expanded(
-          flex: 1,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+  Widget _buildSidebar(BuildContext context) {
+    return BlocBuilder<ProductManagementBloc, ProductManagementState>(
+      builder: (context, state) {
+        if (state is! ProductManagementLoaded) {
+          return const SizedBox();
+        }
+
+        return Column(
+          children: [
+            // Категории
+            Expanded(
+              flex: 1,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Категории',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Категории',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith( // Добавлен context
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.add, size: 20),
+                            onPressed: () => _showCreateCategoryDialog(context),
+                            tooltip: 'Добавить категорию',
+                          ),
+                        ],
                       ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.add, size: 20),
-                        onPressed: () => _showCreateCategoryDialog(),
-                        tooltip: 'Добавить категорию',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: _categories.isEmpty
-                        ? const Center(child: Text('Категории не найдены'))
-                        : ListView.builder(
-                            itemCount: _categories.length,
-                            itemBuilder: (context, index) {
-                              final category = _categories[index];
-                              return ListTile(
-                                leading: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(6),
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                  ),
-                                  child: category['image_url'] != null
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(6),
-                                          child: Image.network(
-                                            category['image_url'],
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Icon(
-                                                Icons.category,
-                                                size: 16,
-                                                color: Theme.of(context).colorScheme.primary,
-                                              );
-                                            },
-                                          ),
-                                        )
-                                      : Icon(
-                                          Icons.category,
-                                          size: 16,
-                                          color: Theme.of(context).colorScheme.primary,
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: state.categories.isEmpty
+                            ? const Center(child: Text('Категории не найдены'))
+                            : ListView.builder(
+                                itemCount: state.categories.length,
+                                itemBuilder: (context, index) {
+                                  final category = state.categories[index];
+                                  return ListTile(
+                                    leading: Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(6),
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1), // Добавлен context
+                                      ),
+                                      child: category['image_url'] != null
+                                          ? ClipRRect(
+                                              borderRadius: BorderRadius.circular(6),
+                                              child: Image.network(
+                                                category['image_url'],
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Icon(
+                                                    Icons.category,
+                                                    size: 16,
+                                                    color: Theme.of(context).colorScheme.primary, // Добавлен context
+                                                  );
+                                                },
+                                              ),
+                                            )
+                                          : Icon(
+                                              Icons.category,
+                                              size: 16,
+                                              color: Theme.of(context).colorScheme.primary, // Добавлен context
+                                            ),
+                                    ),
+                                    title: Text(
+                                      category['name'],
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit, size: 16),
+                                          onPressed: () => _showEditCategoryDialog(context, category),
+                                          color: Colors.blue,
                                         ),
-                                ),
-                                title: Text(
-                                  category['name'],
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 16),
-                                      onPressed: () => _showEditCategoryDialog(category),
-                                      color: Colors.blue,
+                                        IconButton(
+                                          icon: const Icon(Icons.delete, size: 16),
+                                          onPressed: () => _deleteCategory(context, category['id']),
+                                          color: Colors.red,
+                                        ),
+                                      ],
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, size: 16),
-                                      onPressed: () => _deleteCategory(category['id']),
-                                      color: Colors.red,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Теги
-        Expanded(
-          flex: 1,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Теги',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.add, size: 20),
-                        onPressed: () => _showCreateTagDialog(),
-                        tooltip: 'Добавить тег',
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: _tags.isEmpty
-                        ? const Center(child: Text('Теги не найдены'))
-                        : ListView.builder(
-                            itemCount: _tags.length,
-                            itemBuilder: (context, index) {
-                              final tag = _tags[index];
-                              return ListTile(
-                                leading: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(6),
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                  ),
-                                  child: Icon(
-                                    Icons.local_offer,
-                                    size: 16,
-                                    color: Theme.of(context).colorScheme.primary,
-                                  ),
-                                ),
-                                title: Text(
-                                  tag['name'],
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                subtitle: Text(
-                                  '${tag['products_count'] ?? 0} товаров',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 16),
-                                      onPressed: () => _showEditTagDialog(tag),
-                                      color: Colors.blue,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, size: 16),
-                                      onPressed: () => _deleteTag(tag['id']),
-                                      color: Colors.red,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+            const SizedBox(height: 16),
+            // Теги
+            Expanded(
+              flex: 1,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Теги',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith( // Добавлен context
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.add, size: 20),
+                            onPressed: () => _showCreateTagDialog(context),
+                            tooltip: 'Добавить тег',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: state.tags.isEmpty
+                            ? const Center(child: Text('Теги не найдены'))
+                            : ListView.builder(
+                                itemCount: state.tags.length,
+                                itemBuilder: (context, index) {
+                                  final tag = state.tags[index];
+                                  return ListTile(
+                                    leading: Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(6),
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1), // Добавлен context
+                                      ),
+                                      child: Icon(
+                                        Icons.local_offer,
+                                        size: 16,
+                                        color: Theme.of(context).colorScheme.primary, // Добавлен context
+                                      ),
+                                    ),
+                                    title: Text(
+                                      tag['name'],
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      '${tag['products_count'] ?? 0} товаров',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit, size: 16),
+                                          onPressed: () => _showEditTagDialog(context, tag),
+                                          color: Colors.blue,
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete, size: 16),
+                                          onPressed: () => _deleteTag(context, tag['id']),
+                                          color: Colors.red,
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
   // Методы для работы с продуктами
-  Future<void> _createProduct(Map<String, dynamic> productData) async {
-    try {
-      await ApiClient.createAdminProduct(productData);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Товар создан');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка создания');
-    }
-  }
-
-  Future<void> _updateProduct(int productId, Map<String, dynamic> productData) async {
-    try {
-      await ApiClient.updateAdminProduct(productId, productData);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Товар обновлен');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
-    }
-  }
-
-  Future<void> _deleteProduct(int productId) async {
-    try {
-      await ApiClient.deleteAdminProduct(productId);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Товар удален');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка удаления');
-    }
-  }
-
-  Future<void> _createCategory(Map<String, dynamic> categoryData) async {
-    try {
-      await ApiClient.createAdminCategory(categoryData);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Категория создана');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка создания');
-    }
-  }
-
-  Future<void> _updateCategory(int categoryId, Map<String, dynamic> categoryData) async {
-    try {
-      await ApiClient.updateAdminCategory(categoryId, categoryData);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Категория обновлена');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
-    }
-  }
-
-  Future<void> _deleteCategory(int categoryId) async {
-    try {
-      await ApiClient.deleteAdminCategory(categoryId);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Категория удалена');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка удаления');
-    }
-  }
-
-  Future<void> _createTag(Map<String, dynamic> tagData) async {
-    try {
-      await ApiClient.createAdminTag(tagData);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Тег создан');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка создания');
-    }
-  }
-
-  Future<void> _updateTag(int tagId, Map<String, dynamic> tagData) async {
-    try {
-      await ApiClient.updateAdminTag(tagId, tagData);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Тег обновлен');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка обновления');
-    }
-  }
-
-  Future<void> _deleteTag(int tagId) async {
-    try {
-      await ApiClient.deleteAdminTag(tagId);
-      _loadData();
-      AppSnackbar.showInfo(context: context, message: 'Тег удален');
-    } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Ошибка удаления');
-    }
-  }
-
-  // Диалоги
-  void _showCreateProductDialog() {
+  void _showCreateProductDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => ProductEditDialog(
-        categories: _categories,
-        tags: _tags,
-        onSave: _createProduct,
+        categories: _getCategoriesFromState(context),
+        tags: _getTagsFromState(context),
+        onSave: (productData) {
+          context.read<ProductManagementBloc>().add(CreateProduct(productData));
+        },
       ),
     );
   }
 
-  void _showEditProductDialog(Map<String, dynamic> product) {
+  void _showEditProductDialog(BuildContext context, Map<String, dynamic> product, List<dynamic> categories, List<dynamic> tags) {
     showDialog(
       context: context,
       builder: (context) => ProductEditDialog(
         product: product,
-        categories: _categories,
-        tags: _tags,
-        onSave: (productData) => _updateProduct(product['id'], productData),
+        categories: categories,
+        tags: tags,
+        onSave: (productData) {
+          context.read<ProductManagementBloc>().add(UpdateProduct(
+            productId: product['id'],
+            productData: productData,
+          ));
+        },
       ),
     );
   }
 
-  void _showCreateCategoryDialog() {
+  void _deleteProduct(BuildContext context, int productId) {
+    context.read<ProductManagementBloc>().add(DeleteProduct(productId));
+  }
+
+  void _toggleProductActive(BuildContext context, int productId, bool isActive) {
+    context.read<ProductManagementBloc>().add(ToggleProductActive(
+      productId: productId,
+      isActive: isActive,
+    ));
+  }
+
+  void _showCreateCategoryDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => CategoryEditDialog(
-        onSave: _createCategory,
+        onSave: (categoryData) {
+          context.read<ProductManagementBloc>().add(CreateCategory(categoryData));
+        },
       ),
     );
   }
 
-  void _showEditCategoryDialog(Map<String, dynamic> category) {
+  void _showEditCategoryDialog(BuildContext context, Map<String, dynamic> category) {
     showDialog(
       context: context,
       builder: (context) => CategoryEditDialog(
         category: category,
-        onSave: (categoryData) => _updateCategory(category['id'], categoryData),
+        onSave: (categoryData) {
+          context.read<ProductManagementBloc>().add(UpdateCategory(
+            categoryId: category['id'],
+            categoryData: categoryData,
+          ));
+        },
       ),
     );
   }
 
-  void _showCreateTagDialog() {
+  void _deleteCategory(BuildContext context, int categoryId) {
+    context.read<ProductManagementBloc>().add(DeleteCategory(categoryId));
+  }
+
+  void _showCreateTagDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => TagEditDialog(
-        onSave: _createTag,
+        onSave: (tagData) {
+          context.read<ProductManagementBloc>().add(CreateTag(tagData));
+        },
       ),
     );
   }
 
-  void _showEditTagDialog(Map<String, dynamic> tag) {
+  void _showEditTagDialog(BuildContext context, Map<String, dynamic> tag) {
     showDialog(
       context: context,
       builder: (context) => TagEditDialog(
         tag: tag,
-        onSave: (tagData) => _updateTag(tag['id'], tagData),
+        onSave: (tagData) {
+          context.read<ProductManagementBloc>().add(UpdateTag(
+            tagId: tag['id'],
+            tagData: tagData,
+          ));
+        },
       ),
     );
   }
+
+  void _deleteTag(BuildContext context, int tagId) {
+    context.read<ProductManagementBloc>().add(DeleteTag(tagId));
+  }
+
+  List<dynamic> _getCategoriesFromState(BuildContext context) {
+    final state = context.read<ProductManagementBloc>().state;
+    return state is ProductManagementLoaded ? state.categories : [];
+  }
+
+  List<dynamic> _getTagsFromState(BuildContext context) {
+    final state = context.read<ProductManagementBloc>().state;
+    return state is ProductManagementLoaded ? state.tags : [];
+  }
 }
 
-// Карточка продукта
+// Карточка продукта (остается без изменений)
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   final List<dynamic> categories;
@@ -611,7 +587,7 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-// Диалог редактирования продукта
+// Диалог редактирования продукта (остается без изменений)
 class ProductEditDialog extends StatefulWidget {
   final Map<String, dynamic>? product;
   final List<dynamic> categories;
@@ -784,7 +760,7 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
   }
 }
 
-// Диалог редактирования категории
+// Диалог редактирования категории (остается без изменений)
 class CategoryEditDialog extends StatefulWidget {
   final Map<String, dynamic>? category;
   final Function(Map<String, dynamic>) onSave;
@@ -885,7 +861,7 @@ class _CategoryEditDialogState extends State<CategoryEditDialog> {
   }
 }
 
-// Диалог редактирования тега
+// Диалог редактирования тега (остается без изменений)
 class TagEditDialog extends StatefulWidget {
   final Map<String, dynamic>? tag;
   final Function(Map<String, dynamic>) onSave;

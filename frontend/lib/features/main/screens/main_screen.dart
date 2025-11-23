@@ -5,7 +5,7 @@ import 'package:client/features/main/screens/favorites_screen.dart';
 import 'package:client/features/profile/screens/profile_screen.dart';
 import 'package:client/core/widgets/navigation_bar.dart';
 import 'package:client/core/widgets/camera_fab.dart';
-import 'package:client/features/admin/admin_screen.dart';
+import 'package:client/features/admin/screens/admin_screen.dart';
 import 'package:client/features/main/bloc/main_bloc.dart';
 import 'package:client/core/widgets/promotions_section.dart';
 import 'package:client/core/widgets/category_filter.dart';

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class QuantityControls extends ConsumerWidget {
+class QuantityControls extends StatelessWidget {
   final int productId;
   final int quantity;
   final Function(int, int) onQuantityChanged;
@@ -24,13 +23,13 @@ class QuantityControls extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final effectivePrimaryColor = primaryColor ?? theme.colorScheme.primary;
     final effectiveDisabledColor = disabledColor ?? theme.colorScheme.onSurface.withOpacity(0.3);
 
     return Container(
-      width: fullWidth ? double.infinity : 120, // 👈 Условная ширина
+      width: fullWidth ? double.infinity : 120,
       decoration: BoxDecoration(
         border: Border.all(
           color: theme.colorScheme.outline.withOpacity(0.3),
@@ -38,7 +37,7 @@ class QuantityControls extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
-        mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min, // 👈 Здесь
+        mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
         children: [
           IconButton(
             icon: Icon(
@@ -56,7 +55,7 @@ class QuantityControls extends ConsumerWidget {
             ),
           ),
           
-          Expanded( // 👈 Добавь Expanded если fullWidth
+          Expanded(
             child: Container(
               alignment: Alignment.center,
               child: Text(

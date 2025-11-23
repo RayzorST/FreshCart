@@ -16,7 +16,7 @@ class CustomNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWideScreen = MediaQuery.of(context).size.width > 600;
+    //final isWideScreen = MediaQuery.of(context).size.width > 600;
 
     return isVertical 
         ? _buildSideNavigation(context)

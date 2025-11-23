@@ -1,184 +1,203 @@
-// analysis_history_screen.dart
 import 'package:flutter/material.dart';
-import 'package:client/api/client.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
+import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
 
-class AnalysisHistoryScreen extends StatefulWidget {
+class AnalysisHistoryScreen extends StatelessWidget {
   const AnalysisHistoryScreen({super.key});
 
   @override
-  State<AnalysisHistoryScreen> createState() => _AnalysisHistoryScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => AnalysisHistoryBloc()..add(AnalysisHistoryStarted()),
+      child: const _AnalysisHistoryView(),
+    );
+  }
 }
 
-class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  int _currentTab = 0;
-
-  // Данные для вкладок
-  List<dynamic> _myAnalysisHistory = [];
-  List<dynamic> _allUsersAnalysis = [];
-  bool _isLoadingMyHistory = true;
-  bool _isLoadingAllUsers = true;
-  String? _errorMyHistory;
-  String? _errorAllUsers;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_handleTabSelection);
-    _loadMyAnalysisHistory();
-    _loadAllUsersAnalysis();
-  }
-
-  void _handleTabSelection() {
-    if (_tabController.indexIsChanging) {
-      setState(() {
-        _currentTab = _tabController.index;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadMyAnalysisHistory() async {
-    try {
-      final history = await ApiClient.getAnalysisHistory();
-      setState(() {
-        _myAnalysisHistory = history;
-        _isLoadingMyHistory = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMyHistory = 'Ошибка загрузки истории: $e';
-        _isLoadingMyHistory = false;
-      });
-    }
-  }
-
-  Future<void> _loadAllUsersAnalysis() async {
-    try {
-      final allAnalysis = await ApiClient.getAnalysisHistory(); //ИСПРАВИТЬ
-      setState(() {
-        _allUsersAnalysis = allAnalysis;
-        _isLoadingAllUsers = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorAllUsers = 'Ошибка загрузки анализов: $e';
-        _isLoadingAllUsers = false;
-      });
-    }
-  }
-
-  void _refreshData() {
-    if (_currentTab == 0) {
-      setState(() {
-        _isLoadingMyHistory = true;
-        _errorMyHistory = null;
-      });
-      _loadMyAnalysisHistory();
-    } else {
-      setState(() {
-        _isLoadingAllUsers = true;
-        _errorAllUsers = null;
-      });
-      _loadAllUsersAnalysis();
-    }
-  }
+class _AnalysisHistoryView extends StatelessWidget {
+  const _AnalysisHistoryView();
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    return BlocListener<AnalysisHistoryBloc, AnalysisHistoryState>(
+      listener: (context, state) {
+        if (state is AnalysisHistoryCartAction) {
+          if (state.isSuccess) {
+            AppSnackbar.showSuccess(context: context, message: state.message);
+          } else {
+            AppSnackbar.showError(context: context, message: state.message);
+          }
+        } else if (state is AnalysisHistoryDeleted) {
+          AppSnackbar.showInfo(context: context, message: state.message);
+        }
+      },
+      child: BlocBuilder<AnalysisHistoryBloc, AnalysisHistoryState>(
+        builder: (context, state) {
+          final currentTab = state is AnalysisHistorySuccess 
+              ? state.currentTab 
+              : 0;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('История анализов'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: colorScheme.onSurface,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: colorScheme.primary),
-            onPressed: _refreshData,
-            tooltip: 'Обновить',
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: colorScheme.primary,
-          labelColor: colorScheme.primary,
-          unselectedLabelColor: colorScheme.onSurfaceVariant,
-          labelStyle: textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.person),
-              text: 'Мои анализы',
+          return DefaultTabController(
+            length: 2,
+            initialIndex: currentTab,
+            child: Scaffold(
+              appBar: _buildAppBar(context),
+              body: _buildBody(context),
             ),
-            Tab(
-              icon: Icon(Icons.people),
-              text: 'Все анализы',
-            ),
-          ],
-        ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              colorScheme.background,
-              colorScheme.surfaceVariant.withOpacity(0.3),
-            ],
-          ),
-        ),
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            // Первая вкладка - Мои анализы
-            _buildMyAnalysisTab(),
-            
-            // Вторая вкладка - Все анализы пользователей
-            _buildAllUsersAnalysisTab(),
-          ],
-        ),
+          );
+        }
       ),
     );
   }
 
-  Widget _buildMyAnalysisTab() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    //final textTheme = Theme.of(context).textTheme;
+
+    return AppBar(
+      title: const Text('История анализов'),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: colorScheme.onSurface,
+      actions: [
+        BlocBuilder<AnalysisHistoryBloc, AnalysisHistoryState>(
+          builder: (context, state) {
+            return IconButton(
+              icon: Icon(Icons.refresh, color: colorScheme.primary),
+              onPressed: () {
+                context.read<AnalysisHistoryBloc>().add(AnalysisHistoryRefreshed());
+              },
+              tooltip: 'Обновить',
+            );
+          },
+        ),
+      ],
+      bottom: _buildTabBar(context),
+    );
+  }
+
+  PreferredSizeWidget _buildTabBar(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return _isLoadingMyHistory
-        ? const Center(child: CircularProgressIndicator())
-        : _errorMyHistory != null
-            ? _buildErrorWidget(_errorMyHistory!, _loadMyAnalysisHistory)
-            : _myAnalysisHistory.isEmpty
-                ? _buildEmptyMyAnalysisState()
-                : _buildAnalysisList(_myAnalysisHistory, isMyAnalysis: true);
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(48.0),
+      child: BlocBuilder<AnalysisHistoryBloc, AnalysisHistoryState>(
+        builder: (context, state) {
+          //final currentTab = state is AnalysisHistorySuccess 
+          //    ? state.currentTab 
+          //    : 0;
+
+          return TabBar(
+            onTap: (index) {
+              context.read<AnalysisHistoryBloc>().add(AnalysisHistoryTabChanged(index));
+            },
+            indicatorColor: colorScheme.primary,
+            labelColor: colorScheme.primary,
+            unselectedLabelColor: colorScheme.onSurfaceVariant,
+            labelStyle: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            tabs: const [
+              Tab(
+                icon: Icon(Icons.person),
+                text: 'Мои анализы',
+              ),
+              Tab(
+                icon: Icon(Icons.people),
+                text: 'Все анализы',
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
-  Widget _buildAllUsersAnalysisTab() {
-    return _isLoadingAllUsers
-        ? const Center(child: CircularProgressIndicator())
-        : _errorAllUsers != null
-            ? _buildErrorWidget(_errorAllUsers!, _loadAllUsersAnalysis)
-            : _allUsersAnalysis.isEmpty
-                ? _buildEmptyAllUsersState()
-                : _buildAnalysisList(_allUsersAnalysis, isMyAnalysis: false);
+Widget _buildBody(BuildContext context) {
+  return Container(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Theme.of(context).colorScheme.background,
+          Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        ],
+      ),
+    ),
+    child: BlocBuilder<AnalysisHistoryBloc, AnalysisHistoryState>(
+      builder: (context, state) {
+        if (state is AnalysisHistoryLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is AnalysisHistoryError) {
+          return _buildErrorWidget(context, state.message, state.currentTab);
+        }
+
+        if (state is AnalysisHistoryShowDetailsState) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showAnalysisDetails(context, state.analysis, state.isMyAnalysis);
+          });
+        }
+
+        if (state is AnalysisHistoryShowOptionsState) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showMyAnalysisOptions(context, state.analysis);
+          });
+        }
+
+        return _buildTabBarView(context, state);
+      },
+    ),
+  );
+}
+
+  Widget _buildTabBarView(BuildContext context, AnalysisHistoryState state) {
+    if (state is AnalysisHistorySuccess) {
+      return TabBarView(
+        children: [
+          _buildMyAnalysisTab(context, state),
+          _buildAllUsersAnalysisTab(context, state),
+        ],
+      );
+    }
+
+    return TabBarView(
+      children: [
+        Container(),
+        Container(),
+      ],
+    );
   }
 
-  Widget _buildEmptyMyAnalysisState() {
+  Widget _buildMyAnalysisTab(BuildContext context, AnalysisHistorySuccess state) {
+    if (state.isLoadingMyHistory) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (state.myAnalysisHistory.isEmpty) {
+      return _buildEmptyMyAnalysisState(context);
+    }
+
+    return _buildAnalysisList(context, state.myAnalysisHistory, isMyAnalysis: true);
+  }
+
+  Widget _buildAllUsersAnalysisTab(BuildContext context, AnalysisHistorySuccess state) {
+    if (state.isLoadingAllUsers) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (state.allUsersAnalysis.isEmpty) {
+      return _buildEmptyAllUsersState(context);
+    }
+
+    return _buildAnalysisList(context, state.allUsersAnalysis, isMyAnalysis: false);
+  }
+
+  Widget _buildEmptyMyAnalysisState(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -234,7 +253,7 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
     );
   }
 
-  Widget _buildEmptyAllUsersState() {
+  Widget _buildEmptyAllUsersState(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -280,7 +299,7 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
     );
   }
 
-  Widget _buildErrorWidget(String error, VoidCallback onRetry) {
+  Widget _buildErrorWidget(BuildContext context, String error, int currentTab) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -321,7 +340,9 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: onRetry,
+              onPressed: () {
+                context.read<AnalysisHistoryBloc>().add(AnalysisHistoryRefreshed());
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
@@ -334,18 +355,18 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
     );
   }
 
-  Widget _buildAnalysisList(List<dynamic> analyses, {required bool isMyAnalysis}) {
+  Widget _buildAnalysisList(BuildContext context, List<dynamic> analyses, {required bool isMyAnalysis}) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: analyses.length,
       itemBuilder: (context, index) {
         final analysis = analyses[index];
-        return _buildAnalysisItem(analysis, isMyAnalysis: isMyAnalysis);
+        return _buildAnalysisItem(context, analysis, isMyAnalysis: isMyAnalysis);
       },
     );
   }
 
-  Widget _buildAnalysisItem(Map<String, dynamic> analysis, {required bool isMyAnalysis}) {
+  Widget _buildAnalysisItem(BuildContext context, Map<String, dynamic> analysis, {required bool isMyAnalysis}) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -355,7 +376,6 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
     final ingredients = analysis['ingredients'] ?? {};
     final basicIngredients = List<String>.from(ingredients['basic'] ?? []);
     final userName = analysis['user_name'] ?? 'Пользователь';
-    final userEmail = analysis['user_email'] ?? '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -434,10 +454,17 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
           color: colorScheme.onSurfaceVariant,
         ),
         onTap: () {
-          _showAnalysisDetails(analysis, isMyAnalysis: isMyAnalysis);
+          context.read<AnalysisHistoryBloc>().add(
+            AnalysisHistoryShowDetails(
+              analysis: analysis,
+              isMyAnalysis: isMyAnalysis,
+            ),
+          );
         },
         onLongPress: isMyAnalysis ? () {
-          _showMyAnalysisOptions(analysis);
+          context.read<AnalysisHistoryBloc>().add(
+            AnalysisHistoryShowOptions(analysis),
+          );
         } : null,
       ),
     );
@@ -462,7 +489,7 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
     }
   }
 
-  void _showAnalysisDetails(Map<String, dynamic> analysis, {required bool isMyAnalysis}) {
+  void _showAnalysisDetails(BuildContext context, Map<String, dynamic> analysis, bool isMyAnalysis) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -474,151 +501,169 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
     final alternatives = analysis['alternatives_found'] ?? {};
     final userName = analysis['user_name'] ?? 'Пользователь';
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: colorScheme.surfaceTint,
-        title: Text(
-          dishName,
-          style: textTheme.headlineSmall?.copyWith(
-            color: colorScheme.onSurface,
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: colorScheme.surface,
+          surfaceTintColor: colorScheme.surfaceTint,
+          title: Text(
+            dishName,
+            style: textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface,
+            ),
           ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!isMyAnalysis) ...[
-                Text(
-                  'Пользователь: $userName',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _getConfidenceColor(confidence, colorScheme).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isMyAnalysis) ...[
+                  Text(
+                    'Пользователь: $userName',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
-                    child: Text(
-                      'Уверенность: ${(confidence * 100).toStringAsFixed(1)}%',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: _getConfidenceColor(confidence, colorScheme),
-                        fontWeight: FontWeight.w600,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getConfidenceColor(confidence, colorScheme).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Уверенность: ${(confidence * 100).toStringAsFixed(1)}%',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: _getConfidenceColor(confidence, colorScheme),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              const Text(
-                'Основные ингредиенты:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ...basicIngredients.map((ingredient) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2.0),
-                child: Text('• $ingredient'),
-              )),
-              
-              if (additionalIngredients.isNotEmpty) ...[
-                const SizedBox(height: 16),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                
                 const Text(
-                  'Дополнительные ингредиенты:',
+                  'Основные ингредиенты:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                ...additionalIngredients.map((ingredient) => Padding(
+                ...basicIngredients.map((ingredient) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2.0),
                   child: Text('• $ingredient'),
                 )),
+                
+                if (additionalIngredients.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Дополнительные ингредиенты:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  ...additionalIngredients.map((ingredient) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                    child: Text('• $ingredient'),
+                  )),
+                ],
+                
+                if (isMyAnalysis && _hasAvailableProducts(alternatives)) ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        context.read<AnalysisHistoryBloc>().add(
+                          AnalysisHistoryAddAllToCart(alternatives),
+                        );
+                      },
+                      child: const Text('Добавить все в корзину'),
+                    ),
+                  ),
+                ],
               ],
-              
-              if (isMyAnalysis && _hasAvailableProducts(alternatives)) ...[
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => _addAllToCart(alternatives),
-                    child: const Text('Добавить все в корзину'),
+            ),
+          ),
+          actions: [
+            if (isMyAnalysis) 
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  context.read<AnalysisHistoryBloc>().add(
+                    AnalysisHistoryDeleteRequested(analysis['id']),
+                  );
+                },
+                child: Text(
+                  'Удалить',
+                  style: TextStyle(color: colorScheme.error),
+                ),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  void _showMyAnalysisOptions(BuildContext context, Map<String, dynamic> analysis) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Действия с анализом',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
+              ),
+              ListTile(
+                leading: Icon(Icons.shopping_cart, color: colorScheme.primary),
+                title: const Text('Добавить в корзину'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.read<AnalysisHistoryBloc>().add(
+                    AnalysisHistoryAddAllToCart(analysis['alternatives_found'] ?? {}),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete, color: colorScheme.error),
+                title: Text(
+                  'Удалить анализ',
+                  style: TextStyle(color: colorScheme.error),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.read<AnalysisHistoryBloc>().add(
+                    AnalysisHistoryDeleteRequested(analysis['id']),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
-        actions: [
-          if (isMyAnalysis) 
-            TextButton(
-              onPressed: () => _deleteAnalysis(analysis['id']),
-              child: Text(
-                'Удалить',
-                style: TextStyle(color: colorScheme.error),
-              ),
-            ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Закрыть'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showMyAnalysisOptions(Map<String, dynamic> analysis) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Действия с анализом',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.shopping_cart, color: colorScheme.primary),
-              title: const Text('Добавить в корзину'),
-              onTap: () {
-                Navigator.pop(context);
-                _addAllToCart(analysis['alternatives_found'] ?? {});
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.delete, color: colorScheme.error),
-              title: Text(
-                'Удалить анализ',
-                style: TextStyle(color: colorScheme.error),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteAnalysis(analysis['id']);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
+      );
+    });
   }
 
   bool _hasAvailableProducts(Map<String, dynamic> alternatives) {
@@ -635,53 +680,5 @@ class _AnalysisHistoryScreenState extends State<AnalysisHistoryScreen>
       }
     }
     return false;
-  }
-
-  void _addAllToCart(Map<String, dynamic> alternatives) async {
-    try {
-      final basicAlts = List<dynamic>.from(alternatives['basic'] ?? []);
-      final additionalAlts = List<dynamic>.from(alternatives['additional'] ?? []);
-      
-      int addedCount = 0;
-      int skippedCount = 0;
-      
-      for (final alt in [...basicAlts, ...additionalAlts]) {
-        final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
-        for (final product in products) {
-          final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
-          if (stockQuantity > 0) {
-            await ApiClient.addToCart(product['id'], 1);
-            addedCount++;
-          } else {
-            skippedCount++;
-          }
-        }
-      }
-      
-      if (mounted) {
-        if (skippedCount > 0) {
-          AppSnackbar.showWarning(context: context, message: 'Добавлено $addedCount товаров в корзину (пропущено $skippedCount - нет в наличии)');
-        }
-        else{
-          AppSnackbar.showSuccess(context: context, message: 'Добавлено $addedCount товаров в корзину');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.showError(context: context, message: 'Ошибка при добавлении');
-      }
-    }
-  }
-
-  void _deleteAnalysis(int analysisId) async {
-    try {
-      AppSnackbar.showInfo(context: context, message: 'Анализ удален');
-      _loadMyAnalysisHistory();
-      //await ApiClient.deleteAnalysisRecord(analysisId);
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.showError(context: context, message: 'Ошибка удаления');
-      }
-    }
   }
 }

@@ -24,6 +24,11 @@ import 'package:client/features/profile/bloc/order_history_bloc.dart';
 import 'package:client/features/profile/bloc/settings_bloc.dart';
 import 'package:client/features/profile/bloc/addresses_bloc.dart';
 
+// Analysis BLoC
+import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
+import 'package:client/features/analysis/bloc/analysis_result_bloc.dart';
+import 'package:client/features/analysis/bloc/image_picker_bloc.dart';
+
 // Screens
 import 'package:client/features/main/screens/main_screen.dart';
 import 'package:client/features/main/screens/promotion_screen.dart';
@@ -152,25 +157,34 @@ class _FreshCartAppState extends State<FreshCartApp> {
         GoRoute(
           path: '/analysis/camera',
           name: 'camera',
-          builder: (context, state) => const ImagePickerScreen(),
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider(
+              create: (context) => ImagePickerBloc(),
+              child: const ImagePickerScreen(),
+            ),
+          ),
         ),
         GoRoute(
           path: '/analysis/history',
           name: 'analysis-history',
-          builder: (context, state) => const AnalysisHistoryScreen(),
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider(
+              create: (context) => AnalysisHistoryBloc()..add(AnalysisHistoryStarted()),
+              child: const AnalysisHistoryScreen(),
+            ),
+          ),
         ),
         GoRoute(
           path: '/analysis/result',
           name: 'analysis-result',
-          builder: (context, state) {
-            final imageData = state.extra as String?;
-            if (imageData == null) {
-              return const Scaffold(
-                body: Center(child: Text('Ошибка: изображение не найдено')),
-              );
-            }
-            return AnalysisResultScreen(imageData: imageData);
-          },
+          pageBuilder: (context, state) => MaterialPage(
+            child: BlocProvider(
+              create: (context) => AnalysisResultBloc(),
+              child: AnalysisResultScreen(
+                imageData: state.extra as String?,
+              ),
+            ),
+          ),
         ),
         GoRoute(
           path: '/product/:id',
