@@ -21,7 +21,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    // Загружаем избранное при инициализации
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FavoritesBloc>().add(const FavoritesLoaded());
     });
@@ -123,7 +123,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             return _buildEmptyState();
           }
 
-          return _buildFavoritesList(context, state);
+          return _buildFavoritesContent(context, state);
         },
       ),
     );
@@ -189,7 +189,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: () {
-              // Навигация к главному экрану
+              
               context.go('/');
             },
             icon: const Icon(Icons.shopping_bag),
@@ -200,10 +200,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
-  Widget _buildFavoritesList(BuildContext context, FavoritesState state) {
+  Widget _buildFavoritesContent(BuildContext context, FavoritesState state) {
     return Column(
       children: [
-        // Поле поиска
+        
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Card(
@@ -290,25 +290,63 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           )
         else
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
-              itemCount: state.filteredFavorites.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final favorite = state.filteredFavorites[index];
-                final product = favorite['product'];
-                final productId = product['id'] as int;
+            child: LayoutBuilder(
+              builder: (context, constraints) {
                 
-                return FavoriteItemCard(
-                  product: product,
-                  productId: productId,
-                  onRemove: () => _removeFromFavorites(productId),
-                  onTap: () => _onProductTap(product),
-                );
+                if (constraints.maxWidth > 600) {
+                  return _buildFavoritesGrid(context, state);
+                } else {
+                  return _buildFavoritesList(context, state);
+                }
               },
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildFavoritesList(BuildContext context, FavoritesState state) {
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+      itemCount: state.filteredFavorites.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final favorite = state.filteredFavorites[index];
+        final product = favorite['product'];
+        final productId = product['id'] as int;
+        
+        return FavoriteItemCard(
+          product: product,
+          productId: productId,
+          onRemove: () => _removeFromFavorites(productId),
+          onTap: () => _onProductTap(product),
+        );
+      },
+    );
+  }
+
+  Widget _buildFavoritesGrid(BuildContext context, FavoritesState state) {
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 400, 
+        mainAxisExtent: 150, 
+        mainAxisSpacing: 12, 
+        crossAxisSpacing: 12, 
+      ),
+      itemCount: state.filteredFavorites.length,
+      itemBuilder: (context, index) {
+        final favorite = state.filteredFavorites[index];
+        final product = favorite['product'];
+        final productId = product['id'] as int;
+        
+        return FavoriteItemCard(
+          product: product,
+          productId: productId,
+          onRemove: () => _removeFromFavorites(productId),
+          onTap: () => _onProductTap(product),
+        );
+      },
     );
   }
 }
@@ -331,9 +369,9 @@ class FavoriteItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final price = (product['price'] as num?)?.toDouble() ?? 0.0;
 
-    // Получаем количество из корзины
+    
     final quantity = context.select<CartBloc, int>((bloc) {
-      // Если корзина еще загружается, показываем 0
+      
       if (bloc.state.status == CartStatus.loading) {
         return 0;
       }

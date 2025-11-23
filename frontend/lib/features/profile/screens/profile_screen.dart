@@ -39,7 +39,15 @@ class ProfileScreen extends StatelessWidget {
     }
 
     if (state is ProfileLoaded) {
-      return _ProfileContent(user: state.user, orders: state.orders);
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth > 800) {
+            return _WideProfileLayout(user: state.user, orders: state.orders);
+          } else {
+            return _NarrowProfileLayout(user: state.user, orders: state.orders);
+          }
+        },
+      );
     }
 
     if (state is ProfileError) {
@@ -75,47 +83,11 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _ProfileContent extends StatelessWidget {
+class _NarrowProfileLayout extends StatelessWidget {
   final Map<String, dynamic> user;
   final List<dynamic> orders;
 
-  const _ProfileContent({required this.user, required this.orders});
-
-  String _getInitials() {
-    final firstName = user['first_name'] ?? '';
-    final lastName = user['last_name'] ?? '';
-    if (firstName.isNotEmpty && lastName.isNotEmpty) {
-      return '${firstName[0]}${lastName[0]}'.toUpperCase();
-    }
-    return (user['username']?[0] ?? 'U').toString().toUpperCase();
-  }
-
-  String _getDisplayName() {
-    final firstName = user['first_name'] ?? '';
-    final lastName = user['last_name'] ?? '';
-    if (firstName.isNotEmpty && lastName.isNotEmpty) {
-      return '$firstName $lastName';
-    }
-    return user['username']?.toString() ?? 'Пользователь';
-  }
-
-  String _getMemberSince() {
-    final createdAt = user['created_at'];
-    if (createdAt != null) {
-      try {
-        final date = DateTime.parse(createdAt);
-        final now = DateTime.now();
-        final difference = now.difference(date);
-        
-        if (difference.inDays < 30) return '${difference.inDays} д.';
-        if (difference.inDays < 365) return '${(difference.inDays / 30).floor()} мес.';
-        return '${(difference.inDays / 365).floor()} г.';
-      } catch (e) {
-        return 'Недавно';
-      }
-    }
-    return 'Недавно';
-  }
+  const _NarrowProfileLayout({required this.user, required this.orders});
 
   @override
   Widget build(BuildContext context) {
@@ -132,6 +104,13 @@ class _ProfileContent extends StatelessWidget {
                 subtitle: '${orders.length} заказов',
                 icon: Icons.shopping_bag,
                 onTap: () => context.push('/order-history'),
+              ),
+              _buildSectionCard(
+                context,
+                title: 'Мои блюда',
+                subtitle: '0 заказов',
+                icon: Icons.fastfood,
+                onTap: () => context.push('/analysis/history'),
               ),
               _buildSectionCard(
                 context,
@@ -201,7 +180,7 @@ class _ProfileContent extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.primary,
               borderRadius: BorderRadius.circular(40),
               boxShadow: [
                 BoxShadow(
@@ -217,7 +196,7 @@ class _ProfileContent extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -234,7 +213,7 @@ class _ProfileContent extends StatelessWidget {
           Text(
             user['email']?.toString() ?? 'email@example.com',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white,
                 ),
           ),
           const SizedBox(height: 16),
@@ -250,12 +229,48 @@ class _ProfileContent extends StatelessWidget {
     );
   }
 
+  String _getInitials() {
+    final firstName = user['first_name'] ?? '';
+    final lastName = user['last_name'] ?? '';
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '${firstName[0]}${lastName[0]}'.toUpperCase();
+    }
+    return (user['username']?[0] ?? 'U').toString().toUpperCase();
+  }
+
+  String _getDisplayName() {
+    final firstName = user['first_name'] ?? '';
+    final lastName = user['last_name'] ?? '';
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '$firstName $lastName';
+    }
+    return user['username']?.toString() ?? 'Пользователь';
+  }
+
+  String _getMemberSince() {
+    final createdAt = user['created_at'];
+    if (createdAt != null) {
+      try {
+        final date = DateTime.parse(createdAt);
+        final now = DateTime.now();
+        final difference = now.difference(date);
+        
+        if (difference.inDays < 30) return '${difference.inDays} д.';
+        if (difference.inDays < 365) return '${(difference.inDays / 30).floor()} мес.';
+        return '${(difference.inDays / 365).floor()} г.';
+      } catch (e) {
+        return 'Недавно';
+      }
+    }
+    return 'Недавно';
+  }
+
   Widget _buildStatItem(BuildContext context, String value, String label) {
     return Column(
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -264,7 +279,7 @@ class _ProfileContent extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white,
             fontSize: 12,
           ),
         ),
@@ -281,6 +296,7 @@ class _ProfileContent extends StatelessWidget {
   }) {
     return Card(
       elevation: 0,
+      color: Theme.of(context).colorScheme.surface,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
@@ -302,26 +318,8 @@ class _ProfileContent extends StatelessWidget {
     );
   }
 
-  void _showChangePasswordDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Сменить пароль'),
-          content: const Text('Эта функция будет доступна в следующем обновлении.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showLogoutDialog(BuildContext context) {
-    final profileBloc = context.read<ProfileBloc>(); // Получить до диалога
+    final profileBloc = context.read<ProfileBloc>(); 
     
     showDialog(
       context: context,
@@ -337,7 +335,444 @@ class _ProfileContent extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                profileBloc.add(Logout()); // Использовать сохраненный bloc
+                profileBloc.add(Logout()); 
+              },
+              child: const Text('Выйти', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _WideProfileLayout extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final List<dynamic> orders;
+
+  const _WideProfileLayout({required this.user, required this.orders});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Боковая панель с профилем
+              _buildProfileSidebar(context),
+              const SizedBox(width: 40),
+              // Основной контент
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildWelcomeHeader(context),
+                    const SizedBox(height: 32),
+                    _buildActionsGrid(context),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileSidebar(BuildContext context) {
+    return Container(
+      width: 320,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Аватар
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  Theme.of(context).colorScheme.primaryContainer,
+                ],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                _getInitials(),
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Имя и email
+          Text(
+            _getDisplayName(),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            user['email']?.toString() ?? 'email@example.com',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+            textAlign: TextAlign.center,
+          ),
+
+          const SizedBox(height: 32),
+
+          _buildStatCard(
+            context,
+            title: 'Активные заказы',
+            value: '0',
+            icon: Icons.pending_actions,
+            color: Colors.blue,
+          ),
+          const SizedBox(width: 20),
+          _buildStatCard(
+            context,
+            title: 'Всего заказов',
+            value: '${orders.length}',
+            icon: Icons.shopping_bag,
+            color: Colors.green,
+          ),
+          const SizedBox(width: 20),
+          _buildStatCard(
+            context,
+            title: 'С нами',
+            value: _getMemberSince(),
+            icon: Icons.calendar_today,
+            color: Colors.orange,
+          ),
+          
+          const SizedBox(height: 32),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showLogoutDialog(context),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: BorderSide(color: Colors.red.withOpacity(0.3)),
+              ),
+              icon: Icon(Icons.logout, size: 20, color: Colors.red[400]),
+              label: Text(
+                'Выйти из аккаунта',
+                style: TextStyle(
+                  color: Colors.red[400],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeHeader(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Добро пожаловать!',
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Управляйте вашим аккаунтом и заказами',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionsGrid(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 3,
+          crossAxisSpacing: 20,
+          mainAxisSpacing: 20,
+          childAspectRatio: 1.4,
+          children: [
+            _buildActionCard(
+              context,
+              title: 'История заказов',
+              subtitle: '${orders.length} заказов',
+              icon: Icons.history,
+              color: Colors.purple,
+              onTap: () => context.push('/order-history'),
+            ),
+            _buildActionCard(
+              context,
+              title: 'Мои блюда',
+              subtitle: 'Анализ питания',
+              icon: Icons.restaurant,
+              color: Colors.green,
+              onTap: () => context.push('/analysis/history'),
+            ),
+            _buildActionCard(
+              context,
+              title: 'Адреса',
+              subtitle: 'Управление адресами',
+              icon: Icons.location_on,
+              color: Colors.blue,
+              onTap: () => context.push('/addresses'),
+            ),
+            _buildActionCard(
+              context,
+              title: 'Настройки',
+              subtitle: 'Персональные настройки',
+              icon: Icons.settings,
+              color: Colors.orange,
+              onTap: () => context.push('/settings'),
+            ),
+            _buildActionCard(
+              context,
+              title: 'Помощь',
+              subtitle: 'FAQ и поддержка',
+              icon: Icons.help_center,
+              color: Colors.red,
+              onTap: () => context.push('/help'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Text(
+                    'Открыть',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward,
+                    size: 14,
+                    color: color,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getInitials() {
+    final firstName = user['first_name'] ?? '';
+    final lastName = user['last_name'] ?? '';
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '${firstName[0]}${lastName[0]}'.toUpperCase();
+    }
+    return (user['username']?[0] ?? 'U').toString().toUpperCase();
+  }
+
+  String _getDisplayName() {
+    final firstName = user['first_name'] ?? '';
+    final lastName = user['last_name'] ?? '';
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '$firstName $lastName';
+    }
+    return user['username']?.toString() ?? 'Пользователь';
+  }
+
+  String _getMemberSince() {
+    final createdAt = user['created_at'];
+    if (createdAt != null) {
+      try {
+        final date = DateTime.parse(createdAt);
+        final now = DateTime.now();
+        final difference = now.difference(date);
+        
+        if (difference.inDays < 30) return '${difference.inDays} д.';
+        if (difference.inDays < 365) return '${(difference.inDays / 30).floor()} мес.';
+        return '${(difference.inDays / 365).floor()} г.';
+      } catch (e) {
+        return 'Недавно';
+      }
+    }
+    return 'Недавно';
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    final profileBloc = context.read<ProfileBloc>(); 
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Выход из аккаунта'),
+          content: const Text('Вы уверены, что хотите выйти?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                profileBloc.add(Logout()); 
               },
               child: const Text('Выйти', style: TextStyle(color: Colors.red)),
             ),

@@ -17,7 +17,7 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    // Загружаем корзину и адреса при инициализации
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final bloc = context.read<CartBloc>();
       bloc.add(const CartLoaded());
@@ -191,7 +191,7 @@ class _CartScreenState extends State<CartScreen> {
       ),
       body: BlocConsumer<CartBloc, CartState>(
         listener: (context, state) {
-          // Обработка состояний, требующих действий
+          
           if (state.status == CartStatus.orderCreated) {
             AppSnackbar.showSuccess(context: context, message: 'Заказ успешно создан!');
             context.push('/order-history');
@@ -288,8 +288,8 @@ class _CartScreenState extends State<CartScreen> {
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: () {
-              // Навигация к главному экрану
-              // Можно добавить через BLoC навигации или напрямую
+              
+              
               if (context.canPop()) {
                 context.pop();
               }
@@ -303,17 +303,83 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildCartWithItems(BuildContext context, CartState state) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        
+        if (constraints.maxWidth > 900) {
+          return _buildWideLayout(context, state);
+        } else {
+          return _buildNarrowLayout(context, state);
+        }
+      },
+    );
+  }
+
+  Widget _buildWideLayout(BuildContext context, CartState state) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          
+          Expanded(
+            flex: 2,
+            child: Column(
+              children: [
+                _buildAddressSelector(context, state),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: _buildProductsGrid(context, state),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          
+          SizedBox(
+            width: 400,
+            child: _buildOrderSummary(context, state),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNarrowLayout(BuildContext context, CartState state) {
     return ListView(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12, top: 12),
       children: [
         _buildAddressSelector(context, state),
         ...state.cartItems.map((item) {
           final itemMap = _convertToSafeMap(item);
-          return _buildCartItem(context, itemMap);
+          return Column(
+            children: [
+              _buildCartItem(context, itemMap),
+              const SizedBox(height: 12),
+            ],
+          );
         }).toList(),
         _buildOrderSummary(context, state),
         const SizedBox(height: 20),
       ],
+    );
+  }
+
+  Widget _buildProductsGrid(BuildContext context, CartState state) {
+    return GridView.builder(
+      padding: const EdgeInsets.only(bottom: 12),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 500, 
+        mainAxisExtent: 150, 
+        mainAxisSpacing: 12, 
+        crossAxisSpacing: 12, 
+      ),
+      itemCount: state.cartItems.length,
+      itemBuilder: (context, index) {
+        final item = state.cartItems[index];
+        final itemMap = _convertToSafeMap(item);
+        return _buildCartItem(context, itemMap);
+      },
     );
   }
 
@@ -325,7 +391,7 @@ class _CartScreenState extends State<CartScreen> {
     final appliedPromotions = item['applied_promotions'] ?? [];
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 0),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
