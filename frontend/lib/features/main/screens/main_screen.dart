@@ -6,6 +6,7 @@ import 'package:client/features/profile/screens/profile_screen.dart';
 import 'package:client/core/widgets/navigation_bar.dart';
 import 'package:client/core/widgets/camera_fab.dart';
 import 'package:client/features/admin/screens/admin_screen.dart';
+import 'package:client/features/analysis/screens/image_picker_screen.dart';
 import 'package:client/features/main/bloc/main_bloc.dart';
 import 'package:client/core/widgets/promotions_section.dart';
 import 'package:client/core/widgets/category_filter.dart';
@@ -46,7 +47,8 @@ class _MainScreenState extends State<MainScreen> {
           const CartScreen(),
           const FavoritesScreen(),
           const ProfileScreen(),
-          if (kIsWeb) const AdminScreen(),
+          if (kIsWeb)const ImagePickerScreen(),
+          if (kIsWeb)const AdminScreen(),
         ];
 
         if (isWideScreen) {

@@ -32,6 +32,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
           'Детали акции',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

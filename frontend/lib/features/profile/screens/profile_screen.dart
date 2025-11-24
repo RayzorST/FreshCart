@@ -3,6 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/features/profile/bloc/profile_bloc.dart';
 import 'package:client/features/auth/bloc/auth_bloc.dart';
+import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/features/profile/screens/order_history_screen.dart';
+import 'package:client/features/profile/screens/help_screen.dart';
+import 'package:client/features/profile/screens/settings_screen.dart';
+import 'package:client/features/profile/screens/addresses_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -363,10 +368,8 @@ class _WideProfileLayout extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Боковая панель с профилем
               _buildProfileSidebar(context),
               const SizedBox(width: 40),
-              // Основной контент
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,7 +404,6 @@ class _WideProfileLayout extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Аватар
           Container(
             width: 120,
             height: 120,
@@ -591,11 +593,11 @@ class _WideProfileLayout extends StatelessWidget {
           children: [
             _buildActionCard(
               context,
-              title: 'История заказов',
+              title: 'Мои заказы',
               subtitle: '${orders.length} заказов',
               icon: Icons.history,
               color: Colors.purple,
-              onTap: () => context.push('/order-history'),
+              onTap: () => ScreenToModal.show(context: context, child: OrderHistoryScreen()),
             ),
             _buildActionCard(
               context,
@@ -611,7 +613,7 @@ class _WideProfileLayout extends StatelessWidget {
               subtitle: 'Управление адресами',
               icon: Icons.location_on,
               color: Colors.blue,
-              onTap: () => context.push('/addresses'),
+              onTap: () => ScreenToModal.show(context: context, child: AddressesScreen()),
             ),
             _buildActionCard(
               context,
@@ -619,7 +621,7 @@ class _WideProfileLayout extends StatelessWidget {
               subtitle: 'Персональные настройки',
               icon: Icons.settings,
               color: Colors.orange,
-              onTap: () => context.push('/settings'),
+              onTap: () => ScreenToModal.show(context: context, child: SettingsScreen()),
             ),
             _buildActionCard(
               context,
@@ -627,7 +629,7 @@ class _WideProfileLayout extends StatelessWidget {
               subtitle: 'FAQ и поддержка',
               icon: Icons.help_center,
               color: Colors.red,
-              onTap: () => context.push('/help'),
+              onTap: () => ScreenToModal.show(context: context, child: HelpScreen()),
             ),
           ],
         ),

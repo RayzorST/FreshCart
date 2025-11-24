@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:client/api/client.dart';
-import 'package:go_router/go_router.dart';
 
 class CustomNavigationBar extends StatelessWidget {
   final int currentIndex;
@@ -17,8 +16,6 @@ class CustomNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //final isWideScreen = MediaQuery.of(context).size.width > 600;
-
     return isVertical 
         ? _buildSideNavigation(context)
         : _buildBottomNavigation(context);
@@ -42,7 +39,6 @@ class CustomNavigationBar extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.shopping_cart_outlined,
-                    color: Theme.of(context).colorScheme.primary,
                     size: 24,
                   ),
                   const SizedBox(width: 12),
@@ -50,7 +46,6 @@ class CustomNavigationBar extends StatelessWidget {
                     'FreshCart',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ],
@@ -101,11 +96,11 @@ class CustomNavigationBar extends StatelessWidget {
                     if (isWeb)
                       _buildWebNavItem(
                         context: context,
-                        icon: Icons.photo,
+                        icon: Icons.restaurant,
                         label: 'Анализатор блюд',
                         index: 4,
                         currentIndex: currentIndex,
-                        onTap: () => context.push('/analysis/camera'),
+                        onTap: () => onItemTapped(4),
                       ),
                       FutureBuilder<bool>(
                         future: ApiClient.isUserAdmin(),
@@ -119,9 +114,9 @@ class CustomNavigationBar extends StatelessWidget {
                               context: context,
                               icon: Icons.admin_panel_settings,
                               label: 'Админ панель',
-                              index: 4,
+                              index: 5,
                               currentIndex: currentIndex,
-                              onTap: () => onItemTapped(4),
+                              onTap: () => onItemTapped(5),
                             );
                           }
                           
