@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/features/main/bloc/main_bloc.dart';
+import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/features/main/screens/promotion_screen.dart';
 
 class PromotionsSection extends StatelessWidget {
   const PromotionsSection({super.key});
@@ -212,7 +214,13 @@ class PromotionsSection extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        context.push('/promotion/${promotion['id']}', extra: promotion);
+        final screenWidth = MediaQuery.of(context).size.width;
+
+        if (screenWidth > 600) {
+          ScreenToModal.show(context: context, child: PromotionScreen(promotionId: promotion['id']));
+        } else {
+          context.push('/promotion/${promotion['id']}', extra: promotion);
+        }
       },
       child: Container(
         width: 140,

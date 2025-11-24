@@ -6,6 +6,8 @@ import 'package:client/features/main/bloc/main_bloc.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/features/product/screens/product_screen.dart';
 
 class ProductGridSection extends StatefulWidget {
   const ProductGridSection({super.key});
@@ -259,14 +261,19 @@ class ProductCard extends StatelessWidget {
   const ProductCard({super.key, required this.product});
 
   void _onProductTap(BuildContext context) {
-    context.push('/product/${product['id']}', extra: product);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    if (screenWidth > 600) {
+      ScreenToModal.show(context: context, child: ProductScreen(product: product));
+    } else {
+      context.push('/product/${product['id']}', extra: product);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final productId = product['id'] as int;
-    
-    // Получаем количество из корзины
+
     final quantity = context.select<CartBloc, int>((bloc) {
       final item = bloc.state.cartItems.firstWhere(
         (item) => item['product_id'] == productId,
@@ -275,7 +282,6 @@ class ProductCard extends StatelessWidget {
       return item != null ? item['quantity'] : 0;
     });
 
-    // Получаем статус избранного
     final isFavorite = context.select<FavoritesBloc, bool>((bloc) {
       return bloc.state.favorites.any((fav) => fav['product_id'] == productId);
     });

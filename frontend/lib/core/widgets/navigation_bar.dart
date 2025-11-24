@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:client/api/client.dart';
+import 'package:go_router/go_router.dart';
 
 class CustomNavigationBar extends StatelessWidget {
   final int currentIndex;
@@ -30,7 +31,6 @@ class CustomNavigationBar extends StatelessWidget {
       width: isWeb ? 200 : 80,
       child: Column(
         children: [
-          // Заголовок для веб-версии
           if (isWeb)
             Container(
               height: 80,
@@ -99,6 +99,14 @@ class CustomNavigationBar extends StatelessWidget {
                       onTap: () => onItemTapped(3),
                     ),
                     if (isWeb)
+                      _buildWebNavItem(
+                        context: context,
+                        icon: Icons.photo,
+                        label: 'Анализатор блюд',
+                        index: 4,
+                        currentIndex: currentIndex,
+                        onTap: () => context.push('/analysis/camera'),
+                      ),
                       FutureBuilder<bool>(
                         future: ApiClient.isUserAdmin(),
                         builder: (context, snapshot) {

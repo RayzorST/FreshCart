@@ -15,7 +15,6 @@ class _PromotionScreenState extends State<PromotionScreen> {
   @override
   void initState() {
     super.initState();
-    // Загружаем акцию при инициализации
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PromotionsBloc>().add(PromotionLoaded(widget.promotionId));
     });
@@ -29,7 +28,10 @@ class _PromotionScreenState extends State<PromotionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Детали акции'),
+        title: Text(
+          'Детали акции',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

@@ -5,6 +5,8 @@ import 'package:client/api/client.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
+import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/features/product/screens/product_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -135,9 +137,12 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _onProductTap(dynamic product, BuildContext context) {
-    final safeProduct = _convertToSafeMap(product);
-    if (safeProduct['id'] != null) {
-      context.push('/product/${safeProduct['id']}', extra: safeProduct);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    if (screenWidth > 600) {
+      ScreenToModal.show(context: context, child: ProductScreen(product: product));
+    } else {
+      context.push('/product/${product['id']}', extra: product);
     }
   }
 

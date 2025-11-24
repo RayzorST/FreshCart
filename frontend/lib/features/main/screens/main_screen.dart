@@ -53,7 +53,6 @@ class _MainScreenState extends State<MainScreen> {
           return Scaffold(
             body: Row(
               children: [
-                // Боковая навигация для широких экранов
                 CustomNavigationBar(
                   currentIndex: state.currentTabIndex,
                   onItemTapped: _onItemTapped,
@@ -64,8 +63,6 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ],
             ),
-            floatingActionButton: const CameraFAB(),
-            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           );
         }
 

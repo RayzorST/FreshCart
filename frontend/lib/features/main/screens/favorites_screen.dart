@@ -6,6 +6,8 @@ import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
+import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/features/product/screens/product_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -61,7 +63,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   void _onProductTap(Map<String, dynamic> product) {
-    context.push('/product/${product['id']}', extra: product);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    if (screenWidth > 600) {
+      ScreenToModal.show(context: context, child: ProductScreen(product: product));
+    } else {
+      context.push('/product/${product['id']}', extra: product);
+    }
   }
 
   @override
