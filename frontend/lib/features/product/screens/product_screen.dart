@@ -523,8 +523,6 @@ class _ProductScreenContent extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  
                   state.isLoadingCart
                       ? SizedBox(
                           width: 20,
@@ -553,9 +551,7 @@ class _ProductScreenContent extends StatelessWidget {
                                 ),
                               ),
                           ],
-                        ),
-
-                  
+                        ),      
                   IconButton(
                     onPressed: state.isLoadingCart || !isAvailable || state.quantity >= maxQuantity ? null : () {
                       context.read<ProductBloc>().add(

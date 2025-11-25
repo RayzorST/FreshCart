@@ -379,11 +379,6 @@ class FavoriteItemCard extends StatelessWidget {
 
     
     final quantity = context.select<CartBloc, int>((bloc) {
-      
-      if (bloc.state.status == CartStatus.loading) {
-        return 0;
-      }
-      
       final item = bloc.state.cartItems.firstWhere(
         (item) => item['product_id'] == productId,
         orElse: () => null,

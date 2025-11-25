@@ -15,7 +15,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     on<AddressSelected>(_onAddressSelected);
     on<AddressExpandedToggled>(_onAddressExpandedToggled);
     on<AddressesLoaded>(_onAddressesLoaded);
-    on<CartItemQuantityUpdatedLocally>(_onCartItemQuantityUpdatedLocally); // Новое событие
+    on<CartItemQuantityUpdatedLocally>(_onCartItemQuantityUpdatedLocally);
   }
 
   Future<void> _onCartLoaded(

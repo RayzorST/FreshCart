@@ -218,7 +218,8 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildBody(BuildContext context, CartState state) {
-    if (state.status == CartStatus.initial || state.status == CartStatus.loading) {
+    // Показываем полную загрузку только при начальной загрузке
+    if (state.status == CartStatus.initial) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -359,7 +360,7 @@ class _CartScreenState extends State<CartScreen> {
           final itemMap = _convertToSafeMap(item);
           return Column(
             children: [
-              _buildCartItem(context, itemMap),
+              _buildCartItem(context, itemMap, state),
               const SizedBox(height: 12),
             ],
           );
@@ -383,12 +384,12 @@ class _CartScreenState extends State<CartScreen> {
       itemBuilder: (context, index) {
         final item = state.cartItems[index];
         final itemMap = _convertToSafeMap(item);
-        return _buildCartItem(context, itemMap);
+        return _buildCartItem(context, itemMap, state);
       },
     );
   }
 
-  Widget _buildCartItem(BuildContext context, Map<String, dynamic> item) {
+  Widget _buildCartItem(BuildContext context, Map<String, dynamic> item, CartState state) {
     final product = _convertToSafeMap(item['product']);
     final productId = item['product_id'];
     final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
@@ -409,7 +410,7 @@ class _CartScreenState extends State<CartScreen> {
             _buildProductImage(context, product),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildProductInfo(context, product, price, productId, quantity, appliedPromotions),
+              child: _buildProductInfo(context, product, price, productId, quantity, appliedPromotions, state),
             ),
           ],
         ),
@@ -463,7 +464,8 @@ class _CartScreenState extends State<CartScreen> {
     double price, 
     int productId, 
     int quantity, 
-    List<dynamic> appliedPromotions
+    List<dynamic> appliedPromotions,
+    CartState state, // Добавлен параметр state
   ) {
     final item = _convertToSafeMap(product);
     final hasDiscount = item['price'] != price;
@@ -539,13 +541,32 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                       const SizedBox(width: 8),
                     ],
-                    Text(
-                      '$discountedPrice ₽',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: hasDiscount ? Colors.green : Theme.of(context).colorScheme.primary,
+                    // Показываем индикатор загрузки только для ценового блока при состоянии loading
+                    if (state.status == CartStatus.loading)
+                      SizedBox(
+                        width: 60,
+                        height: 20,
+                        child: Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
                           ),
-                    ),
+                        ),
+                      )
+                    else
+                      Text(
+                        '$discountedPrice ₽',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: hasDiscount ? Colors.green : Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
                   ],
                 ),
               ],
@@ -621,14 +642,21 @@ class _CartScreenState extends State<CartScreen> {
                   _buildSummaryRow(
                     context,
                     'Сумма товаров',
-                    '${state.originalTotalAmount.toStringAsFixed(2)} ₽',
+                    state.status == CartStatus.loading 
+                      ? _buildLoadingPrice(context)
+                      : Text('${state.originalTotalAmount.toStringAsFixed(2)} ₽'),
                     icon: Icons.shopping_cart_outlined,
                   ),
                   const SizedBox(height: 12),
                   _buildSummaryRow(
                     context,
                     'Ваша скидка',
-                    '-${totalSavings.toStringAsFixed(2)} ₽',
+                    state.status == CartStatus.loading 
+                      ? _buildLoadingPrice(context)
+                      : Text(
+                          '-${totalSavings.toStringAsFixed(2)} ₽',
+                          style: TextStyle(color: Colors.green),
+                        ),
                     valueColor: Colors.green,
                     icon: Icons.discount_outlined,
                   ),
@@ -642,7 +670,16 @@ class _CartScreenState extends State<CartScreen> {
                 _buildSummaryRow(
                   context,
                   'Итого к оплате',
-                  '${state.totalAmount.toStringAsFixed(2)} ₽',
+                  state.status == CartStatus.loading 
+                    ? _buildLoadingPrice(context)
+                    : Text(
+                        '${state.totalAmount.toStringAsFixed(2)} ₽',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 17,
+                            ),
+                      ),
                   isTotal: true,
                   valueColor: Theme.of(context).colorScheme.primary,
                   icon: Icons.shopping_cart_outlined,
@@ -709,10 +746,30 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  Widget _buildLoadingPrice(BuildContext context) {
+    return SizedBox(
+      width: 80,
+      height: 20,
+      child: Center(
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSummaryRow(
     BuildContext context,
     String label,
-    String value, {
+    Widget value, // Изменено на Widget
+    {
     bool isTotal = false,
     Color? valueColor,
     IconData? icon,
@@ -736,14 +793,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
           ),
         ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: valueColor ?? Colors.grey[700],
-                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                fontSize: isTotal ? 17 : null,
-              ),
-        ),
+        value,
       ],
     );
   }

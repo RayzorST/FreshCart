@@ -197,31 +197,27 @@ class _PromotionScreenState extends State<PromotionScreen> {
             ),
             child: Column(
               children: [
-                _buildDetailItem(
-                  Icons.shopping_cart,
-                  'Минимальная сумма заказа',
-                  '${(promotion['min_order_amount'] / 100).toStringAsFixed(2)} ₽',
-                ),
-                const Divider(),
-                _buildDetailItem(
-                  Icons.filter_alt,
-                  'Минимальное количество',
-                  '${promotion['min_quantity']} шт.',
-                ),
-                const Divider(),
+                if (promotion['min_order_amount'] != 0) ...[
+                  _buildDetailItem(
+                    Icons.shopping_cart,
+                    'Минимальная сумма заказа',
+                    '${(promotion['min_order_amount'] / 100).toStringAsFixed(2)} ₽',
+                  ),
+                  const Divider(),
+                ],
+                if (promotion['min_quantity'] != 0) ...[
+                  _buildDetailItem(
+                    Icons.filter_alt,
+                    'Минимальное количество',
+                    '${promotion['min_quantity']} шт.',
+                  ),
+                  const Divider(),
+                ],
                 _buildDetailItem(
                   Icons.calendar_today,
                   'Действует до',
                   _formatDate(promotion['end_date']),
                 ),
-                if (promotion['priority'] != null) ...[
-                  const Divider(),
-                  _buildDetailItem(
-                    Icons.priority_high,
-                    'Приоритет',
-                    '${promotion['priority']}',
-                  ),
-                ],
               ],
             ),
           ),
