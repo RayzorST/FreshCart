@@ -1,11 +1,16 @@
 import 'package:bloc/bloc.dart';
-import 'package:client/api/client.dart';
+import 'package:injectable/injectable.dart';
+import 'package:client/domain/usecases/register_usecase.dart';
+import 'package:client/domain/entities/user_entity.dart';
 
 part 'register_event.dart';
 part 'register_state.dart';
 
+@injectable
 class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
-  RegisterBloc() : super(RegisterInitial()) {
+  final RegisterUseCase _registerUseCase;
+
+  RegisterBloc(this._registerUseCase) : super(RegisterInitial()) {
     on<RegisterButtonPressed>(_onRegisterButtonPressed);
   }
 
@@ -15,18 +20,16 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
   ) async {
     emit(RegisterLoading());
     
-    try {
-      final response = await ApiClient.registration(
-        event.email,
-        event.password,
-        event.firstName,
-        event.lastName
-      );
-      
-      final token = response['access_token'];
-      emit(RegisterSuccess(token: token));
-    } catch (e) {
-      emit(RegisterFailure(error: e.toString()));
-    }
+    final result = await _registerUseCase(
+      email: event.email,
+      password: event.password,
+      firstName: event.firstName,
+      lastName: event.lastName,
+    );
+    
+    result.fold(
+      (error) => emit(RegisterFailure(error: error)),
+      (user) => emit(RegisterSuccess(user: user)),
+    );
   }
 }

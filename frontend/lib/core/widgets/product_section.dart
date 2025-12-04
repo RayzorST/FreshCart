@@ -8,6 +8,7 @@ import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/product_modal.dart';
 import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/domain/entities/cart_item_entity.dart';
 
 class ProductGridSection extends StatefulWidget {
   const ProductGridSection({super.key});
@@ -270,20 +271,54 @@ class ProductCard extends StatelessWidget {
     }
   }
 
+  // Вспомогательный метод для создания CartItemEntity из продукта
+  CartItemEntity _createCartItemEntity(int quantity) {
+    return CartItemEntity(
+      productId: product['id'] as int,
+      productName: product['name'] as String,
+      productCategory: product['category']?['name'] as String? ?? '',
+      price: (product['price'] as num).toDouble(),
+      originalPrice: product['original_price'] != null 
+          ? (product['original_price'] as num).toDouble()
+          : null,
+      quantity: quantity,
+      imageUrl: product['image_url'] as String?,
+      promotions: product['promotions'] != null
+          ? List<Map<String, dynamic>>.from(product['promotions'])
+          : [],
+      isSynced: false,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final productId = product['id'] as int;
 
-    final quantity = context.select<CartBloc, int>((bloc) {
-      final item = bloc.state.cartItems.firstWhere(
-        (item) => item['product_id'] == productId,
-        orElse: () => null,
-      );
-      return item != null ? item['quantity'] : 0;
+    // Получаем количество из корзины через CartBloc
+    final cartItem = context.select<CartBloc, CartItemEntity?>((bloc) {
+      try {
+        return bloc.state.cartItems.firstWhere(
+          (item) => item.productId == productId,
+        );
+      } catch (e) {
+        return null;
+      }
     });
 
+    final quantity = cartItem?.quantity ?? 0;
+    
+    // Получаем информацию о избранном
     final isFavorite = context.select<FavoritesBloc, bool>((bloc) {
-      return bloc.state.favorites.any((fav) => fav['product_id'] == productId);
+      try {
+        return bloc.state.favorites.any((fav) {
+          final favProductId = fav['product_id'] ?? fav['id'];
+          return favProductId == productId;
+        });
+      } catch (e) {
+        return false;
+      }
     });
 
     return Card(
@@ -358,11 +393,26 @@ class ProductCard extends StatelessWidget {
                   
                   const Spacer(),
                   
+                  // Кнопки управления количеством
                   QuantityControls(
                     productId: productId,
                     quantity: quantity,
-                    onQuantityChanged: (productId, quantity) {
-                      context.read<CartBloc>().add(CartItemQuantityUpdated(productId, quantity));
+                    onQuantityChanged: (productId, newQuantity) {
+                      final cartBloc = context.read<CartBloc>();
+                      
+                      if (newQuantity == 0) {
+                        // Удаляем из корзины
+                        cartBloc.add(CartItemRemoved(productId));
+                      } else if (cartItem != null) {
+                        // Обновляем существующий товар
+                        cartBloc.add(CartItemUpdated(
+                          cartItem.copyWith(quantity: newQuantity),
+                        ));
+                      } else {
+                        // Добавляем новый товар
+                        final newCartItem = _createCartItemEntity(newQuantity);
+                        cartBloc.add(CartItemAdded(newCartItem));
+                      }
                     },
                     fullWidth: true,
                   ),

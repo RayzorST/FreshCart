@@ -10,12 +10,12 @@ abstract class AuthEvent extends Equatable {
 class AppStarted extends AuthEvent {}
 
 class LoggedIn extends AuthEvent {
-  final String token;
+  final UserEntity user;
 
-  const LoggedIn(this.token);
+  const LoggedIn({required this.user});
 
   @override
-  List<Object> get props => [token];
+  List<Object> get props => [user];
 }
 
 class LoggedOut extends AuthEvent {}

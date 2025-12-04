@@ -11,8 +11,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   SettingsBloc() : super(SettingsInitial()) {
     on<LoadSettings>(_onLoadSettings);
-    on<LoadThemeSettings>(_onLoadThemeSettings); // Новое событие
-    on<LoadNotificationSettings>(_onLoadNotificationSettings); // Новое событие
+    on<LoadThemeSettings>(_onLoadThemeSettings);
+    on<LoadNotificationSettings>(_onLoadNotificationSettings); 
     on<UpdateNotificationSettings>(_onUpdateNotificationSettings);
     on<UpdateThemeSettings>(_onUpdateThemeSettings);
     on<ToggleTheme>(_onToggleTheme);
@@ -24,15 +24,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   ) async {
     emit(SettingsLoading());
     try {
-      // Сначала загружаем только тему (не требует аутентификации)
       final prefs = await SharedPreferences.getInstance();
       final isDarkTheme = prefs.getBool(_themeKey) ?? false;
-      
-      // Если требуется аутентификация для уведомлений, загружаем их отдельно
-      // Пока используем значения по умолчанию
+
       emit(SettingsLoaded(
-        orderNotifications: true, // значение по умолчанию
-        promoNotifications: true, // значение по умолчанию
+        orderNotifications: true,
+        promoNotifications: true, 
         isDarkTheme: isDarkTheme,
       ));
     } catch (e) {
@@ -40,7 +37,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     }
   }
 
-  // Новый метод для загрузки только темы
   Future<void> _onLoadThemeSettings(
     LoadThemeSettings event,
     Emitter<SettingsState> emit,
@@ -59,12 +55,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
           isDarkTheme: isDarkTheme,
         ));
       }
-    } catch (e) {
-      print('Ошибка загрузки темы: $e');
-    }
+    } catch (e) {}
   }
 
-  // Новый метод для загрузки уведомлений (только после аутентификации)
   Future<void> _onLoadNotificationSettings(
     LoadNotificationSettings event,
     Emitter<SettingsState> emit,
@@ -80,10 +73,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         orderNotifications: settings['order_notifications'] ?? true,
         promoNotifications: settings['promo_notifications'] ?? true,
       ));
-    } catch (e) {
-      print('Ошибка загрузки уведомлений: $e');
-      // Не эмитим ошибку, оставляем текущее состояние
-    }
+    } catch (e) {}
   }
 
   // Остальные методы без изменений

@@ -6,12 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:client/core/theme/app_theme.dart';
 import 'package:client/core/widgets/splash_screen.dart';
 
+import 'package:client/core/di/di.dart';
+
 // Auth BLoC
 import 'package:client/features/auth/bloc/auth_bloc.dart';
-import 'package:client/features/auth/bloc/login_bloc.dart';
-import 'package:client/features/auth/bloc/register_bloc.dart';
-import 'package:client/features/auth/screens/login_screen.dart';
-import 'package:client/features/auth/screens/register_screen.dart';
 
 // Main BLoC
 import 'package:client/features/main/bloc/main_bloc.dart';
@@ -30,6 +28,8 @@ import 'package:client/features/analysis/bloc/analysis_result_bloc.dart';
 import 'package:client/features/analysis/bloc/image_picker_bloc.dart';
 
 // Screens
+import 'package:client/features/auth/screens/login_screen.dart';
+import 'package:client/features/auth/screens/register_screen.dart';
 import 'package:client/features/main/screens/main_screen.dart';
 import 'package:client/features/main/screens/promotion_screen.dart';
 import 'package:client/features/analysis/screens/analysis_screen.dart';
@@ -73,20 +73,14 @@ class _FreshCartAppState extends State<FreshCartApp> {
           path: '/login',
           name: 'login',
           pageBuilder: (context, state) => MaterialPage(
-            child: BlocProvider(
-              create: (context) => LoginBloc(),
-              child: const LoginScreen(),
-            ),
+            child: const LoginScreen()
           ),
         ),
         GoRoute(
           path: '/register',
           name: 'register',
           pageBuilder: (context, state) => MaterialPage(
-            child: BlocProvider(
-              create: (context) => RegisterBloc(),
-              child: const RegisterScreen(),
-            ),
+            child: const RegisterScreen()
           ),
         ),
         GoRoute(
@@ -225,7 +219,6 @@ class _FreshCartAppState extends State<FreshCartApp> {
         if (authState is AuthLoading || authState is AuthInitial) {
           return null;
         }
-
         final isAuthenticated = authState is AuthAuthenticated;
         final isSplash = state.uri.path == '/splash';
         final isAuthPage = state.uri.path == '/login' || state.uri.path == '/register';
@@ -252,7 +245,7 @@ class _FreshCartAppState extends State<FreshCartApp> {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (context) => AuthBloc()..add(AppStarted()),
+          create: (context) => getIt<AuthBloc>()..add(AppStarted()),
           lazy: false,
         ),
         BlocProvider(
@@ -262,7 +255,7 @@ class _FreshCartAppState extends State<FreshCartApp> {
         BlocProvider(create: (context) => MainBloc()),
         BlocProvider(create: (context) => FavoritesBloc()..add(const FavoritesLoaded())),
         BlocProvider(create: (context) => PromotionsBloc()),
-        BlocProvider(create: (context) => CartBloc()..add(const CartLoaded())),
+        BlocProvider(create: (context) => getIt<CartBloc>()..add(const CartLoaded())),
       ],
       child: Builder(
         builder: (context) {

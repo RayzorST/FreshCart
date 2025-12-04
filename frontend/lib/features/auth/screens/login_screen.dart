@@ -3,7 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/auth/bloc/login_bloc.dart';
-import 'package:client/features/auth/bloc/auth_bloc.dart'; // Добавляем импорт
+import 'package:client/features/auth/bloc/auth_bloc.dart';
+import 'package:client/core/di/di.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -11,12 +12,11 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => LoginBloc(),
+      create: (context) => getIt<LoginBloc>(),
       child: BlocListener<LoginBloc, LoginState>(
         listener: (context, state) {
           if (state is LoginSuccess) {
-            // Используем AuthBloc вместо AuthProvider
-            context.read<AuthBloc>().add(LoggedIn(state.token));
+            context.read<AuthBloc>().add(LoggedIn(user: state.user));
             context.go('/');
             AppSnackbar.showSuccess(context: context, message: 'Успешный вход');
           } else if (state is LoginFailure) {

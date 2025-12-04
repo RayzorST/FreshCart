@@ -5,7 +5,6 @@ import 'package:client/api/client.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/main/bloc/favorites_bloc.dart';
-import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:client/core/widgets/product_modal.dart';
 import 'package:client/features/product/screens/product_screen.dart';
 
@@ -378,13 +377,13 @@ class FavoriteItemCard extends StatelessWidget {
     final price = (product['price'] as num?)?.toDouble() ?? 0.0;
 
     
-    final quantity = context.select<CartBloc, int>((bloc) {
-      final item = bloc.state.cartItems.firstWhere(
-        (item) => item['product_id'] == productId,
-        orElse: () => null,
-      );
-      return item != null ? item['quantity'] : 0;
-    });
+    // final quantity = context.select<CartBloc, int>((bloc) {
+    //   final item = bloc.state.cartItems.firstWhere(
+    //     (item) => item['product_id'] == productId,
+    //     orElse: () => null,
+    //   );
+    //   return item != null ? item['quantity'] : 0;
+    // });
 
     return Card(
       margin: const EdgeInsets.only(bottom: 0),
@@ -399,9 +398,9 @@ class FavoriteItemCard extends StatelessWidget {
           children: [
             _buildProductImage(context),
             const SizedBox(width: 12),
-            Expanded(
-              child: _buildProductInfo(context, price, quantity),
-            ),
+            // Expanded(
+            //   child: _buildProductInfo(context, price, quantity),
+            // ),
           ],
         ),
       ),
@@ -499,7 +498,7 @@ class FavoriteItemCard extends StatelessWidget {
               productId: productId,
               quantity: quantity,
               onQuantityChanged: (productId, quantity) {
-                context.read<CartBloc>().add(CartItemQuantityUpdated(productId, quantity));
+                //context.read<CartBloc>().add(CartItemQuantityUpdated(productId, quantity));
               },
             ),
           ],

@@ -3,7 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/auth/bloc/register_bloc.dart';
-import 'package:client/features/auth/bloc/auth_bloc.dart'; // Добавляем импорт
+import 'package:client/features/auth/bloc/auth_bloc.dart';
+import 'package:client/core/di/di.dart';
 
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
@@ -11,12 +12,11 @@ class RegisterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => RegisterBloc(),
+      create: (context) => getIt<RegisterBloc>(),
       child: BlocListener<RegisterBloc, RegisterState>(
         listener: (context, state) {
           if (state is RegisterSuccess) {
-            // Используем AuthBloc вместо AuthProvider
-            context.read<AuthBloc>().add(LoggedIn(state.token));
+            context.read<AuthBloc>().add(LoggedIn(user: state.user));
             context.go('/');
             AppSnackbar.showSuccess(context: context, message: 'Успешная регистрация');
           } else if (state is RegisterFailure) {

@@ -7,9 +7,9 @@ class LoginInitial extends LoginState {}
 class LoginLoading extends LoginState {}
 
 class LoginSuccess extends LoginState {
-  final String token;
+  final UserEntity user;
 
-  LoginSuccess({required this.token});
+  LoginSuccess({required this.user});
 }
 
 class LoginFailure extends LoginState {

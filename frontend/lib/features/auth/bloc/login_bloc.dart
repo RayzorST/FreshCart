@@ -1,11 +1,16 @@
 import 'package:bloc/bloc.dart';
-import 'package:client/api/client.dart';
+import 'package:injectable/injectable.dart';
+import 'package:client/domain/usecases/login_usecase.dart';
+import 'package:client/domain/entities/user_entity.dart';
 
 part 'login_event.dart';
 part 'login_state.dart';
 
+@injectable
 class LoginBloc extends Bloc<LoginEvent, LoginState> {
-  LoginBloc() : super(LoginInitial()) {
+  final LoginUseCase _loginUseCase;
+
+  LoginBloc(this._loginUseCase) : super(LoginInitial()) {
     on<LoginButtonPressed>(_onLoginButtonPressed);
   }
 
@@ -15,12 +20,11 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
   ) async {
     emit(LoginLoading());
     
-    try {
-      final response = await ApiClient.login(event.email, event.password);
-      final token = response['access_token'];
-      emit(LoginSuccess(token: token));
-    } catch (e) {
-      emit(LoginFailure(error: e.toString()));
-    }
+    final result = await _loginUseCase(event.email, event.password);
+    
+    result.fold(
+      (error) => emit(LoginFailure(error: error)),
+      (user) => emit(LoginSuccess(user: user)),
+    );
   }
 }
