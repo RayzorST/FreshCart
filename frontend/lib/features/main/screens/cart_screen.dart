@@ -1,14 +1,14 @@
+import 'package:client/domain/entities/cart_item_entity.dart';
+import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/features/main/screens/promotion_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:client/api/client.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:client/core/widgets/product_modal.dart';
 import 'package:client/features/product/screens/product_screen.dart';
-import 'package:client/domain/entities/cart_item_entity.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -27,8 +27,6 @@ class _CartScreenState extends State<CartScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final bloc = context.read<CartBloc>();
       bloc.add(const CartLoaded());
-      // Для адресов пока оставим как было, но в будущем тоже нужно будет репозиторий
-      // bloc.add(const AddressesLoaded());
     });
   }
 
@@ -125,7 +123,6 @@ class _CartScreenState extends State<CartScreen> {
 
   void _createOrder(BuildContext context) {
     // TODO: Обновить для работы с адресами
-    // context.read<CartBloc>().add(const CartOrderCreated());
     
     showDialog(
       context: context,
@@ -187,13 +184,13 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _onProductTap(Map<String, dynamic> product, BuildContext context) {
+  void _onProductTap(ProductEntity product, BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
     if (screenWidth > 600) {
       ScreenToModal.show(context: context, child: ProductScreen(product: product));
     } else {
-      context.push('/product/${product['id']}', extra: product);
+      context.push('/product/${product.id}', extra: product);
     }
   }
 
@@ -439,13 +436,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildProductImage(BuildContext context, CartItemEntity item) {
     return GestureDetector(
-      onTap: () => _onProductTap({
-        'id': item.productId,
-        'name': item.productName,
-        'category': {'name': item.productCategory},
-        'price': item.price,
-        'image_url': item.imageUrl,
-      }, context),
+      onTap: () => _onProductTap(item.product, context),
       child: Container(
         width: 80,
         height: 80,
@@ -459,17 +450,10 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildProductImageContent(BuildContext context, CartItemEntity item) {
-    if (item.imageUrl == null || item.imageUrl!.isEmpty) {
-      return Icon(
-        Icons.fastfood,
-        size: 30,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      );
-    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: Image.network(
-        '${ApiClient.baseUrl}/images/products/${item.productId}/image',
+        item.product.imageUrl,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           return Icon(
@@ -487,9 +471,9 @@ class _CartScreenState extends State<CartScreen> {
     CartItemEntity item,
   ) {
     final hasDiscount = item.hasDiscount;
-    final originalPrice = item.originalPrice ?? item.price;
-    final discountedPrice = item.price;
-
+    final originalPrice = item.appliedPrice ?? item.product.price;
+    final discountedPrice = item.product.price;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -498,18 +482,12 @@ class _CartScreenState extends State<CartScreen> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => _onProductTap({
-                  'id': item.productId,
-                  'name': item.productName,
-                  'category': {'name': item.productCategory},
-                  'price': item.price,
-                  'image_url': item.imageUrl,
-                }, context),
+                onTap: () => _onProductTap(item.product, context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.productName,
+                      item.product.name,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -517,31 +495,19 @@ class _CartScreenState extends State<CartScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      item.productCategory,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                    ),
+                    if (item.product.category != null)
+                      Text(
+                        item.product.category!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                      ),
                   ],
                 ),
               ),
             ),
-            if (item.hasPromotions) 
-              IconButton(
-                icon: Icon(
-                  Icons.local_offer_outlined,
-                  size: 20,
-                  color: Colors.orange,
-                ),
-                onPressed: () => _navigateToPromotionScreen(item.promotions, context),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
-                ),
-              ),
-            _buildDeleteButton(context, item.productId),
+            // TODO: Добавить промоции если будут в новой архитектуре
+            _buildDeleteButton(context, item.product.id),
           ],
         ),
         const SizedBox(height: 8),
@@ -576,14 +542,14 @@ class _CartScreenState extends State<CartScreen> {
               ],
             ),
             QuantityControls(
-              productId: item.productId,
+              productId: item.product.id,
               quantity: item.quantity,
               onQuantityChanged: (productId, quantity) {
-                final updatedItem = item.copyWith(quantity: quantity);
                 if (quantity == 0) {
                   context.read<CartBloc>().add(CartItemRemoved(productId));
                 }
                 else{
+                  final updatedItem = item.copyWith(quantity: quantity);
                   context.read<CartBloc>().add(CartItemUpdated(updatedItem));
                 }
               },

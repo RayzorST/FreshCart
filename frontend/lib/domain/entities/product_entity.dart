@@ -1,18 +1,17 @@
 import 'package:client/api/client.dart';
 
-class Product {
+class ProductEntity {
   final int id;
   final String name;
   final String description;
   final double price;
   final int stockQuantity;
-  final String imageUrl;
-  final Map<String, dynamic>? category;
+  final String? category;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  Product({
+  ProductEntity({
     required this.id,
     required this.name,
     required this.description,
@@ -22,21 +21,21 @@ class Product {
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
-  }) : imageUrl = '${ApiClient.baseUrl}/images/products/$id/image'; 
+  });
 
-  int? get categoryId => category?['id'];
+  String get imageUrl => '${ApiClient.baseUrl}/images/products/$id/image';
 
-  String? get categoryName => category?['name'];
-
-  factory Product.fromJson(Map<String, dynamic> json) {
-    return Product(
+  factory ProductEntity.fromJson(Map<String, dynamic> json) {
+    return ProductEntity(
       id: json['id'] as int,
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
       price: (json['price'] as num).toDouble(),
       stockQuantity: json['stock_quantity'] as int? ?? 0,
       category: json['category'] != null 
-          ? Map<String, dynamic>.from(json['category'] as Map)
+          ? json['category'] is String 
+              ? json['category'] as String
+              : (json['category'] as Map)['name'] as String?
           : null,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -51,7 +50,6 @@ class Product {
       'description': description,
       'price': price,
       'stock_quantity': stockQuantity,
-      'image_url': imageUrl, 
       'category': category,
       'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
@@ -59,39 +57,10 @@ class Product {
     };
   }
 
-  Product copyWith({
-    int? id,
-    String? name,
-    String? description,
-    double? price,
-    int? stockQuantity,
-    Map<String, dynamic>? category,
-    bool? isActive,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Product(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      description: description ?? this.description,
-      price: price ?? this.price,
-      stockQuantity: stockQuantity ?? this.stockQuantity,
-      category: category ?? this.category,
-      isActive: isActive ?? this.isActive,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-
-  @override
-  String toString() {
-    return 'Product(id: $id, name: $name, price: $price, category: ${category?['name']})';
-  }
-
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Product && other.id == id;
+    return other is ProductEntity && other.id == id;
   }
 
   @override

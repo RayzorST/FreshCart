@@ -1,6 +1,7 @@
+import 'package:client/domain/entities/cart_item_entity.dart';
+import 'package:client/domain/entities/product_entity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:client/api/client.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/features/main/bloc/main_bloc.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
@@ -8,7 +9,6 @@ import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/product_modal.dart';
 import 'package:client/features/product/screens/product_screen.dart';
-import 'package:client/domain/entities/cart_item_entity.dart';
 
 class ProductGridSection extends StatefulWidget {
   const ProductGridSection({super.key});
@@ -214,8 +214,8 @@ class _ProductGridSectionState extends State<ProductGridSection> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
-            final product = state.products[index];
-            return ProductCard(product: product);
+            final product = state.products[index]; // Теперь это Product, а не dynamic
+            return ProductCard(product: product); // Передаем Product
           },
         ),
         
@@ -257,7 +257,7 @@ class _ProductGridSectionState extends State<ProductGridSection> {
 }
 
 class ProductCard extends StatelessWidget {
-  final Map<String, dynamic> product;
+  final ProductEntity product;
 
   const ProductCard({super.key, required this.product});
 
@@ -265,42 +265,33 @@ class ProductCard extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
 
     if (screenWidth > 600) {
-      ScreenToModal.show(context: context, child: ProductScreen(product: product));
+      ScreenToModal.show(
+        context: context, 
+        child: ProductScreen(product: product)
+      );
     } else {
-      context.push('/product/${product['id']}', extra: product);
+      context.push('/product/${product.id}', extra: product);
     }
   }
 
-  // Вспомогательный метод для создания CartItemEntity из продукта
-  CartItemEntity _createCartItemEntity(int quantity) {
+  // Создаем CartItem из продукта
+  CartItemEntity _createCartItem(int quantity) {
     return CartItemEntity(
-      productId: product['id'] as int,
-      productName: product['name'] as String,
-      productCategory: product['category']?['name'] as String? ?? '',
-      price: (product['price'] as num).toDouble(),
-      originalPrice: product['original_price'] != null 
-          ? (product['original_price'] as num).toDouble()
-          : null,
+      product: product,
       quantity: quantity,
-      imageUrl: product['image_url'] as String?,
-      promotions: product['promotions'] != null
-          ? List<Map<String, dynamic>>.from(product['promotions'])
-          : [],
-      isSynced: false,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      addedAt: DateTime.now(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final productId = product['id'] as int;
+    final productId = product.id;
 
     // Получаем количество из корзины через CartBloc
     final cartItem = context.select<CartBloc, CartItemEntity?>((bloc) {
       try {
         return bloc.state.cartItems.firstWhere(
-          (item) => item.productId == productId,
+          (item) => item.product.id == productId,
         );
       } catch (e) {
         return null;
@@ -309,11 +300,12 @@ class ProductCard extends StatelessWidget {
 
     final quantity = cartItem?.quantity ?? 0;
     
-    // Получаем информацию о избранном
+    // Получаем информацию о избранном (нужно будет обновить FavoritesBloc)
     final isFavorite = context.select<FavoritesBloc, bool>((bloc) {
       try {
         return bloc.state.favorites.any((fav) {
-          final favProductId = fav['product_id'] ?? fav['id'];
+          // Пока используем старую структуру, нужно обновить FavoritesBloc
+          final favProductId = fav.id;
           return favProductId == productId;
         });
       } catch (e) {
@@ -343,26 +335,20 @@ class ProductCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       color: Theme.of(context).colorScheme.surfaceVariant,
                     ),
-                    child: product['image_url'] != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              '${ApiClient.baseUrl}/images/products/${product['id']}/image',
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(
-                                  Icons.fastfood,
-                                  size: 40,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                );
-                              },
-                            ),
-                          )
-                        : Icon(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        product.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
                             Icons.fastfood,
                             size: 40,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   
@@ -371,7 +357,7 @@ class ProductCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          product['name'],
+                          product.name,
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -382,7 +368,7 @@ class ProductCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '${product['price']} ₽',
+                        '${product.price} ₽',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Theme.of(context).colorScheme.primary,
@@ -405,12 +391,14 @@ class ProductCard extends StatelessWidget {
                         cartBloc.add(CartItemRemoved(productId));
                       } else if (cartItem != null) {
                         // Обновляем существующий товар
-                        cartBloc.add(CartItemUpdated(
-                          cartItem.copyWith(quantity: newQuantity),
-                        ));
+                        final updatedCartItem = cartItem.copyWith(
+                          quantity: newQuantity,
+                          product: product, // Сохраняем продукт
+                        );
+                        cartBloc.add(CartItemUpdated(updatedCartItem));
                       } else {
                         // Добавляем новый товар
-                        final newCartItem = _createCartItemEntity(newQuantity);
+                        final newCartItem = _createCartItem(newQuantity);
                         cartBloc.add(CartItemAdded(newCartItem));
                       }
                     },
@@ -430,7 +418,8 @@ class ProductCard extends StatelessWidget {
                   size: 20,
                 ),
                 onPressed: () {
-                  context.read<FavoritesBloc>().add(FavoriteToggled(productId, !isFavorite));
+                  // TODO: Обновить после создания нового FavoritesBloc
+                  // context.read<FavoritesBloc>().add(FavoriteToggled(product, !isFavorite));
                 },
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(

@@ -1,11 +1,14 @@
+import 'package:client/domain/entities/product_entity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:client/api/client.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/product/bloc/product_bloc.dart';
+import 'package:client/core/di/di.dart';
+import 'package:client/domain/repositories/cart_repository.dart';
+import 'package:client/domain/repositories/favorite_repository.dart';
 
 class ProductScreen extends StatelessWidget {
-  final Map<String, dynamic> product;
+  final ProductEntity product;
   
   const ProductScreen({
     super.key,
@@ -15,7 +18,11 @@ class ProductScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ProductBloc(product)
+      create: (context) => ProductBloc(
+        product, 
+        getIt<CartRepository>(), 
+        getIt<FavoriteRepository>()
+      )
         ..add(ProductLoadFavoriteStatus())
         ..add(ProductLoadCartQuantity()),
       child: _ProductScreenContent(product: product),
@@ -24,17 +31,14 @@ class ProductScreen extends StatelessWidget {
 }
 
 class _ProductScreenContent extends StatelessWidget {
-  final Map<String, dynamic> product;
+  final ProductEntity product;
 
   const _ProductScreenContent({required this.product});
 
   @override
   Widget build(BuildContext context) {
-    final price = product['price'] is int ? 
-        (product['price'] as int).toDouble() : 
-        (product['price'] as num).toDouble();
-    
-    final stockQuantity = product['stock_quantity'] ?? 0;
+    final price = product.price;
+    final stockQuantity = product.stockQuantity;
     final isAvailable = stockQuantity > 0;
     final maxQuantity = stockQuantity;
 
@@ -94,10 +98,10 @@ class _ProductScreenContent extends StatelessWidget {
                               
                       _buildDescriptionSection(context),
                       
-                      const SizedBox(height: 32),
-                                 
-                      if (product['characteristics'] != null)
-                        _buildCharacteristicsSection(context),
+                      // TODO: Добавить характеристики если они появятся в Product
+                      // const SizedBox(height: 32),
+                      // if (product.characteristics != null)
+                      //   _buildCharacteristicsSection(context),
                       
                       const SizedBox(height: 40),
                     ],
@@ -128,32 +132,21 @@ class _ProductScreenContent extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          if (product['image_url'] != null)
-            Positioned.fill(
-              child: Image.network(
-                '${ApiClient.baseUrl}/images/products/${product['id']}/image',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Center(
-                    child: Icon(
-                      Icons.food_bank,
-                      size: 80,
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                    ),
-                  );
-                },
-              ),
-            )
-          else
-            Positioned.fill(
-              child: Center(
-                child: Icon(
-                  Icons.food_bank,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                ),
-              ),
+          Positioned.fill(
+            child: Image.network(
+              product.imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Center(
+                  child: Icon(
+                    Icons.food_bank,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                  ),
+                );
+              },
             ),
+          ),
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -169,37 +162,38 @@ class _ProductScreenContent extends StatelessWidget {
             ),
           ),
     
-          if (product['discount'] != null)
-            Positioned(
-              top: 20,
-              left: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.red, Colors.orange],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  '-${product['discount']}%',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+          // TODO: Добавить скидку если она появится в Product
+          // if (product.discount != null)
+          //   Positioned(
+          //     top: 20,
+          //     left: 20,
+          //     child: Container(
+          //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          //       decoration: BoxDecoration(
+          //         gradient: LinearGradient(
+          //           colors: [Colors.red, Colors.orange],
+          //           begin: Alignment.topLeft,
+          //           end: Alignment.bottomRight,
+          //         ),
+          //         borderRadius: BorderRadius.circular(16),
+          //         boxShadow: [
+          //           BoxShadow(
+          //             color: Colors.red.withOpacity(0.3),
+          //             blurRadius: 8,
+          //             offset: const Offset(0, 2),
+          //           ),
+          //         ],
+          //       ),
+          //       child: Text(
+          //         '-${product.discount}%',
+          //         style: const TextStyle(
+          //           color: Colors.white,
+          //           fontSize: 14,
+          //           fontWeight: FontWeight.bold,
+          //         ),
+          //       ),
+          //     ),
+          //   ),
         ],
       ),
     );
@@ -213,31 +207,32 @@ class _ProductScreenContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                product['name'],
+                product.name,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   height: 1.2,
                 ),
               ),
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+              if (product.category != null && product.category!.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Text(
+                    product.category!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                child: Text(
-                  product['category']?['name'] ?? 'Без категории',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -247,8 +242,8 @@ class _ProductScreenContent extends StatelessWidget {
               onPressed: state.isLoadingFavorite ? null : () {
                 context.read<ProductBloc>().add(ProductToggleFavorite());
                 final message = state.isFavorite 
-                    ? '${product['name']} удален из избранного'
-                    : '${product['name']} добавлен в избранное';
+                    ? '${product.name} удален из избранного'
+                    : '${product.name} добавлен в избранное';
                 AppSnackbar.showInfo(context: context, message: message);
               },
               icon: state.isLoadingFavorite
@@ -293,32 +288,33 @@ class _ProductScreenContent extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        if (product['rating'] != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.star,
-                  color: Colors.amber,
-                  size: 18,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  product['rating'].toString(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        // TODO: Добавить рейтинг если он появится в Product
+        // if (product.rating != null)
+        //   Container(
+        //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        //     decoration: BoxDecoration(
+        //       color: Colors.amber.withOpacity(0.1),
+        //       borderRadius: BorderRadius.circular(8),
+        //       border: Border.all(color: Colors.amber.withOpacity(0.3)),
+        //     ),
+        //     child: Row(
+        //       children: [
+        //         Icon(
+        //           Icons.star,
+        //           color: Colors.amber,
+        //           size: 18,
+        //         ),
+        //         const SizedBox(width: 4),
+        //         Text(
+        //           product.rating.toString(),
+        //           style: TextStyle(
+        //             fontWeight: FontWeight.w600,
+        //             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        //           ),
+        //         ),
+        //       ],
+        //     ),
+        //   ),
       ],
     );
   }
@@ -383,7 +379,7 @@ class _ProductScreenContent extends StatelessWidget {
             ),
           ),
           child: Text(
-            product['description'] ?? 'Описание отсутствует',
+            product.description.isNotEmpty ? product.description : 'Описание отсутствует',
             style: TextStyle(
               fontSize: 15,
               height: 1.5,
@@ -395,70 +391,71 @@ class _ProductScreenContent extends StatelessWidget {
     );
   }
 
-  Widget _buildCharacteristicsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.list_alt,
-              color: Theme.of(context).colorScheme.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Характеристики',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.background,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).dividerColor.withOpacity(0.3),
-            ),
-          ),
-          child: Column(
-            children: product['characteristics'].entries.map((entry) => 
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        '${entry.key}:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        entry.value.toString(),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            ).toList(),
-          ),
-        ),
-      ],
-    );
-  }
+  // TODO: Восстановить если добавятся характеристики
+  // Widget _buildCharacteristicsSection(BuildContext context) {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Row(
+  //         children: [
+  //           Icon(
+  //             Icons.list_alt,
+  //             color: Theme.of(context).colorScheme.primary,
+  //             size: 20,
+  //           ),
+  //           const SizedBox(width: 8),
+  //           Text(
+  //             'Характеристики',
+  //             style: Theme.of(context).textTheme.titleMedium?.copyWith(
+  //               fontWeight: FontWeight.bold,
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //       const SizedBox(height: 12),
+  //       Container(
+  //         padding: const EdgeInsets.all(16),
+  //         decoration: BoxDecoration(
+  //           color: Theme.of(context).colorScheme.background,
+  //           borderRadius: BorderRadius.circular(12),
+  //           border: Border.all(
+  //             color: Theme.of(context).dividerColor.withOpacity(0.3),
+  //           ),
+  //         ),
+  //         child: Column(
+  //           children: product.characteristics!.entries.map((entry) => 
+  //             Padding(
+  //               padding: const EdgeInsets.symmetric(vertical: 6),
+  //               child: Row(
+  //                 children: [
+  //                   Expanded(
+  //                     flex: 2,
+  //                     child: Text(
+  //                       '${entry.key}:',
+  //                       style: TextStyle(
+  //                         fontWeight: FontWeight.w600,
+  //                         color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+  //                       ),
+  //                     ),
+  //                   ),
+  //                   Expanded(
+  //                     flex: 3,
+  //                     child: Text(
+  //                       entry.value.toString(),
+  //                       style: TextStyle(
+  //                         color: Theme.of(context).colorScheme.onSurface,
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             )
+  //           ).toList(),
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildBottomPanel(BuildContext context, bool isAvailable, int maxQuantity) {
     return Container(

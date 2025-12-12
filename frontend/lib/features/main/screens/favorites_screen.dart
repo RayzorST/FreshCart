@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:client/api/client.dart';
-import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/main/bloc/favorites_bloc.dart';
-import 'package:client/core/widgets/product_modal.dart';
-import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/domain/entities/favorite_item_entity.dart';
+import 'package:client/core/widgets/quantity_controls.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -56,18 +55,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   void _removeFromFavorites(int productId) {
-    context.read<FavoritesBloc>().add(
-      FavoriteToggled(productId, false),
+    context.read<FavoritesBloc>().add(FavoriteRemoved(productId));
+    
+    // Показываем уведомление
+    AppSnackbar.showInfo(
+      context: context, 
+      message: 'Товар удален из избранного',
     );
   }
 
-  void _onProductTap(Map<String, dynamic> product) {
+  void _onProductTap(ProductEntity product) {
     final screenWidth = MediaQuery.of(context).size.width;
 
     if (screenWidth > 600) {
-      ScreenToModal.show(context: context, child: ProductScreen(product: product));
+      // Для планшетов/десктопа можно показать модалку
+      // ScreenToModal.show(context: context, child: ProductScreen(product: product));
+      context.push('/product/${product.id}', extra: product);
     } else {
-      context.push('/product/${product['id']}', extra: product);
+      context.push('/product/${product.id}', extra: product);
     }
   }
 
@@ -196,7 +201,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: () {
-              
               context.go('/');
             },
             icon: const Icon(Icons.shopping_bag),
@@ -208,9 +212,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildFavoritesContent(BuildContext context, FavoritesState state) {
+    final displayFavorites = state.isSearching 
+        ? state.filteredFavorites 
+        : state.favorites;
+
     return Column(
       children: [
-        
+        // Поиск
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Card(
@@ -266,7 +274,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
         ),
 
-        if (state.isSearching && state.filteredFavorites.isEmpty)
+        if (state.isSearching && displayFavorites.isEmpty)
           Expanded(
             child: Center(
               child: Column(
@@ -299,11 +307,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                
                 if (constraints.maxWidth > 600) {
-                  return _buildFavoritesGrid(context, state);
+                  return _buildFavoritesGrid(context, displayFavorites);
                 } else {
-                  return _buildFavoritesList(context, state);
+                  return _buildFavoritesList(context, displayFavorites);
                 }
               },
             ),
@@ -312,27 +319,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
-  Widget _buildFavoritesList(BuildContext context, FavoritesState state) {
+  Widget _buildFavoritesList(BuildContext context, List<FavoriteItemEntity> favorites) {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
-      itemCount: state.filteredFavorites.length,
+      itemCount: favorites.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final favorite = state.filteredFavorites[index];
-        final product = favorite['product'];
-        final productId = product['id'] as int;
+        final favorite = favorites[index];
+        final product = favorite.product;
         
         return FavoriteItemCard(
-          product: product,
-          productId: productId,
-          onRemove: () => _removeFromFavorites(productId),
+          favoriteItem: favorite,
+          onRemove: () => _removeFromFavorites(product.id),
           onTap: () => _onProductTap(product),
         );
       },
     );
   }
 
-  Widget _buildFavoritesGrid(BuildContext context, FavoritesState state) {
+  Widget _buildFavoritesGrid(BuildContext context, List<FavoriteItemEntity> favorites) {
     return GridView.builder(
       padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -341,16 +346,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         mainAxisSpacing: 12, 
         crossAxisSpacing: 12, 
       ),
-      itemCount: state.filteredFavorites.length,
+      itemCount: favorites.length,
       itemBuilder: (context, index) {
-        final favorite = state.filteredFavorites[index];
-        final product = favorite['product'];
-        final productId = product['id'] as int;
+        final favorite = favorites[index];
+        final product = favorite.product;
         
         return FavoriteItemCard(
-          product: product,
-          productId: productId,
-          onRemove: () => _removeFromFavorites(productId),
+          favoriteItem: favorite,
+          onRemove: () => _removeFromFavorites(product.id),
           onTap: () => _onProductTap(product),
         );
       },
@@ -359,31 +362,21 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 }
 
 class FavoriteItemCard extends StatelessWidget {
-  final Map<String, dynamic> product;
-  final int productId;
+  final FavoriteItemEntity favoriteItem;
   final VoidCallback onRemove;
   final VoidCallback onTap;
 
   const FavoriteItemCard({
     super.key,
-    required this.product,
-    required this.productId,
+    required this.favoriteItem,
     required this.onRemove,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final price = (product['price'] as num?)?.toDouble() ?? 0.0;
-
-    
-    // final quantity = context.select<CartBloc, int>((bloc) {
-    //   final item = bloc.state.cartItems.firstWhere(
-    //     (item) => item['product_id'] == productId,
-    //     orElse: () => null,
-    //   );
-    //   return item != null ? item['quantity'] : 0;
-    // });
+    final product = favoriteItem.product;
+    final price = product.price;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 0),
@@ -396,18 +389,18 @@ class FavoriteItemCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProductImage(context),
+            _buildProductImage(context, product),
             const SizedBox(width: 12),
-            // Expanded(
-            //   child: _buildProductInfo(context, price, quantity),
-            // ),
+            Expanded(
+              child: _buildProductInfo(context, product, price),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProductImage(BuildContext context) {
+  Widget _buildProductImage(BuildContext context, ProductEntity product) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -417,37 +410,31 @@ class FavoriteItemCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           color: Theme.of(context).colorScheme.surfaceVariant,
         ),
-        child: _buildProductImageContent(context),
+        child: _buildProductImageContent(context, product),
       ),
     );
   }
 
-  Widget _buildProductImageContent(BuildContext context) {
-    final imageUrl = product['image_url'];
-    if (imageUrl == null || imageUrl.toString().isEmpty) {
-      return Icon(
-        Icons.fastfood,
-        size: 30,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      );
-    }
+  Widget _buildProductImageContent(BuildContext context, ProductEntity product) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: Image.network(
-        '${ApiClient.baseUrl}/images/products/${product['id']}/image',
+        product.imageUrl,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          return Icon(
-            Icons.fastfood,
-            size: 30,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          return Center(
+            child: Icon(
+              Icons.fastfood,
+              size: 30,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildProductInfo(BuildContext context, double price, int quantity) {
+  Widget _buildProductInfo(BuildContext context, ProductEntity product, double price) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -461,7 +448,7 @@ class FavoriteItemCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product['name'] ?? 'Товар #$productId',
+                      product.name,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -469,12 +456,13 @@ class FavoriteItemCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      product['category']?['name'] ?? 'Без категории',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                    ),
+                    if (product.category != null && product.category!.isNotEmpty)
+                      Text(
+                        product.category!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                      ),
                   ],
                 ),
               ),
@@ -495,11 +483,9 @@ class FavoriteItemCard extends StatelessWidget {
                   ),
             ),
             QuantityControls(
-              productId: productId,
-              quantity: quantity,
-              onQuantityChanged: (productId, quantity) {
-                //context.read<CartBloc>().add(CartItemQuantityUpdated(productId, quantity));
-              },
+              productId: product.id,
+              quantity: 0, // Получить из CartBloc
+              onQuantityChanged: (productId, quantity) {},
             ),
           ],
         ),

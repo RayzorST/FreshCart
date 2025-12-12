@@ -51,7 +51,21 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     result.fold(
       (error) => emit(state.copyWith(error: error)),
       (item) {
-        final newItems = [...state.cartItems, item];
+        // Проверяем, есть ли уже такой товар в корзине
+        final existingIndex = state.cartItems.indexWhere(
+          (cartItem) => cartItem.product.id == item.product.id
+        );
+        
+        List<CartItemEntity> newItems;
+        if (existingIndex >= 0) {
+          // Обновляем существующий
+          newItems = List<CartItemEntity>.from(state.cartItems);
+          newItems[existingIndex] = item;
+        } else {
+          // Добавляем новый
+          newItems = [...state.cartItems, item];
+        }
+        
         final total = _calculateTotal(newItems);
         final originalTotal = _calculateOriginalTotal(newItems);
         
@@ -74,7 +88,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       (error) => emit(state.copyWith(error: error)),
       (updatedItem) {
         final newItems = state.cartItems.map((item) {
-          return item.productId == updatedItem.productId ? updatedItem : item;
+          return item.product.id == updatedItem.product.id ? updatedItem : item;
         }).toList();
         
         final total = _calculateTotal(newItems);
@@ -99,7 +113,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       (error) => emit(state.copyWith(error: error)),
       (_) {
         final newItems = state.cartItems
-            .where((item) => item.productId != event.productId)
+            .where((item) => item.product.id != event.productId)
             .toList();
         
         final total = _calculateTotal(newItems);
@@ -118,7 +132,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     CartSyncedWithServer event,
     Emitter<CartState> emit,
   ) async {
-    emit(state.copyWith(status: CartStatus.loading));
+    emit(state.copyWith(status: CartStatus.syncing));
     
     final result = await _cartRepository.syncCartWithServer();
     
@@ -133,6 +147,9 @@ class CartBloc extends Bloc<CartEvent, CartState> {
   }
 
   double _calculateOriginalTotal(List<CartItemEntity> items) {
-    return items.fold(0.0, (sum, item) => sum + item.totalOriginalPrice);
+    return items.fold(0.0, (sum, item) {
+      final originalItemPrice = item.appliedPrice ?? item.product.price;
+      return sum + (originalItemPrice * item.quantity);
+    });
   }
 }

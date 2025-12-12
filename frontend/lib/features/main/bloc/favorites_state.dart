@@ -9,8 +9,8 @@ enum FavoritesStatus {
 
 class FavoritesState extends Equatable {
   final FavoritesStatus status;
-  final List<dynamic> favorites;
-  final List<dynamic> filteredFavorites;
+  final List<FavoriteItemEntity> favorites;
+  final List<FavoriteItemEntity> filteredFavorites;
   final String searchQuery;
   final bool isSearching;
   final String? error;
@@ -34,8 +34,8 @@ class FavoritesState extends Equatable {
 
   FavoritesState copyWith({
     FavoritesStatus? status,
-    List<dynamic>? favorites,
-    List<dynamic>? filteredFavorites,
+    List<FavoriteItemEntity>? favorites,
+    List<FavoriteItemEntity>? filteredFavorites,
     String? searchQuery,
     bool? isSearching,
     String? error,

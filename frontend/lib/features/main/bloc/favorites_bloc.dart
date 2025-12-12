@@ -1,20 +1,25 @@
 import 'dart:async';
 import 'package:bloc/bloc.dart';
-import 'package:client/api/client.dart';
 import 'package:equatable/equatable.dart';
+import 'package:injectable/injectable.dart';
+import 'package:client/domain/entities/favorite_item_entity.dart';
+import 'package:client/domain/repositories/favorite_repository.dart';
+import 'package:client/domain/entities/product_entity.dart';
 
 part 'favorites_event.dart';
 part 'favorites_state.dart';
 
+@injectable
 class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
+  final FavoriteRepository _favoriteRepository;
   Timer? _searchDebounce;
 
-  FavoritesBloc() : super(const FavoritesState.initial()) {
+  FavoritesBloc(this._favoriteRepository) : super(const FavoritesState.initial()) {
     on<FavoritesLoaded>(_onFavoritesLoaded);
     on<FavoritesSearchChanged>(_onFavoritesSearchChanged);
-    on<FavoritesSearchPerformed>(_onFavoritesSearchPerformed);
-    on<FavoriteToggled>(_onFavoriteToggled);
     on<FavoritesSearchCleared>(_onFavoritesSearchCleared);
+    on<FavoriteToggled>(_onFavoriteToggled);
+    on<FavoriteRemoved>(_onFavoriteRemoved);
   }
 
   @override
@@ -30,12 +35,23 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     emit(state.copyWith(status: FavoritesStatus.loading));
     
     try {
-      final favorites = await ApiClient.getFavorites();
-      emit(state.copyWith(
-        status: FavoritesStatus.loaded,
-        favorites: favorites,
-        filteredFavorites: favorites,
-      ));
+      final result = await _favoriteRepository.getFavorites();
+      
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: FavoritesStatus.error,
+            error: error,
+          ));
+        },
+        (favorites) {
+          emit(state.copyWith(
+            status: FavoritesStatus.loaded,
+            favorites: favorites,
+            filteredFavorites: favorites,
+          ));
+        },
+      );
     } catch (e) {
       emit(state.copyWith(
         status: FavoritesStatus.error,
@@ -69,64 +85,10 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     ));
 
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-      add(FavoritesSearchPerformed(query: query));
+      // Для серверного поиска можно добавить отдельное событие
+      // если API поддерживает поиск в избранном
+      // add(FavoritesSearchPerformed(query: query));
     });
-  }
-
-  Future<void> _onFavoritesSearchPerformed(
-    FavoritesSearchPerformed event,
-    Emitter<FavoritesState> emit,
-  ) async {
-    try {
-      final searchResults = await ApiClient.getFavorites(search: event.query);
-      emit(state.copyWith(
-        filteredFavorites: searchResults,
-        isSearching: true,
-      ));
-    } catch (e) {
-      print('Server search error: $e');
-    }
-  }
-
-  Future<void> _onFavoriteToggled(
-    FavoriteToggled event,
-    Emitter<FavoritesState> emit,
-  ) async {
-    try {
-      if (event.isFavorite) {
-        await ApiClient.addToFavorites(event.productId);
-      } else {
-        await ApiClient.removeFromFavorites(event.productId);
-      }
-
-      final updatedFavorites = List<dynamic>.from(state.favorites);
-      if (!event.isFavorite) {
-        updatedFavorites.removeWhere((fav) => fav['product_id'] == event.productId);
-      } else {
-        final products = await ApiClient.getProducts();
-        final product = products.firstWhere(
-          (p) => p['id'] == event.productId,
-          orElse: () => {'id': event.productId},
-        );
-        updatedFavorites.add({
-          'product_id': event.productId,
-          'product': product,
-        });
-      }
-
-      final updatedFiltered = _performLocalSearch(updatedFavorites, state.searchQuery);
-
-      emit(state.copyWith(
-        favorites: updatedFavorites,
-        filteredFavorites: updatedFiltered,
-      ));
-
-    } catch (e) {
-      emit(state.copyWith(
-        error: 'Ошибка обновления избранного: $e',
-      ));
-      rethrow;
-    }
   }
 
   void _onFavoritesSearchCleared(
@@ -141,13 +103,82 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     ));
   }
 
-  List<dynamic> _performLocalSearch(List<dynamic> favorites, String query) {
+  Future<void> _onFavoriteToggled(
+    FavoriteToggled event,
+    Emitter<FavoritesState> emit,
+  ) async {
+    try {
+      if (event.isFavorite) {
+        // Добавляем в избранное
+        final productEntity = _findProductById(event.productId);
+        if (productEntity != null) {
+          final favoriteItem = FavoriteItemEntity(
+            product: productEntity,
+            addedAt: DateTime.now(),
+          );
+          await _favoriteRepository.addToFavorites(favoriteItem);
+        }
+      } else {
+        // Удаляем из избранного
+        await _favoriteRepository.removeFromFavorites(event.productId);
+      }
+
+      // Обновляем список
+      add(const FavoritesLoaded());
+      
+    } catch (e) {
+      emit(state.copyWith(
+        error: 'Ошибка обновления избранного: $e',
+      ));
+    }
+  }
+
+  Future<void> _onFavoriteRemoved(
+    FavoriteRemoved event,
+    Emitter<FavoritesState> emit,
+  ) async {
+    try {
+      await _favoriteRepository.removeFromFavorites(event.productId);
+      
+      // Обновляем локальный список
+      final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
+        ..removeWhere((fav) => fav.product.id == event.productId);
+      
+      final updatedFiltered = _performLocalSearch(updatedFavorites, state.searchQuery);
+
+      emit(state.copyWith(
+        favorites: updatedFavorites,
+        filteredFavorites: updatedFiltered,
+      ));
+      
+    } catch (e) {
+      emit(state.copyWith(
+        error: 'Ошибка удаления из избранного: $e',
+      ));
+    }
+  }
+
+  List<FavoriteItemEntity> _performLocalSearch(
+    List<FavoriteItemEntity> favorites, 
+    String query
+  ) {
     if (query.isEmpty) return favorites;
 
     return favorites.where((favorite) {
-      final product = favorite['product'];
-      final productName = product['name']?.toString().toLowerCase() ?? '';
-      return productName.contains(query.toLowerCase());
+      final productName = favorite.product.name.toLowerCase();
+      final category = favorite.product.category?.toLowerCase() ?? '';
+      return productName.contains(query.toLowerCase()) || 
+             category.contains(query.toLowerCase());
     }).toList();
+  }
+
+  // Вспомогательный метод для нахождения продукта
+  ProductEntity? _findProductById(int productId) {
+    for (final favorite in state.favorites) {
+      if (favorite.product.id == productId) {
+        return favorite.product;
+      }
+    }
+    return null;
   }
 }

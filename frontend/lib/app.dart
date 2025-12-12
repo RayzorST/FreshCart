@@ -1,3 +1,5 @@
+import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/domain/repositories/product_repository.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -185,7 +187,7 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'product',
           builder: (context, state) {
             try {
-              final product = state.extra as Map<String, dynamic>?;
+              final product = state.extra as ProductEntity?;
               if (product == null) {
                 return const Scaffold(
                   body: Center(child: Text('Ошибка загрузки товара')),
@@ -252,8 +254,8 @@ class _FreshCartAppState extends State<FreshCartApp> {
           create: (context) => SettingsBloc()..add(LoadThemeSettings()),
           lazy: false,
         ),
-        BlocProvider(create: (context) => MainBloc()),
-        BlocProvider(create: (context) => FavoritesBloc()..add(const FavoritesLoaded())),
+        BlocProvider(create: (context) => getIt<MainBloc>()),
+        BlocProvider(create: (context) => getIt<FavoritesBloc>()..add(const FavoritesLoaded())),
         BlocProvider(create: (context) => PromotionsBloc()),
         BlocProvider(create: (context) => getIt<CartBloc>()..add(const CartLoaded())),
       ],

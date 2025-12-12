@@ -1,43 +1,52 @@
-import 'dart:convert';
-import 'package:drift/drift.dart';
 import 'package:dartz/dartz.dart';
+import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:client/api/client.dart';
 import 'package:client/data/datasources/local/app_database.dart';
 import 'package:client/domain/entities/cart_item_entity.dart';
+import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/domain/repositories/cart_repository.dart';
+import 'package:client/domain/repositories/product_repository.dart';
 
 @LazySingleton(as: CartRepository)
 class CartRepositoryImpl implements CartRepository {
   final AppDatabase _database;
+  final ProductRepository _productRepository;
 
-  CartRepositoryImpl(this._database);
+  CartRepositoryImpl(this._database, this._productRepository);
 
   @override
   Future<Either<String, List<CartItemEntity>>> getCartItems() async {
     try {
-      final items = await _database.getCartItems();
+      final results = await _database.getCartItemsWithProducts();
       
-      final entities = items.map((item) {
-        return CartItemEntity(
-          id: item.id,
-          productId: item.productId,
-          productName: item.productName,
-          productCategory: item.productCategory,
-          price: item.price,
-          originalPrice: item.originalPrice,
-          quantity: item.quantity,
-          imageUrl: item.imageUrl,
-          promotions: item.promotions != null
-              ? List<Map<String, dynamic>>.from(jsonDecode(item.promotions!))
-              : [],
-          isSynced: item.isSynced,
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
+      final cartItems = await Future.wait(results.map((result) async {
+        final cartItem = result.$1;
+        final dbProduct = result.$2;
+        
+        final product = ProductEntity(
+          id: dbProduct.id,
+          name: dbProduct.name,
+          description: dbProduct.description,
+          price: dbProduct.price,
+          stockQuantity: dbProduct.stockQuantity,
+          category: dbProduct.category,
+          isActive: dbProduct.isActive,
+          createdAt: dbProduct.createdAt,
+          updatedAt: dbProduct.updatedAt,
         );
-      }).toList();
+        
+        return CartItemEntity(
+          id: cartItem.id,
+          product: product,
+          quantity: cartItem.quantity,
+          appliedPrice: cartItem.appliedPrice,
+          isSynced: cartItem.isSynced,
+          addedAt: cartItem.addedAt,
+        );
+      }));
       
-      return Right(entities);
+      return Right(cartItems);
     } catch (e) {
       return Left('Ошибка загрузки корзины: $e');
     }
@@ -46,28 +55,31 @@ class CartRepositoryImpl implements CartRepository {
   @override
   Future<Either<String, CartItemEntity>> addToCart(CartItemEntity item) async {
     try {
-      // Используем .insert который автоматически создает Value обертки
-      final id = await _database.addToCart(
-        CartItemsCompanion.insert(
-          productId: item.productId,
-          productName: item.productName,
-          productCategory: item.productCategory,
-          price: item.price,
-          originalPrice: item.originalPrice != null 
-              ? Value(item.originalPrice!)
-              : const Value.absent(),
-          quantity: item.quantity,
-          imageUrl: item.imageUrl != null 
-              ? Value(item.imageUrl!)
-              : const Value.absent(),
-          promotions: item.promotions.isNotEmpty 
-              ? Value(jsonEncode(item.promotions))
-              : const Value.absent(),
-          isSynced: Value(item.isSynced),
-        ),
-      );
+      // Проверяем, есть ли уже в корзине
+      final existing = await _database.getCartItemByProductId(item.product.id);
       
-      return Right(item.copyWith(id: id));
+      if (existing != null) {
+        // Обновляем количество
+        final updatedQuantity = existing.quantity + item.quantity;
+        final updatedItem = item.copyWith(
+          id: existing.id,
+          quantity: updatedQuantity,
+        );
+        
+        await _updateCartItemInDb(updatedItem);
+        return Right(updatedItem);
+      } else {
+        // Добавляем новый
+        final id = await _database.insertCartItem(CartItemsCompanion(
+          productId: Value(item.product.id),
+          quantity: Value(item.quantity),
+          appliedPrice: Value(item.appliedPrice),
+          isSynced: const Value(false),
+          addedAt: Value(DateTime.now()),
+        ));
+        
+        return Right(item.copyWith(id: id));
+      }
     } catch (e) {
       return Left('Ошибка добавления в корзину: $e');
     }
@@ -80,25 +92,8 @@ class CartRepositoryImpl implements CartRepository {
         return Left('Элемент корзины не имеет id');
       }
       
-      final companion = CartItemsCompanion(
-        id: Value(item.id!),
-        productId: Value(item.productId),
-        productName: Value(item.productName),
-        productCategory: Value(item.productCategory),
-        price: Value(item.price),
-        originalPrice: Value(item.originalPrice),
-        quantity: Value(item.quantity),
-        imageUrl: Value(item.imageUrl),
-        promotions: Value(item.promotions.isNotEmpty 
-            ? jsonEncode(item.promotions)
-            : null),
-        isSynced: Value(item.isSynced),
-        updatedAt: Value(DateTime.now()),
-      );
-      
-      await _database.updateCartItem(companion);
-      
-      return Right(item.copyWith(updatedAt: DateTime.now()));
+      await _updateCartItemInDb(item);
+      return Right(item);
     } catch (e) {
       return Left('Ошибка обновления корзины: $e');
     }
@@ -107,7 +102,7 @@ class CartRepositoryImpl implements CartRepository {
   @override
   Future<Either<String, void>> removeFromCart(int productId) async {
     try {
-      await _database.removeFromCart(productId);
+      await _database.removeCartItem(productId);
       return const Right(null);
     } catch (e) {
       return Left('Ошибка удаления из корзины: $e');
@@ -127,99 +122,114 @@ class CartRepositoryImpl implements CartRepository {
   @override
   Future<Either<String, double>> getTotalAmount() async {
     try {
-      final items = await _database.getCartItems();
-      double total = 0.0;
+      final cartItems = await getCartItems();
       
-      for (final item in items) {
-        total += item.price * item.quantity;
-      }
-      
-      return Right(total);
+      return cartItems.fold(
+        (error) => Left(error),
+        (items) {
+          double total = 0.0;
+          for (final item in items) {
+            total += item.totalPrice;
+          }
+          return Right(total);
+        },
+      );
     } catch (e) {
       return Left('Ошибка расчета суммы: $e');
     }
   }
 
   @override
+ @override
   Future<Either<String, void>> syncCartWithServer() async {
     try {
-      // 1. Получаем локальные несинхронизированные товары
-      final localItems = await _database.getCartItems();
-      final unsyncedItems = localItems.where((item) => !item.isSynced).toList();
+      // 1. Получаем локальную корзину
+      final localItemsResult = await getCartItems();
       
-      // 2. Синхронизируем с сервером
-      for (final item in unsyncedItems) {
-        try {
-          if (item.quantity == 0) {
-            await ApiClient.removeFromCart(item.productId);
-          } else {
-            await ApiClient.addToCart(item.productId, item.quantity);
-          }
-          
-          // Помечаем как синхронизированный
-          await _database.markAsSynced(item.productId);
-        } catch (e) {
-          // Продолжаем синхронизацию других товаров
-          print('Ошибка синхронизации товара ${item.productId}: $e');
-        }
+      // Правильная обработка Either
+      if (localItemsResult.isLeft()) {
+        return localItemsResult.fold(
+          (error) => Left(error),
+          (items) => const Right(null), // Эта ветка никогда не выполнится для isLeft()
+        );
       }
       
+      final localItems = localItemsResult.getOrElse(() => []);
+
+      // 2. Синхронизируем каждый элемент
+      for (final item in localItems) {
+        if (!item.isSynced) {
+          try {
+            if (item.quantity == 0) {
+              await ApiClient.removeFromCart(item.product.id); // Используем _apiClient
+            } else {
+              await ApiClient.addToCart(item.product.id, item.quantity); // Используем _apiClient
+            }
+            
+            await _database.markCartItemAsSynced(item.product.id);
+          } catch (e) {
+            print('Ошибка синхронизации товара ${item.product.id}: $e');
+          }
+        }
+      }
+
       // 3. Получаем актуальную корзину с сервера
-      final serverCart = await ApiClient.getCart();
+      final serverCart = await ApiClient.getCart(); // Используем _apiClient
       final serverItems = serverCart['items'] as List<dynamic>? ?? [];
-      
-      // 4. Обновляем локальную БД данными с сервера
+
+      // 4. Обновляем локальную БД
       for (final serverItem in serverItems) {
-        final itemMap = _convertToSafeMap(serverItem);
-        final productId = itemMap['product_id'] as int;
-        final quantity = itemMap['quantity'] as int;
-        
+        final productId = serverItem['product_id'] as int;
+        final quantity = serverItem['quantity'] as int;
+
         final localItem = await _database.getCartItemByProductId(productId);
-        
+
         if (localItem == null) {
-          // Добавляем новый товар
-          await _database.addToCart(CartItemsCompanion.insert(
-            productId: productId,
-            productName: '',
-            productCategory: '',
-            price: 0.0,
-            quantity: quantity,
+          // Добавляем новый
+          await _database.insertCartItem(CartItemsCompanion(
+            productId: Value(productId),
+            quantity: Value(quantity),
             isSynced: const Value(true),
+            addedAt: Value(DateTime.now()),
           ));
         } else if (localItem.quantity != quantity) {
           // Обновляем количество
           await _database.updateCartItem(CartItemsCompanion(
             id: Value(localItem.id),
             productId: Value(productId),
-            productName: Value(localItem.productName),
-            productCategory: Value(localItem.productCategory),
-            price: Value(localItem.price),
-            originalPrice: Value(localItem.originalPrice),
             quantity: Value(quantity),
-            imageUrl: Value(localItem.imageUrl),
-            promotions: Value(localItem.promotions),
+            appliedPrice: Value(localItem.appliedPrice),
             isSynced: const Value(true),
-            updatedAt: Value(DateTime.now()),
+            addedAt: Value(localItem.addedAt),
           ));
         }
       }
-      
+
       return const Right(null);
     } catch (e) {
       return Left('Ошибка синхронизации корзины: $e');
     }
   }
 
-  Map<String, dynamic> _convertToSafeMap(dynamic data) {
-    if (data == null) return {};
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) {
-      try {
-        return Map<String, dynamic>.from(data);
-      } catch (e) {
-        return {};
-      }
-    }
-    return {};
+  @override
+  Future<bool> isInCart(int productId) async {
+    return await _database.isProductInCart(productId);
+  }
+
+  @override
+  Future<int> getCartItemCount() async {
+    return await _database.getCartItemCount();
+  }
+
+  // Приватные методы
+  Future<void> _updateCartItemInDb(CartItemEntity item) async {
+    await _database.updateCartItem(CartItemsCompanion(
+      id: Value(item.id!),
+      productId: Value(item.product.id),
+      quantity: Value(item.quantity),
+      appliedPrice: Value(item.appliedPrice),
+      isSynced: Value(item.isSynced),
+      addedAt: Value(item.addedAt),
+    ));
   }
 }

@@ -9,7 +9,7 @@ class ProductLoadCartQuantity extends ProductEvent {}
 class ProductToggleFavorite extends ProductEvent {}
 
 class ProductUpdateCartQuantity extends ProductEvent {
-  final int newQuantity;
+  final int quantity;
 
-  ProductUpdateCartQuantity(this.newQuantity);
+  ProductUpdateCartQuantity(this.quantity);
 }

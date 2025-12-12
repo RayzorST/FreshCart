@@ -11,7 +11,7 @@ enum MainStatus {
 class MainState extends Equatable {
   final int currentTabIndex;
   final MainStatus promotionsStatus;
-  final List<dynamic> promotions;
+  final List<Map<String, dynamic>> promotions;
   final String? promotionsError;
   final MainStatus categoriesStatus;
   final List<dynamic> categories;
@@ -20,7 +20,7 @@ class MainState extends Equatable {
   final String selectedCategoryId;
   final String searchQuery;
   final MainStatus productsStatus;
-  final List<dynamic> products;
+  final List<ProductEntity> products; // Изменено на List<Product>
   final String? productsError;
   final bool hasMoreProducts;
 
@@ -53,14 +53,14 @@ class MainState extends Equatable {
         selectedCategoryId = '0',
         searchQuery = '',
         productsStatus = MainStatus.initial,
-        products = const [],
+        products = const [], // Пустой список Product
         productsError = null,
         hasMoreProducts = false;
 
   MainState copyWith({
     int? currentTabIndex,
     MainStatus? promotionsStatus,
-    List<dynamic>? promotions,
+    List<Map<String, dynamic>>? promotions,
     String? promotionsError,
     MainStatus? categoriesStatus,
     List<dynamic>? categories,
@@ -69,7 +69,7 @@ class MainState extends Equatable {
     String? selectedCategoryId,
     String? searchQuery,
     MainStatus? productsStatus,
-    List<dynamic>? products,
+    List<ProductEntity>? products, // Изменено на List<Product>
     String? productsError,
     bool? hasMoreProducts,
   }) {

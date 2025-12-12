@@ -20,15 +20,6 @@ class FavoritesSearchChanged extends FavoritesEvent {
   List<Object> get props => [query];
 }
 
-class FavoritesSearchPerformed extends FavoritesEvent {
-  final String query;
-
-  const FavoritesSearchPerformed({required this.query});
-
-  @override
-  List<Object> get props => [query];
-}
-
 class FavoritesSearchCleared extends FavoritesEvent {
   const FavoritesSearchCleared();
 }
@@ -41,4 +32,13 @@ class FavoriteToggled extends FavoritesEvent {
 
   @override
   List<Object> get props => [productId, isFavorite];
+}
+
+class FavoriteRemoved extends FavoritesEvent {
+  final int productId;
+
+  const FavoriteRemoved(this.productId);
+
+  @override
+  List<Object> get props => [productId];
 }
