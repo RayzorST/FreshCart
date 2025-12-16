@@ -27,8 +27,13 @@ class FavoritesSearchCleared extends FavoritesEvent {
 class FavoriteToggled extends FavoritesEvent {
   final int productId;
   final bool isFavorite;
+  final ProductEntity? product; // Добавляем product для добавления
 
-  const FavoriteToggled(this.productId, this.isFavorite);
+  const FavoriteToggled({
+    required this.productId,
+    required this.isFavorite,
+    this.product, // Может быть null при удалении
+  });
 
   @override
   List<Object> get props => [productId, isFavorite];

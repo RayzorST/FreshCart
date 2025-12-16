@@ -31,6 +31,9 @@ import '../../features/auth/bloc/register_bloc.dart' as _i969;
 import '../../features/main/bloc/cart_bloc.dart' as _i377;
 import '../../features/main/bloc/favorites_bloc.dart' as _i58;
 import '../../features/main/bloc/main_bloc.dart' as _i299;
+import '../app_sync_handler.dart' as _i887;
+import '../services/sync_service.dart' as _i979;
+import '../services/sync_manager.dart' as _i478;
 
 // initializes the registration of main-scope dependencies inside of GetIt
 _i174.GetIt $initGetIt(
@@ -52,6 +55,9 @@ _i174.GetIt $initGetIt(
   gh.lazySingleton<_i933.ProductRepository>(
     () => _i876.ProductRepositoryImpl(gh<_i483.AppDatabase>()),
   );
+  gh.lazySingleton<_i979.SyncService>(
+    () => _i979.SyncService(gh<_i483.AppDatabase>()),
+  );
   gh.lazySingleton<_i46.CartRepository>(
     () => _i915.CartRepositoryImpl(
       gh<_i483.AppDatabase>(),
@@ -63,6 +69,9 @@ _i174.GetIt $initGetIt(
       gh<_i483.AppDatabase>(),
       gh<_i933.ProductRepository>(),
     ),
+  );
+  gh.lazySingleton<_i478.SyncManager>(
+    () => _i478.SyncManager(gh<_i979.SyncService>()),
   );
   gh.factory<_i58.FavoritesBloc>(
     () => _i58.FavoritesBloc(gh<_i780.FavoriteRepository>()),
@@ -93,6 +102,10 @@ _i174.GetIt $initGetIt(
   );
   gh.factory<_i44.GetCartItemCountUseCase>(
     () => _i44.GetCartItemCountUseCase(gh<_i46.CartRepository>()),
+  );
+  gh.lazySingleton<_i887.AppSyncHandler>(
+    () =>
+        _i887.AppSyncHandler(gh<_i979.SyncService>(), gh<_i478.SyncManager>()),
   );
   gh.factory<_i969.RegisterBloc>(
     () => _i969.RegisterBloc(gh<_i35.RegisterUseCase>()),

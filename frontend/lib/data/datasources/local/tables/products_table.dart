@@ -11,6 +11,14 @@ class Products extends Table {
   DateTimeColumn get createdAt => dateTime().named('created_at').withDefault(Constant(DateTime.now()))();
   DateTimeColumn get updatedAt => dateTime().named('updated_at').withDefault(Constant(DateTime.now()))();
 
+  TextColumn get syncStatus => text()
+    .withDefault(const Constant('pending'))
+    .named('sync_status')();
+      
+  DateTimeColumn get lastSyncedAt => dateTime()
+    .nullable()
+    .named('last_synced_at')();
+
   @override
   Set<Column> get primaryKey => {id};
 }

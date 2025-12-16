@@ -51,30 +51,33 @@ class CartRepositoryImpl implements CartRepository {
       return Left('Ошибка загрузки корзины: $e');
     }
   }
-
+  
   @override
   Future<Either<String, CartItemEntity>> addToCart(CartItemEntity item) async {
     try {
-      // Проверяем, есть ли уже в корзине
       final existing = await _database.getCartItemByProductId(item.product.id);
       
       if (existing != null) {
-        // Обновляем количество
-        final updatedQuantity = existing.quantity + item.quantity;
+        // Обновляем
         final updatedItem = item.copyWith(
           id: existing.id,
-          quantity: updatedQuantity,
+          quantity: existing.quantity + item.quantity,
         );
         
-        await _updateCartItemInDb(updatedItem);
+        await _database.updateCartItem(CartItemsCompanion(
+          id: Value(updatedItem.id!),
+          productId: Value(updatedItem.product.id),
+          quantity: Value(updatedItem.quantity),
+          syncStatus: const Value('pending'), // Помечаем для синхронизации
+        ));
+        
         return Right(updatedItem);
       } else {
         // Добавляем новый
         final id = await _database.insertCartItem(CartItemsCompanion(
           productId: Value(item.product.id),
           quantity: Value(item.quantity),
-          appliedPrice: Value(item.appliedPrice),
-          isSynced: const Value(false),
+          syncStatus: const Value('pending'), // Помечаем для синхронизации
           addedAt: Value(DateTime.now()),
         ));
         
@@ -140,44 +143,30 @@ class CartRepositoryImpl implements CartRepository {
   }
 
   @override
- @override
   Future<Either<String, void>> syncCartWithServer() async {
     try {
-      // 1. Получаем локальную корзину
-      final localItemsResult = await getCartItems();
+      // 1. Отправляем изменения
+      final pendingItems = await _database.getCartItemsPendingSync();
       
-      // Правильная обработка Either
-      if (localItemsResult.isLeft()) {
-        return localItemsResult.fold(
-          (error) => Left(error),
-          (items) => const Right(null), // Эта ветка никогда не выполнится для isLeft()
-        );
-      }
-      
-      final localItems = localItemsResult.getOrElse(() => []);
-
-      // 2. Синхронизируем каждый элемент
-      for (final item in localItems) {
-        if (!item.isSynced) {
-          try {
-            if (item.quantity == 0) {
-              await ApiClient.removeFromCart(item.product.id); // Используем _apiClient
-            } else {
-              await ApiClient.addToCart(item.product.id, item.quantity); // Используем _apiClient
-            }
-            
-            await _database.markCartItemAsSynced(item.product.id);
-          } catch (e) {
-            print('Ошибка синхронизации товара ${item.product.id}: $e');
+      for (final item in pendingItems) {
+        try {
+          if (item.quantity == 0) {
+            await ApiClient.removeFromCart(item.productId);
+          } else {
+            await ApiClient.addToCart(item.productId, item.quantity);
           }
+          
+          await _database.markCartItemAsSynced(item.productId);
+        } catch (e) {
+          print('Ошибка синхронизации товара ${item.productId}: $e');
         }
       }
 
-      // 3. Получаем актуальную корзину с сервера
-      final serverCart = await ApiClient.getCart(); // Используем _apiClient
+      // 2. Загружаем актуальную корзину
+      final serverCart = await ApiClient.getCart();
       final serverItems = serverCart['items'] as List<dynamic>? ?? [];
 
-      // 4. Обновляем локальную БД
+      // 3. Обновляем локально
       for (final serverItem in serverItems) {
         final productId = serverItem['product_id'] as int;
         final quantity = serverItem['quantity'] as int;
@@ -190,6 +179,8 @@ class CartRepositoryImpl implements CartRepository {
             productId: Value(productId),
             quantity: Value(quantity),
             isSynced: const Value(true),
+            syncStatus: const Value('synced'),
+            lastSyncedAt: Value(DateTime.now()),
             addedAt: Value(DateTime.now()),
           ));
         } else if (localItem.quantity != quantity) {
@@ -200,6 +191,8 @@ class CartRepositoryImpl implements CartRepository {
             quantity: Value(quantity),
             appliedPrice: Value(localItem.appliedPrice),
             isSynced: const Value(true),
+            syncStatus: const Value('synced'),
+            lastSyncedAt: Value(DateTime.now()),
             addedAt: Value(localItem.addedAt),
           ));
         }

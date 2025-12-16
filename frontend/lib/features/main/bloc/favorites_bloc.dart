@@ -45,10 +45,13 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
           ));
         },
         (favorites) {
+          // Применяем текущий поиск к загруженным избранным
+          final filteredFavorites = _performLocalSearch(favorites, state.searchQuery);
+          
           emit(state.copyWith(
             status: FavoritesStatus.loaded,
             favorites: favorites,
-            filteredFavorites: favorites,
+            filteredFavorites: filteredFavorites,
           ));
         },
       );
@@ -60,42 +63,29 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     }
   }
 
-  void _onFavoritesSearchChanged(
+  Future<void> _onFavoritesSearchChanged(
     FavoritesSearchChanged event,
     Emitter<FavoritesState> emit,
-  ) {
+  ) async {
     _searchDebounce?.cancel();
 
     final query = event.query.trim();
     
-    if (query.isEmpty) {
-      emit(state.copyWith(
-        searchQuery: query,
-        filteredFavorites: state.favorites,
-        isSearching: false,
-      ));
-      return;
-    }
-
-    final localResults = _performLocalSearch(state.favorites, query);
+    final filteredFavorites = _performLocalSearch(state.favorites, query);
+    
     emit(state.copyWith(
       searchQuery: query,
-      filteredFavorites: localResults,
-      isSearching: true,
+      filteredFavorites: filteredFavorites,
+      isSearching: query.isNotEmpty,
     ));
-
-    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-      // Для серверного поиска можно добавить отдельное событие
-      // если API поддерживает поиск в избранном
-      // add(FavoritesSearchPerformed(query: query));
-    });
   }
 
-  void _onFavoritesSearchCleared(
+  Future<void> _onFavoritesSearchCleared(
     FavoritesSearchCleared event,
     Emitter<FavoritesState> emit,
-  ) {
+  ) async {
     _searchDebounce?.cancel();
+    
     emit(state.copyWith(
       searchQuery: '',
       filteredFavorites: state.favorites,
@@ -109,22 +99,44 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
   ) async {
     try {
       if (event.isFavorite) {
-        // Добавляем в избранное
-        final productEntity = _findProductById(event.productId);
-        if (productEntity != null) {
+        // Добавляем в избранное - нужно передать ProductEntity
+        if (event.product != null) {
           final favoriteItem = FavoriteItemEntity(
-            product: productEntity,
+            product: event.product!,
             addedAt: DateTime.now(),
           );
-          await _favoriteRepository.addToFavorites(favoriteItem);
+          final result = await _favoriteRepository.addToFavorites(favoriteItem);
+          
+          if (result.isRight()) {
+            // Обновляем список локально
+            final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
+              ..add(result.fold((l) => null, (r) => r)!);
+            
+            final filteredFavorites = _performLocalSearch(updatedFavorites, state.searchQuery);
+            
+            emit(state.copyWith(
+              favorites: updatedFavorites,
+              filteredFavorites: filteredFavorites,
+            ));
+          }
         }
       } else {
         // Удаляем из избранного
-        await _favoriteRepository.removeFromFavorites(event.productId);
-      }
+        final result = await _favoriteRepository.removeFromFavorites(event.productId);
+        
+        if (result.isRight()) {
+          // Обновляем локальный список
+          final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
+            ..removeWhere((fav) => fav.product.id == event.productId);
+          
+          final updatedFiltered = _performLocalSearch(updatedFavorites, state.searchQuery);
 
-      // Обновляем список
-      add(const FavoritesLoaded());
+          emit(state.copyWith(
+            favorites: updatedFavorites,
+            filteredFavorites: updatedFiltered,
+          ));
+        }
+      }
       
     } catch (e) {
       emit(state.copyWith(
@@ -170,15 +182,5 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
       return productName.contains(query.toLowerCase()) || 
              category.contains(query.toLowerCase());
     }).toList();
-  }
-
-  // Вспомогательный метод для нахождения продукта
-  ProductEntity? _findProductById(int productId) {
-    for (final favorite in state.favorites) {
-      if (favorite.product.id == productId) {
-        return favorite.product;
-      }
-    }
-    return null;
   }
 }

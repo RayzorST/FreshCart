@@ -261,33 +261,16 @@ class ProductCard extends StatelessWidget {
 
   const ProductCard({super.key, required this.product});
 
-  void _onProductTap(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    if (screenWidth > 600) {
-      ScreenToModal.show(
-        context: context, 
-        child: ProductScreen(product: product)
-      );
-    } else {
-      context.push('/product/${product.id}', extra: product);
-    }
-  }
-
-  // Создаем CartItem из продукта
-  CartItemEntity _createCartItem(int quantity) {
-    return CartItemEntity(
-      product: product,
-      quantity: quantity,
-      addedAt: DateTime.now(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final productId = product.id;
 
-    // Получаем количество из корзины через CartBloc
+    // Получаем информацию о избранном из FavoritesBloc
+    final isFavorite = context.select<FavoritesBloc, bool>((bloc) {
+      return bloc.state.favorites.any((favItem) => favItem.product.id == productId);
+    });
+
+    // Получаем количество из корзины
     final cartItem = context.select<CartBloc, CartItemEntity?>((bloc) {
       try {
         return bloc.state.cartItems.firstWhere(
@@ -299,19 +282,6 @@ class ProductCard extends StatelessWidget {
     });
 
     final quantity = cartItem?.quantity ?? 0;
-    
-    // Получаем информацию о избранном (нужно будет обновить FavoritesBloc)
-    final isFavorite = context.select<FavoritesBloc, bool>((bloc) {
-      try {
-        return bloc.state.favorites.any((fav) {
-          // Пока используем старую структуру, нужно обновить FavoritesBloc
-          final favProductId = fav.id;
-          return favProductId == productId;
-        });
-      } catch (e) {
-        return false;
-      }
-    });
 
     return Card(
       elevation: 0,
@@ -418,8 +388,14 @@ class ProductCard extends StatelessWidget {
                   size: 20,
                 ),
                 onPressed: () {
-                  // TODO: Обновить после создания нового FavoritesBloc
-                  // context.read<FavoritesBloc>().add(FavoriteToggled(product, !isFavorite));
+                  final favoritesBloc = context.read<FavoritesBloc>();
+                  final newFavoriteState = !isFavorite;
+                  
+                  favoritesBloc.add(FavoriteToggled(
+                    productId: productId,
+                    isFavorite: newFavoriteState,
+                    product: newFavoriteState ? product : null,
+                  ));
                 },
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(
@@ -431,6 +407,27 @@ class ProductCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _onProductTap(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    if (screenWidth > 600) {
+      ScreenToModal.show(
+        context: context, 
+        child: ProductScreen(product: product)
+      );
+    } else {
+      context.push('/product/${product.id}', extra: product);
+    }
+  }
+
+  CartItemEntity _createCartItem(int quantity) {
+    return CartItemEntity(
+      product: product,
+      quantity: quantity,
+      addedAt: DateTime.now(),
     );
   }
 }

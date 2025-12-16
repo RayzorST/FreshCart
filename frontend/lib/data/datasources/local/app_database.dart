@@ -1,5 +1,9 @@
+// app_database.dart
+import 'dart:io';
+
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:injectable/injectable.dart';
 
@@ -15,7 +19,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2; // Увеличиваем версию для синхронизации
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -23,16 +27,33 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          // Миграции при обновлении схемы
+          if (from < 2) {
+            // Добавляем поля синхронизации в версии 2
+            await m.addColumn(products, products.syncStatus);
+            await m.addColumn(products, products.lastSyncedAt);
+            
+            await m.addColumn(cartItems, cartItems.syncStatus);
+            await m.addColumn(cartItems, cartItems.lastSyncedAt);
+            
+            await m.addColumn(favoriteItems, favoriteItems.syncStatus);
+            await m.addColumn(favoriteItems, favoriteItems.lastSyncedAt);
+          }
+        },
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
         },
       );
 
   // ========== Products ==========
+  
   Future<int> insertProduct(ProductsCompanion product) =>
       into(products).insert(product, mode: InsertMode.insertOrReplace);
   
-  Future<void> insertProducts(List<ProductsCompanion> productsList) =>
-      batch((batch) => batch.insertAll(products, productsList, mode: InsertMode.insertOrReplace));
+  Future<void> insertProducts(List<ProductsCompanion> productsList) async {
+    await batch((batch) {
+      batch.insertAll(products, productsList, mode: InsertMode.insertOrReplace);
+    });
+  }
   
   Future<List<Product>> getAllProducts() => select(products).get();
   
@@ -47,7 +68,32 @@ class AppDatabase extends _$AppDatabase {
   
   Future<void> clearProducts() => delete(products).go();
 
+  // Методы для синхронизации продуктов
+  Future<void> markProductAsSynced(int productId) async {
+    await (update(products)
+          ..where((tbl) => tbl.id.equals(productId)))
+        .write(ProductsCompanion(
+          syncStatus: const Value('synced'),
+          lastSyncedAt: Value(DateTime.now()),
+        ));
+  }
+  
+  Future<void> markProductAsPending(int productId) async {
+    await (update(products)
+          ..where((tbl) => tbl.id.equals(productId)))
+        .write(ProductsCompanion(
+          syncStatus: const Value('pending'),
+        ));
+  }
+  
+  Future<List<Product>> getProductsPendingSync() {
+    return (select(products)
+          ..where((tbl) => tbl.syncStatus.equals('pending')))
+        .get();
+  }
+
   // ========== Cart Items ==========
+  
   Future<int> insertCartItem(CartItemsCompanion item) =>
       into(cartItems).insert(item);
   
@@ -69,6 +115,8 @@ class AppDatabase extends _$AppDatabase {
           ..where((tbl) => tbl.productId.equals(productId)))
         .write(CartItemsCompanion(
           isSynced: const Value(true),
+          syncStatus: const Value('synced'),
+          lastSyncedAt: Value(DateTime.now()),
         ));
   }
   
@@ -76,8 +124,15 @@ class AppDatabase extends _$AppDatabase {
   
   Future<bool> isProductInCart(int productId) =>
       getCartItemByProductId(productId).then((item) => item != null);
+  
+  Future<List<CartItem>> getCartItemsPendingSync() {
+    return (select(cartItems)
+          ..where((tbl) => tbl.syncStatus.equals('pending')))
+        .get();
+  }
 
   // ========== Favorite Items ==========
+  
   Future<int> insertFavoriteItem(FavoriteItemsCompanion item) =>
       into(favoriteItems).insert(item);
   
@@ -93,8 +148,24 @@ class AppDatabase extends _$AppDatabase {
   
   Future<bool> isProductFavorite(int productId) =>
       getFavoriteItemByProductId(productId).then((item) => item != null);
+  
+  Future<List<FavoriteItem>> getFavoritesPendingSync() {
+    return (select(favoriteItems)
+          ..where((tbl) => tbl.syncStatus.equals('pending')))
+        .get();
+  }
+  
+  Future<void> markFavoriteAsSynced(int productId) async {
+    await (update(favoriteItems)
+          ..where((tbl) => tbl.productId.equals(productId)))
+        .write(FavoriteItemsCompanion(
+          syncStatus: const Value('synced'),
+          lastSyncedAt: Value(DateTime.now()),
+        ));
+  }
 
   // ========== Join Queries ==========
+  
   Future<List<(CartItem, Product)>> getCartItemsWithProducts() {
     final query = select(cartItems).join([
       innerJoin(products, products.id.equalsExp(cartItems.productId)),
@@ -118,15 +189,73 @@ class AppDatabase extends _$AppDatabase {
       return (favoriteItem, product);
     }).get();
   }
+  
+  // ========== Утилиты ==========
+  
+  Future<void> markAllCartItemsAsSynced() async {
+    await (update(cartItems)
+          ..where((tbl) => tbl.syncStatus.equals('pending')))
+        .write(CartItemsCompanion(
+          isSynced: const Value(true),
+          syncStatus: const Value('synced'),
+          lastSyncedAt: Value(DateTime.now()),
+        ));
+  }
+  
+  Future<void> markAllFavoritesAsSynced() async {
+    await (update(favoriteItems)
+          ..where((tbl) => tbl.syncStatus.equals('pending')))
+        .write(FavoriteItemsCompanion(
+          syncStatus: const Value('synced'),
+          lastSyncedAt: Value(DateTime.now()),
+        ));
+  }
+  
+  Future<void> markAllProductsAsSynced() async {
+    await (update(products)
+          ..where((tbl) => tbl.syncStatus.equals('pending')))
+        .write(ProductsCompanion(
+          syncStatus: const Value('synced'),
+          lastSyncedAt: Value(DateTime.now()),
+        ));
+  }
+  
+  // Проверка наличия ожидающих синхронизации элементов
+  Future<bool> hasPendingSync() async {
+    final cartPending = await getCartItemsPendingSync();
+    final favoritesPending = await getFavoritesPendingSync();
+    final productsPending = await getProductsPendingSync();
+    
+    return cartPending.isNotEmpty || 
+           favoritesPending.isNotEmpty || 
+           productsPending.isNotEmpty;
+  }
+  
+  // Получить количество ожидающих элементов
+  Future<Map<String, int>> getPendingSyncCounts() async {
+    final cartPending = await getCartItemsPendingSync();
+    final favoritesPending = await getFavoritesPendingSync();
+    final productsPending = await getProductsPendingSync();
+    
+    return {
+      'cart': cartPending.length,
+      'favorites': favoritesPending.length,
+      'products': productsPending.length,
+    };
+  }
 }
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    return driftDatabase(
-      name: 'cart.db',
-      native: const DriftNativeOptions(
-        databaseDirectory: getApplicationDocumentsDirectory,
-      ),
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'cart.db'));
+    
+    return NativeDatabase(
+      file,
+      setup: (db) {
+        // Включаем поддержку внешних ключей
+        db.execute('PRAGMA foreign_keys = ON');
+      },
     );
   });
 }

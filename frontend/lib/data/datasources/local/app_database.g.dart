@@ -107,6 +107,29 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     requiredDuringInsert: false,
     defaultValue: Constant(DateTime.now()),
   );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _lastSyncedAtMeta = const VerificationMeta(
+    'lastSyncedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+    'last_synced_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -118,6 +141,8 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     isActive,
     createdAt,
     updatedAt,
+    syncStatus,
+    lastSyncedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -196,6 +221,21 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+        _lastSyncedAtMeta,
+        lastSyncedAt.isAcceptableOrUnknown(
+          data['last_synced_at']!,
+          _lastSyncedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -241,6 +281,14 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_synced_at'],
+      ),
     );
   }
 
@@ -260,6 +308,8 @@ class Product extends DataClass implements Insertable<Product> {
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
   const Product({
     required this.id,
     required this.name,
@@ -270,6 +320,8 @@ class Product extends DataClass implements Insertable<Product> {
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
+    required this.syncStatus,
+    this.lastSyncedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -285,6 +337,10 @@ class Product extends DataClass implements Insertable<Product> {
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
     return map;
   }
 
@@ -301,6 +357,10 @@ class Product extends DataClass implements Insertable<Product> {
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      syncStatus: Value(syncStatus),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
     );
   }
 
@@ -319,6 +379,8 @@ class Product extends DataClass implements Insertable<Product> {
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
     );
   }
   @override
@@ -334,6 +396,8 @@ class Product extends DataClass implements Insertable<Product> {
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
     };
   }
 
@@ -347,6 +411,8 @@ class Product extends DataClass implements Insertable<Product> {
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? syncStatus,
+    Value<DateTime?> lastSyncedAt = const Value.absent(),
   }) => Product(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -357,6 +423,8 @@ class Product extends DataClass implements Insertable<Product> {
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    syncStatus: syncStatus ?? this.syncStatus,
+    lastSyncedAt: lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
   );
   Product copyWithCompanion(ProductsCompanion data) {
     return Product(
@@ -373,6 +441,12 @@ class Product extends DataClass implements Insertable<Product> {
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
     );
   }
 
@@ -387,7 +461,9 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('category: $category, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
@@ -403,6 +479,8 @@ class Product extends DataClass implements Insertable<Product> {
     isActive,
     createdAt,
     updatedAt,
+    syncStatus,
+    lastSyncedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -416,7 +494,9 @@ class Product extends DataClass implements Insertable<Product> {
           other.category == this.category &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncedAt == this.lastSyncedAt);
 }
 
 class ProductsCompanion extends UpdateCompanion<Product> {
@@ -429,6 +509,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String> syncStatus;
+  final Value<DateTime?> lastSyncedAt;
   const ProductsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -439,6 +521,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   });
   ProductsCompanion.insert({
     this.id = const Value.absent(),
@@ -450,6 +534,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   }) : name = Value(name),
        description = Value(description),
        price = Value(price),
@@ -464,6 +550,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastSyncedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -475,6 +563,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
     });
   }
 
@@ -488,6 +578,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<String>? syncStatus,
+    Value<DateTime?>? lastSyncedAt,
   }) {
     return ProductsCompanion(
       id: id ?? this.id,
@@ -499,6 +591,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 
@@ -532,6 +626,12 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
     return map;
   }
 
@@ -546,7 +646,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('category: $category, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
@@ -635,6 +737,29 @@ class $CartItemsTable extends CartItems
     requiredDuringInsert: false,
     defaultValue: Constant(DateTime.now()),
   );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _lastSyncedAtMeta = const VerificationMeta(
+    'lastSyncedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+    'last_synced_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -643,6 +768,8 @@ class $CartItemsTable extends CartItems
     appliedPrice,
     isSynced,
     addedAt,
+    syncStatus,
+    lastSyncedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -694,6 +821,21 @@ class $CartItemsTable extends CartItems
         addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
       );
     }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+        _lastSyncedAtMeta,
+        lastSyncedAt.isAcceptableOrUnknown(
+          data['last_synced_at']!,
+          _lastSyncedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -731,6 +873,14 @@ class $CartItemsTable extends CartItems
         DriftSqlType.dateTime,
         data['${effectivePrefix}added_at'],
       )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_synced_at'],
+      ),
     );
   }
 
@@ -747,6 +897,8 @@ class CartItem extends DataClass implements Insertable<CartItem> {
   final double? appliedPrice;
   final bool isSynced;
   final DateTime addedAt;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
   const CartItem({
     required this.id,
     required this.productId,
@@ -754,6 +906,8 @@ class CartItem extends DataClass implements Insertable<CartItem> {
     this.appliedPrice,
     required this.isSynced,
     required this.addedAt,
+    required this.syncStatus,
+    this.lastSyncedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -766,6 +920,10 @@ class CartItem extends DataClass implements Insertable<CartItem> {
     }
     map['is_synced'] = Variable<bool>(isSynced);
     map['added_at'] = Variable<DateTime>(addedAt);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
     return map;
   }
 
@@ -779,6 +937,10 @@ class CartItem extends DataClass implements Insertable<CartItem> {
           : Value(appliedPrice),
       isSynced: Value(isSynced),
       addedAt: Value(addedAt),
+      syncStatus: Value(syncStatus),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
     );
   }
 
@@ -794,6 +956,8 @@ class CartItem extends DataClass implements Insertable<CartItem> {
       appliedPrice: serializer.fromJson<double?>(json['appliedPrice']),
       isSynced: serializer.fromJson<bool>(json['isSynced']),
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
     );
   }
   @override
@@ -806,6 +970,8 @@ class CartItem extends DataClass implements Insertable<CartItem> {
       'appliedPrice': serializer.toJson<double?>(appliedPrice),
       'isSynced': serializer.toJson<bool>(isSynced),
       'addedAt': serializer.toJson<DateTime>(addedAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
     };
   }
 
@@ -816,6 +982,8 @@ class CartItem extends DataClass implements Insertable<CartItem> {
     Value<double?> appliedPrice = const Value.absent(),
     bool? isSynced,
     DateTime? addedAt,
+    String? syncStatus,
+    Value<DateTime?> lastSyncedAt = const Value.absent(),
   }) => CartItem(
     id: id ?? this.id,
     productId: productId ?? this.productId,
@@ -823,6 +991,8 @@ class CartItem extends DataClass implements Insertable<CartItem> {
     appliedPrice: appliedPrice.present ? appliedPrice.value : this.appliedPrice,
     isSynced: isSynced ?? this.isSynced,
     addedAt: addedAt ?? this.addedAt,
+    syncStatus: syncStatus ?? this.syncStatus,
+    lastSyncedAt: lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
   );
   CartItem copyWithCompanion(CartItemsCompanion data) {
     return CartItem(
@@ -834,6 +1004,12 @@ class CartItem extends DataClass implements Insertable<CartItem> {
           : this.appliedPrice,
       isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
     );
   }
 
@@ -845,14 +1021,24 @@ class CartItem extends DataClass implements Insertable<CartItem> {
           ..write('quantity: $quantity, ')
           ..write('appliedPrice: $appliedPrice, ')
           ..write('isSynced: $isSynced, ')
-          ..write('addedAt: $addedAt')
+          ..write('addedAt: $addedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, productId, quantity, appliedPrice, isSynced, addedAt);
+  int get hashCode => Object.hash(
+    id,
+    productId,
+    quantity,
+    appliedPrice,
+    isSynced,
+    addedAt,
+    syncStatus,
+    lastSyncedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -862,7 +1048,9 @@ class CartItem extends DataClass implements Insertable<CartItem> {
           other.quantity == this.quantity &&
           other.appliedPrice == this.appliedPrice &&
           other.isSynced == this.isSynced &&
-          other.addedAt == this.addedAt);
+          other.addedAt == this.addedAt &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncedAt == this.lastSyncedAt);
 }
 
 class CartItemsCompanion extends UpdateCompanion<CartItem> {
@@ -872,6 +1060,8 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
   final Value<double?> appliedPrice;
   final Value<bool> isSynced;
   final Value<DateTime> addedAt;
+  final Value<String> syncStatus;
+  final Value<DateTime?> lastSyncedAt;
   const CartItemsCompanion({
     this.id = const Value.absent(),
     this.productId = const Value.absent(),
@@ -879,6 +1069,8 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
     this.appliedPrice = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.addedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   });
   CartItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -887,6 +1079,8 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
     this.appliedPrice = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.addedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   }) : productId = Value(productId);
   static Insertable<CartItem> custom({
     Expression<int>? id,
@@ -895,6 +1089,8 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
     Expression<double>? appliedPrice,
     Expression<bool>? isSynced,
     Expression<DateTime>? addedAt,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastSyncedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -903,6 +1099,8 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
       if (appliedPrice != null) 'applied_price': appliedPrice,
       if (isSynced != null) 'is_synced': isSynced,
       if (addedAt != null) 'added_at': addedAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
     });
   }
 
@@ -913,6 +1111,8 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
     Value<double?>? appliedPrice,
     Value<bool>? isSynced,
     Value<DateTime>? addedAt,
+    Value<String>? syncStatus,
+    Value<DateTime?>? lastSyncedAt,
   }) {
     return CartItemsCompanion(
       id: id ?? this.id,
@@ -921,6 +1121,8 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
       appliedPrice: appliedPrice ?? this.appliedPrice,
       isSynced: isSynced ?? this.isSynced,
       addedAt: addedAt ?? this.addedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 
@@ -945,6 +1147,12 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
     if (addedAt.present) {
       map['added_at'] = Variable<DateTime>(addedAt.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
     return map;
   }
 
@@ -956,7 +1164,9 @@ class CartItemsCompanion extends UpdateCompanion<CartItem> {
           ..write('quantity: $quantity, ')
           ..write('appliedPrice: $appliedPrice, ')
           ..write('isSynced: $isSynced, ')
-          ..write('addedAt: $addedAt')
+          ..write('addedAt: $addedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
@@ -1007,8 +1217,37 @@ class $FavoriteItemsTable extends FavoriteItems
     requiredDuringInsert: false,
     defaultValue: Constant(DateTime.now()),
   );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, productId, addedAt];
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _lastSyncedAtMeta = const VerificationMeta(
+    'lastSyncedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+    'last_synced_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    productId,
+    addedAt,
+    syncStatus,
+    lastSyncedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1038,6 +1277,21 @@ class $FavoriteItemsTable extends FavoriteItems
         addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
       );
     }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+        _lastSyncedAtMeta,
+        lastSyncedAt.isAcceptableOrUnknown(
+          data['last_synced_at']!,
+          _lastSyncedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1063,6 +1317,14 @@ class $FavoriteItemsTable extends FavoriteItems
         DriftSqlType.dateTime,
         data['${effectivePrefix}added_at'],
       )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_synced_at'],
+      ),
     );
   }
 
@@ -1076,10 +1338,14 @@ class FavoriteItem extends DataClass implements Insertable<FavoriteItem> {
   final int id;
   final int productId;
   final DateTime addedAt;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
   const FavoriteItem({
     required this.id,
     required this.productId,
     required this.addedAt,
+    required this.syncStatus,
+    this.lastSyncedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1087,6 +1353,10 @@ class FavoriteItem extends DataClass implements Insertable<FavoriteItem> {
     map['id'] = Variable<int>(id);
     map['product_id'] = Variable<int>(productId);
     map['added_at'] = Variable<DateTime>(addedAt);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
     return map;
   }
 
@@ -1095,6 +1365,10 @@ class FavoriteItem extends DataClass implements Insertable<FavoriteItem> {
       id: Value(id),
       productId: Value(productId),
       addedAt: Value(addedAt),
+      syncStatus: Value(syncStatus),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
     );
   }
 
@@ -1107,6 +1381,8 @@ class FavoriteItem extends DataClass implements Insertable<FavoriteItem> {
       id: serializer.fromJson<int>(json['id']),
       productId: serializer.fromJson<int>(json['productId']),
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
     );
   }
   @override
@@ -1116,20 +1392,35 @@ class FavoriteItem extends DataClass implements Insertable<FavoriteItem> {
       'id': serializer.toJson<int>(id),
       'productId': serializer.toJson<int>(productId),
       'addedAt': serializer.toJson<DateTime>(addedAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
     };
   }
 
-  FavoriteItem copyWith({int? id, int? productId, DateTime? addedAt}) =>
-      FavoriteItem(
-        id: id ?? this.id,
-        productId: productId ?? this.productId,
-        addedAt: addedAt ?? this.addedAt,
-      );
+  FavoriteItem copyWith({
+    int? id,
+    int? productId,
+    DateTime? addedAt,
+    String? syncStatus,
+    Value<DateTime?> lastSyncedAt = const Value.absent(),
+  }) => FavoriteItem(
+    id: id ?? this.id,
+    productId: productId ?? this.productId,
+    addedAt: addedAt ?? this.addedAt,
+    syncStatus: syncStatus ?? this.syncStatus,
+    lastSyncedAt: lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
+  );
   FavoriteItem copyWithCompanion(FavoriteItemsCompanion data) {
     return FavoriteItem(
       id: data.id.present ? data.id.value : this.id,
       productId: data.productId.present ? data.productId.value : this.productId,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
     );
   }
 
@@ -1138,45 +1429,60 @@ class FavoriteItem extends DataClass implements Insertable<FavoriteItem> {
     return (StringBuffer('FavoriteItem(')
           ..write('id: $id, ')
           ..write('productId: $productId, ')
-          ..write('addedAt: $addedAt')
+          ..write('addedAt: $addedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, productId, addedAt);
+  int get hashCode =>
+      Object.hash(id, productId, addedAt, syncStatus, lastSyncedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is FavoriteItem &&
           other.id == this.id &&
           other.productId == this.productId &&
-          other.addedAt == this.addedAt);
+          other.addedAt == this.addedAt &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncedAt == this.lastSyncedAt);
 }
 
 class FavoriteItemsCompanion extends UpdateCompanion<FavoriteItem> {
   final Value<int> id;
   final Value<int> productId;
   final Value<DateTime> addedAt;
+  final Value<String> syncStatus;
+  final Value<DateTime?> lastSyncedAt;
   const FavoriteItemsCompanion({
     this.id = const Value.absent(),
     this.productId = const Value.absent(),
     this.addedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   });
   FavoriteItemsCompanion.insert({
     this.id = const Value.absent(),
     required int productId,
     this.addedAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   }) : productId = Value(productId);
   static Insertable<FavoriteItem> custom({
     Expression<int>? id,
     Expression<int>? productId,
     Expression<DateTime>? addedAt,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastSyncedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (productId != null) 'product_id': productId,
       if (addedAt != null) 'added_at': addedAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
     });
   }
 
@@ -1184,11 +1490,15 @@ class FavoriteItemsCompanion extends UpdateCompanion<FavoriteItem> {
     Value<int>? id,
     Value<int>? productId,
     Value<DateTime>? addedAt,
+    Value<String>? syncStatus,
+    Value<DateTime?>? lastSyncedAt,
   }) {
     return FavoriteItemsCompanion(
       id: id ?? this.id,
       productId: productId ?? this.productId,
       addedAt: addedAt ?? this.addedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 
@@ -1204,6 +1514,12 @@ class FavoriteItemsCompanion extends UpdateCompanion<FavoriteItem> {
     if (addedAt.present) {
       map['added_at'] = Variable<DateTime>(addedAt.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
     return map;
   }
 
@@ -1212,7 +1528,9 @@ class FavoriteItemsCompanion extends UpdateCompanion<FavoriteItem> {
     return (StringBuffer('FavoriteItemsCompanion(')
           ..write('id: $id, ')
           ..write('productId: $productId, ')
-          ..write('addedAt: $addedAt')
+          ..write('addedAt: $addedAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
@@ -1246,6 +1564,8 @@ typedef $$ProductsTableCreateCompanionBuilder =
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<String> syncStatus,
+      Value<DateTime?> lastSyncedAt,
     });
 typedef $$ProductsTableUpdateCompanionBuilder =
     ProductsCompanion Function({
@@ -1258,6 +1578,8 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<String> syncStatus,
+      Value<DateTime?> lastSyncedAt,
     });
 
 final class $$ProductsTableReferences
@@ -1352,6 +1674,16 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1459,6 +1791,16 @@ class $$ProductsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProductsTableAnnotationComposer
@@ -1500,6 +1842,16 @@ class $$ProductsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => column,
+  );
 
   Expression<T> cartItemsRefs<T extends Object>(
     Expression<T> Function($$CartItemsTableAnnotationComposer a) f,
@@ -1589,6 +1941,8 @@ class $$ProductsTableTableManager
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
               }) => ProductsCompanion(
                 id: id,
                 name: name,
@@ -1599,6 +1953,8 @@ class $$ProductsTableTableManager
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                syncStatus: syncStatus,
+                lastSyncedAt: lastSyncedAt,
               ),
           createCompanionCallback:
               ({
@@ -1611,6 +1967,8 @@ class $$ProductsTableTableManager
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
               }) => ProductsCompanion.insert(
                 id: id,
                 name: name,
@@ -1621,6 +1979,8 @@ class $$ProductsTableTableManager
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                syncStatus: syncStatus,
+                lastSyncedAt: lastSyncedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -1713,6 +2073,8 @@ typedef $$CartItemsTableCreateCompanionBuilder =
       Value<double?> appliedPrice,
       Value<bool> isSynced,
       Value<DateTime> addedAt,
+      Value<String> syncStatus,
+      Value<DateTime?> lastSyncedAt,
     });
 typedef $$CartItemsTableUpdateCompanionBuilder =
     CartItemsCompanion Function({
@@ -1722,6 +2084,8 @@ typedef $$CartItemsTableUpdateCompanionBuilder =
       Value<double?> appliedPrice,
       Value<bool> isSynced,
       Value<DateTime> addedAt,
+      Value<String> syncStatus,
+      Value<DateTime?> lastSyncedAt,
     });
 
 final class $$CartItemsTableReferences
@@ -1779,6 +2143,16 @@ class $$CartItemsTableFilterComposer
 
   ColumnFilters<DateTime> get addedAt => $composableBuilder(
     column: $table.addedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1840,6 +2214,16 @@ class $$CartItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ProductsTableOrderingComposer get productId {
     final $$ProductsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -1889,6 +2273,16 @@ class $$CartItemsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get addedAt =>
       $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => column,
+  );
 
   $$ProductsTableAnnotationComposer get productId {
     final $$ProductsTableAnnotationComposer composer = $composerBuilder(
@@ -1948,6 +2342,8 @@ class $$CartItemsTableTableManager
                 Value<double?> appliedPrice = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
               }) => CartItemsCompanion(
                 id: id,
                 productId: productId,
@@ -1955,6 +2351,8 @@ class $$CartItemsTableTableManager
                 appliedPrice: appliedPrice,
                 isSynced: isSynced,
                 addedAt: addedAt,
+                syncStatus: syncStatus,
+                lastSyncedAt: lastSyncedAt,
               ),
           createCompanionCallback:
               ({
@@ -1964,6 +2362,8 @@ class $$CartItemsTableTableManager
                 Value<double?> appliedPrice = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
               }) => CartItemsCompanion.insert(
                 id: id,
                 productId: productId,
@@ -1971,6 +2371,8 @@ class $$CartItemsTableTableManager
                 appliedPrice: appliedPrice,
                 isSynced: isSynced,
                 addedAt: addedAt,
+                syncStatus: syncStatus,
+                lastSyncedAt: lastSyncedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -2044,12 +2446,16 @@ typedef $$FavoriteItemsTableCreateCompanionBuilder =
       Value<int> id,
       required int productId,
       Value<DateTime> addedAt,
+      Value<String> syncStatus,
+      Value<DateTime?> lastSyncedAt,
     });
 typedef $$FavoriteItemsTableUpdateCompanionBuilder =
     FavoriteItemsCompanion Function({
       Value<int> id,
       Value<int> productId,
       Value<DateTime> addedAt,
+      Value<String> syncStatus,
+      Value<DateTime?> lastSyncedAt,
     });
 
 final class $$FavoriteItemsTableReferences
@@ -2099,6 +2505,16 @@ class $$FavoriteItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ProductsTableFilterComposer get productId {
     final $$ProductsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -2142,6 +2558,16 @@ class $$FavoriteItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ProductsTableOrderingComposer get productId {
     final $$ProductsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2180,6 +2606,16 @@ class $$FavoriteItemsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get addedAt =>
       $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => column,
+  );
 
   $$ProductsTableAnnotationComposer get productId {
     final $$ProductsTableAnnotationComposer composer = $composerBuilder(
@@ -2236,20 +2672,28 @@ class $$FavoriteItemsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> productId = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
               }) => FavoriteItemsCompanion(
                 id: id,
                 productId: productId,
                 addedAt: addedAt,
+                syncStatus: syncStatus,
+                lastSyncedAt: lastSyncedAt,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required int productId,
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> lastSyncedAt = const Value.absent(),
               }) => FavoriteItemsCompanion.insert(
                 id: id,
                 productId: productId,
                 addedAt: addedAt,
+                syncStatus: syncStatus,
+                lastSyncedAt: lastSyncedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(

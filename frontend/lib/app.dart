@@ -1,5 +1,4 @@
 import 'package:client/domain/entities/product_entity.dart';
-import 'package:client/domain/repositories/product_repository.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

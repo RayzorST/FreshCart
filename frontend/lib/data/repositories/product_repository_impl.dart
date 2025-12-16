@@ -15,14 +15,12 @@ class ProductRepositoryImpl implements ProductRepository {
   @override
   Future<Either<String, List<ProductEntity>>> getAllProducts() async {
     try {
-      // 1. Пытаемся получить из БД
       final dbProducts = await _database.getAllProducts();
       if (dbProducts.isNotEmpty) {
         final products = dbProducts.map(_fromDbModel).toList();
         return Right(products);
       }
 
-      // 2. Если в БД пусто, загружаем с сервера
       return await syncProducts();
     } catch (e) {
       return Left('Ошибка загрузки продуктов: $e');
@@ -37,11 +35,9 @@ class ProductRepositoryImpl implements ProductRepository {
         return Right(_fromDbModel(dbProduct));
       }
 
-      // Если нет в БД, загружаем с сервера
-      final response = await ApiClient.getProducts(); // Используем инжектированный _apiClient
+      final response = await ApiClient.getProducts();
       final product = ProductEntity.fromJson(response[0]);
-      
-      // Кэшируем
+
       await _database.insertProduct(_toDbCompanion(product));
       
       return Right(product);
@@ -69,10 +65,9 @@ class ProductRepositoryImpl implements ProductRepository {
   @override
   Future<Either<String, List<ProductEntity>>> syncProducts() async {
     try {
-      final response = await ApiClient.getProducts(); // Используем инжектированный _apiClient
+      final response = await ApiClient.getProducts();
       final products = response.map((json) => ProductEntity.fromJson(json)).toList();
       
-      // Кэшируем в БД
       final companions = products.map(_toDbCompanion).toList();
       await _database.insertProducts(companions);
       
@@ -93,7 +88,6 @@ class ProductRepositoryImpl implements ProductRepository {
     }
   }
 
-  // Хелперы для конвертации
   ProductEntity _fromDbModel(Product dbProduct) {
     return ProductEntity(
       id: dbProduct.id,

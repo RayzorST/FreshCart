@@ -103,7 +103,6 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         },
       );
     } catch (e) {
-      // Игнорируем ошибку загрузки корзины
       emit(state.copyWith(quantity: 0));
     }
   }
@@ -116,18 +115,16 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       emit(state.copyWith(isLoadingFavorite: true));
       
       if (state.isFavorite) {
-        // Удаляем из избранного
         final result = await favoriteRepository.removeFromFavorites(product.id);
         
-        result.fold(
-          (error) {
+        await result.fold(
+          (error) async {
             emit(state.copyWith(
               isLoadingFavorite: false,
               errorMessage: error,
             ));
           },
           (_) async {
-            // Синхронизируем с сервером
             try {
               await ApiClient.removeFromFavorites(product.id);
             } catch (e) {
@@ -149,14 +146,15 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         
         final result = await favoriteRepository.addToFavorites(favoriteItem);
         
-        result.fold(
-          (error) {
+        // Используем fold с await
+        await result.fold(
+          (error) async {
             emit(state.copyWith(
               isLoadingFavorite: false,
               errorMessage: error,
             ));
           },
-          (_) async {
+          (_) async {  // Добавляем async здесь
             // Синхронизируем с сервером
             try {
               await ApiClient.addToFavorites(product.id);
@@ -195,93 +193,88 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         // Удаляем из корзины
         final result = await cartRepository.removeFromCart(product.id);
         
-        result.fold(
-          (error) {
-            emit(state.copyWith(
-              isLoadingCart: false,
-              errorMessage: error,
-            ));
-          },
-          (_) async {
-            // Синхронизируем с сервером
-            try {
-              await ApiClient.removeFromCart(product.id);
-            } catch (e) {
-              // Сервер недоступен, но локально уже удалили
-            }
-            
-            emit(state.copyWith(
-              quantity: quantity,
-              isLoadingCart: false,
-            ));
-          },
-        );
+        if (result.isLeft()) {
+          emit(state.copyWith(
+            isLoadingCart: false,
+            errorMessage: result.fold((l) => l, (r) => null),
+          ));
+          return;
+        }
+        
+        // Синхронизируем с сервером
+        try {
+          await ApiClient.removeFromCart(product.id);
+        } catch (e) {
+          // Сервер недоступен, но локально уже удалили
+        }
+        
+        emit(state.copyWith(
+          quantity: quantity,
+          isLoadingCart: false,
+        ));
       } else {
         // Сначала получаем текущую корзину
         final cartResult = await cartRepository.getCartItems();
         
-        cartResult.fold(
-          (error) {
+        if (cartResult.isLeft()) {
+          emit(state.copyWith(
+            isLoadingCart: false,
+            errorMessage: cartResult.fold((l) => l, (r) => null),
+          ));
+          return;
+        }
+        
+        final cartItems = cartResult.fold((l) => [], (r) => r);
+        final cartItem = CartItemEntity(
+          product: product,
+          quantity: quantity,
+          addedAt: DateTime.now(),
+        );
+        
+        try {
+          // Проверяем, есть ли уже товар в корзине
+          final existingItem = cartItems.firstWhere(
+            (item) => item.product.id == product.id,
+            orElse: () => cartItem,
+          );
+          
+          Either<String, CartItemEntity> operationResult;
+          
+          if (existingItem.id != null) {
+            // Обновляем существующий
+            operationResult = await cartRepository.updateCartItem(
+              cartItem.copyWith(id: existingItem.id),
+            );
+          } else {
+            // Добавляем новый
+            operationResult = await cartRepository.addToCart(cartItem);
+          }
+          
+          if (operationResult.isLeft()) {
             emit(state.copyWith(
               isLoadingCart: false,
-              errorMessage: error,
+              errorMessage: operationResult.fold((l) => l, (r) => null),
             ));
-          },
-          (cartItems) async {
-            final cartItem = CartItemEntity(
-              product: product,
-              quantity: quantity,
-              addedAt: DateTime.now(),
-            );
-            
-            try {
-              // Проверяем, есть ли уже товар в корзине
-              final existingItem = cartItems.firstWhere(
-                (item) => item.product.id == product.id,
-                orElse: () => cartItem,
-              );
-              
-              Either<String, CartItemEntity> operationResult;
-              
-              if (existingItem.id != null) {
-                // Обновляем существующий
-                operationResult = await cartRepository.updateCartItem(
-                  cartItem.copyWith(id: existingItem.id),
-                );
-              } else {
-                // Добавляем новый
-                operationResult = await cartRepository.addToCart(cartItem);
-              }
-              
-              operationResult.fold(
-                (error) {
-                  emit(state.copyWith(
-                    isLoadingCart: false,
-                    errorMessage: error,
-                  ));
-                },
-                (_) async {
-                  // Синхронизируем с сервером
-                  try {
-                    await ApiClient.addToCart(product.id, quantity);
-                  } catch (e) {
-                    // Сервер недоступен, но локально уже обновили
-                  }
-                  
-                  emit(state.copyWith(
-                    quantity: quantity,
-                    isLoadingCart: false,
-                  ));
-                },
-              );
-            } catch (e) {
-              emit(state.copyWith(
-                isLoadingCart: false,
-                errorMessage: 'Ошибка при поиске товара в корзине',
-              ));
-            }
-          },
-        );
+            return;
+          }
+          
+          // Синхронизируем с сервером
+          try {
+            await ApiClient.addToCart(product.id, quantity);
+          } catch (e) {
+            // Сервер недоступен, но локально уже обновили
+          }
+          
+          emit(state.copyWith(
+            quantity: quantity,
+            isLoadingCart: false,
+          ));
+        } catch (e) {
+          emit(state.copyWith(
+            isLoadingCart: false,
+            errorMessage: 'Ошибка при поиске товара в корзине',
+          ));
+        }
       }
     } catch (e) {
       emit(state.copyWith(

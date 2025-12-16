@@ -116,6 +116,15 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  static Future<List<dynamic>> getProduct(int productId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/items/$productId'),
+      headers: _headers,
+    );
+    
+    return _handleResponse(response);
+  }
+
   static Future<List<dynamic>> searchProducts({
     String? name,
     int? categoryId,
