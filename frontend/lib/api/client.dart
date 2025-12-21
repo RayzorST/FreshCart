@@ -118,7 +118,7 @@ class ApiClient {
 
   static Future<List<dynamic>> getProduct(int productId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/items/$productId'),
+      Uri.parse('$baseUrl/products/items/$productId'),
       headers: _headers,
     );
     

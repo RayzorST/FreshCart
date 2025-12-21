@@ -33,7 +33,14 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onItemTapped(int index) {
-    context.read<MainBloc>().add(MainTabChanged(index));
+    final mainBloc = context.read<MainBloc>();
+    mainBloc.add(MainTabChanged(index));
+
+    if (index == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        mainBloc.add(const ProductsLoaded());
+      });
+    }
   }
 
   @override

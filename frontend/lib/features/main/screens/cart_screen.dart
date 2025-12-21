@@ -49,10 +49,9 @@ class _CartScreenState extends State<CartScreen> {
   void _navigateToPromotionScreen(List<Map<String, dynamic>> appliedPromotions, BuildContext context) {
     if (appliedPromotions.isEmpty) return;
 
-    if (appliedPromotions.length > 1){
+    if (appliedPromotions.length > 1) {
       _showPromotionsDialog(appliedPromotions, 'Примененные акции');
-    }
-    else{
+    } else {
       final screenWidth = MediaQuery.of(context).size.width;
       if (screenWidth > 600) {
         final promotion = appliedPromotions.first;
@@ -155,29 +154,6 @@ class _CartScreenState extends State<CartScreen> {
               AppSnackbar.showSuccess(context: context, message: 'Заказ создан!');
             },
             child: const Text('Создать заказ'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddAddressDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Добавьте адрес доставки'),
-        content: const Text('Для оформления заказа необходимо добавить адрес доставки.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.push('/addresses');
-            },
-            child: const Text('Добавить адрес'),
           ),
         ],
       ),
@@ -308,14 +284,6 @@ class _CartScreenState extends State<CartScreen> {
                   color: Colors.grey[600],
                 ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Добавляйте товары в корзину,\nчтобы сделать заказ',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[500],
-                ),
-          ),
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: () {
@@ -354,9 +322,6 @@ class _CartScreenState extends State<CartScreen> {
             flex: 2,
             child: Column(
               children: [
-                // TODO: Добавить селектор адресов позже
-                // _buildAddressSelector(context, state),
-                const SizedBox(height: 12),
                 Expanded(
                   child: _buildProductsGrid(context, state),
                 ),
@@ -378,8 +343,6 @@ class _CartScreenState extends State<CartScreen> {
     return ListView(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12, top: 12),
       children: [
-        // TODO: Добавить селектор адресов позже
-        // _buildAddressSelector(context, state),
         ...state.cartItems.map((item) {
           return Column(
             children: [
@@ -471,7 +434,7 @@ class _CartScreenState extends State<CartScreen> {
     CartItemEntity item,
   ) {
     final hasDiscount = item.hasDiscount;
-    final originalPrice = item.appliedPrice ?? item.product.price;
+    final originalPrice = item.discountPrice ?? item.product.price;
     final discountedPrice = item.product.price;
     
     return Column(
@@ -506,7 +469,6 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
             ),
-            // TODO: Добавить промоции если будут в новой архитектуре
             _buildDeleteButton(context, item.product.id),
           ],
         ),
@@ -544,13 +506,13 @@ class _CartScreenState extends State<CartScreen> {
             QuantityControls(
               productId: item.product.id,
               quantity: item.quantity,
-              onQuantityChanged: (productId, quantity) {
-                if (quantity == 0) {
-                  context.read<CartBloc>().add(CartItemRemoved(productId));
-                }
-                else{
-                  final updatedItem = item.copyWith(quantity: quantity);
-                  context.read<CartBloc>().add(CartItemUpdated(updatedItem));
+              onQuantityChanged: (productId, newQuantity) {
+                final cartBloc = context.read<CartBloc>();
+    
+                if (newQuantity == 0) {
+                  cartBloc.add(CartItemRemoved(productId));
+                } else {
+                  cartBloc.add(CartItemUpdated(productId, newQuantity));
                 }
               },
             ),

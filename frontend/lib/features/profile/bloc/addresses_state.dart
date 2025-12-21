@@ -1,30 +1,42 @@
 part of 'addresses_bloc.dart';
 
-abstract class AddressesState extends Equatable {
-  const AddressesState();
-
-  @override
-  List<Object> get props => [];
+enum AddressesStatus {
+  initial,
+  loading,
+  loaded,
+  saving,
+  saved,
+  error,
 }
 
-class AddressesInitial extends AddressesState {}
+class AddressesState extends Equatable {
+  final AddressesStatus status;
+  final List<AddressEntity> addresses;
+  final String? error;
 
-class AddressesLoading extends AddressesState {}
+  const AddressesState({
+    required this.status,
+    required this.addresses,
+    this.error,
+  });
 
-class AddressesLoaded extends AddressesState {
-  final List<dynamic> addresses;
+  const AddressesState.initial()
+      : status = AddressesStatus.initial,
+        addresses = const [],
+        error = null;
 
-  const AddressesLoaded({required this.addresses});
+  AddressesState copyWith({
+    AddressesStatus? status,
+    List<AddressEntity>? addresses,
+    String? error,
+  }) {
+    return AddressesState(
+      status: status ?? this.status,
+      addresses: addresses ?? this.addresses,
+      error: error ?? this.error,
+    );
+  }
 
   @override
-  List<Object> get props => [addresses];
-}
-
-class AddressesError extends AddressesState {
-  final String message;
-
-  const AddressesError({required this.message});
-
-  @override
-  List<Object> get props => [message];
+  List<Object?> get props => [status, addresses, error];
 }

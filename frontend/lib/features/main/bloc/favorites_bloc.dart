@@ -1,3 +1,4 @@
+// [file name]: favorites_bloc.dart
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -32,6 +33,10 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     FavoritesLoaded event,
     Emitter<FavoritesState> emit,
   ) async {
+    if (state.status == FavoritesStatus.loaded && state.favorites.isNotEmpty) {
+      return;
+    }
+
     emit(state.copyWith(status: FavoritesStatus.loading));
     
     try {
@@ -45,7 +50,6 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
           ));
         },
         (favorites) {
-          // Применяем текущий поиск к загруженным избранным
           final filteredFavorites = _performLocalSearch(favorites, state.searchQuery);
           
           emit(state.copyWith(
@@ -71,13 +75,37 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
 
     final query = event.query.trim();
     
-    final filteredFavorites = _performLocalSearch(state.favorites, query);
-    
-    emit(state.copyWith(
-      searchQuery: query,
-      filteredFavorites: filteredFavorites,
-      isSearching: query.isNotEmpty,
-    ));
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () async {
+      if (query.isNotEmpty) {
+        // Ищем на сервере
+        final result = await _favoriteRepository.getFavorites(search: query);
+        
+        result.fold(
+          (error) {
+            emit(state.copyWith(
+              searchQuery: query,
+              error: error,
+            ));
+          },
+          (filteredFavorites) {
+            emit(state.copyWith(
+              searchQuery: query,
+              filteredFavorites: filteredFavorites,
+              isSearching: true,
+            ));
+          },
+        );
+      } else {
+        // Локальный поиск если query пустой
+        final filteredFavorites = _performLocalSearch(state.favorites, query);
+        
+        emit(state.copyWith(
+          searchQuery: query,
+          filteredFavorites: filteredFavorites,
+          isSearching: false,
+        ));
+      }
+    });
   }
 
   Future<void> _onFavoritesSearchCleared(
@@ -99,18 +127,15 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
   ) async {
     try {
       if (event.isFavorite) {
-        // Добавляем в избранное - нужно передать ProductEntity
-        if (event.product != null) {
-          final favoriteItem = FavoriteItemEntity(
-            product: event.product!,
-            addedAt: DateTime.now(),
-          );
-          final result = await _favoriteRepository.addToFavorites(favoriteItem);
-          
-          if (result.isRight()) {
-            // Обновляем список локально
+        final result = await _favoriteRepository.addToFavorites(event.productId);
+        
+        result.fold(
+          (error) {
+            emit(state.copyWith(error: error));
+          },
+          (favoriteItem) {
             final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
-              ..add(result.fold((l) => null, (r) => r)!);
+              ..add(favoriteItem);
             
             final filteredFavorites = _performLocalSearch(updatedFavorites, state.searchQuery);
             
@@ -118,26 +143,28 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
               favorites: updatedFavorites,
               filteredFavorites: filteredFavorites,
             ));
-          }
-        }
+          },
+        );
       } else {
-        // Удаляем из избранного
         final result = await _favoriteRepository.removeFromFavorites(event.productId);
         
-        if (result.isRight()) {
-          // Обновляем локальный список
-          final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
-            ..removeWhere((fav) => fav.product.id == event.productId);
-          
-          final updatedFiltered = _performLocalSearch(updatedFavorites, state.searchQuery);
+        result.fold(
+          (error) {
+            emit(state.copyWith(error: error));
+          },
+          (_) {
+            final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
+              ..removeWhere((fav) => fav.product.id == event.productId);
+            
+            final updatedFiltered = _performLocalSearch(updatedFavorites, state.searchQuery);
 
-          emit(state.copyWith(
-            favorites: updatedFavorites,
-            filteredFavorites: updatedFiltered,
-          ));
-        }
+            emit(state.copyWith(
+              favorites: updatedFavorites,
+              filteredFavorites: updatedFiltered,
+            ));
+          },
+        );
       }
-      
     } catch (e) {
       emit(state.copyWith(
         error: 'Ошибка обновления избранного: $e',
@@ -150,19 +177,24 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     Emitter<FavoritesState> emit,
   ) async {
     try {
-      await _favoriteRepository.removeFromFavorites(event.productId);
+      final result = await _favoriteRepository.removeFromFavorites(event.productId);
       
-      // Обновляем локальный список
-      final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
-        ..removeWhere((fav) => fav.product.id == event.productId);
-      
-      final updatedFiltered = _performLocalSearch(updatedFavorites, state.searchQuery);
+      result.fold(
+        (error) {
+          emit(state.copyWith(error: error));
+        },
+        (_) {
+          final updatedFavorites = List<FavoriteItemEntity>.from(state.favorites)
+            ..removeWhere((fav) => fav.product.id == event.productId);
+          
+          final updatedFiltered = _performLocalSearch(updatedFavorites, state.searchQuery);
 
-      emit(state.copyWith(
-        favorites: updatedFavorites,
-        filteredFavorites: updatedFiltered,
-      ));
-      
+          emit(state.copyWith(
+            favorites: updatedFavorites,
+            filteredFavorites: updatedFiltered,
+          ));
+        },
+      );
     } catch (e) {
       emit(state.copyWith(
         error: 'Ошибка удаления из избранного: $e',

@@ -2,6 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:client/api/client.dart';
 import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/domain/repositories/product_repository.dart';
+import 'package:client/domain/repositories/promotion_repository.dart';
 import 'package:equatable/equatable.dart';
 import 'package:injectable/injectable.dart';
 
@@ -11,8 +12,12 @@ part 'main_state.dart';
 @injectable
 class MainBloc extends Bloc<MainEvent, MainState> {
   final ProductRepository _productRepository;
+  final PromotionRepository _promotionRepository;
 
-  MainBloc(this._productRepository) : super(const MainState.initial()) {
+  MainBloc(
+    this._productRepository,
+    this._promotionRepository,
+  ) : super(const MainState.initial()) {
     on<MainTabChanged>(_onTabChanged);
     on<PromotionsLoaded>(_onPromotionsLoaded);
     on<CategoriesLoaded>(_onCategoriesLoaded);
@@ -37,11 +42,23 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     emit(state.copyWith(promotionsStatus: MainStatus.loading));
     
     try {
-      final promotions = await ApiClient.getPromotions();
-      emit(state.copyWith(
-        promotionsStatus: MainStatus.loaded,
-        //promotions: promotions,
-      ));
+      final result = await _promotionRepository.getActivePromotions();
+      print(result);
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            promotionsStatus: MainStatus.error,
+            promotionsError: error,
+          ));
+        },
+        (promotions) {
+          final promotionsMap = promotions.map((p) => p.toJson()).toList();
+          emit(state.copyWith(
+            promotionsStatus: MainStatus.loaded,
+            promotions: promotionsMap,
+          ));
+        },
+      );
     } catch (e) {
       emit(state.copyWith(
         promotionsStatus: MainStatus.error,
@@ -96,68 +113,38 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     add(const ProductsLoaded());
   }
 
-Future<void> _onProductsLoaded(
+  Future<void> _onProductsLoaded(
     ProductsLoaded event,
     Emitter<MainState> emit,
   ) async {
     emit(state.copyWith(productsStatus: MainStatus.loading));
     
     try {
-      // Используем API напрямую для первоначальной загрузки
-      final products = await ApiClient.getProducts(
+      final result = await _productRepository.getProducts(
         categoryId: state.selectedCategoryId == '0' ? null : int.tryParse(state.selectedCategoryId),
         search: state.searchQuery.isEmpty ? null : state.searchQuery,
       );
-      
-      // Конвертируем Map в ProductEntity
-      final productEntities = products
-          .map((json) => ProductEntity.fromJson(json))
-          .toList();
-      
-      // Кэшируем через репозиторий
-      await _productRepository.cacheProducts(productEntities);
-      
-      emit(state.copyWith(
-        productsStatus: MainStatus.loaded,
-        products: productEntities,
-        hasMoreProducts: productEntities.length >= 20,
-      ));
-    } catch (e) {
-      // Если API недоступен, используем репозиторий
-      final result = await _productRepository.getAllProducts();
       
       result.fold(
         (error) {
           emit(state.copyWith(
             productsStatus: MainStatus.error,
-            productsError: 'Ошибка загрузки товаров: $e',
+            productsError: error,
           ));
         },
-        (cachedProducts) {
-          // Фильтруем кэшированные продукты
-          List<ProductEntity> filteredProducts = cachedProducts;
-          
-          if (state.selectedCategoryId != '0') {
-            filteredProducts = filteredProducts.where(
-              (product) => product.category == state.selectedCategoryId,
-            ).toList();
-          }
-          
-          if (state.searchQuery.isNotEmpty) {
-            filteredProducts = filteredProducts.where(
-              (product) => product.name.toLowerCase().contains(
-                state.searchQuery.toLowerCase(),
-              ),
-            ).toList();
-          }
-          
+        (products) {
           emit(state.copyWith(
             productsStatus: MainStatus.loaded,
-            products: filteredProducts,
-            hasMoreProducts: false,
+            products: products,
+            hasMoreProducts: products.length >= 20,
           ));
         },
       );
+    } catch (e) {
+      emit(state.copyWith(
+        productsStatus: MainStatus.error,
+        productsError: 'Ошибка загрузки товаров: $e',
+      ));
     }
   }
 
@@ -170,23 +157,28 @@ Future<void> _onProductsLoaded(
     emit(state.copyWith(productsStatus: MainStatus.loadingMore));
     
     try {
-      final moreProducts = await ApiClient.searchProducts(
-        categoryId: state.selectedCategoryId == '0' ? null : int.tryParse(state.selectedCategoryId),
-        name: state.searchQuery.isEmpty ? null : state.searchQuery,
-        offset: state.products.length,
+      final result = await _productRepository.searchProducts(state.searchQuery);
+      
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            productsStatus: MainStatus.error,
+            productsError: error,
+          ));
+        },
+        (newProducts) {
+          final existingIds = state.products.map((p) => p.id).toSet();
+          final uniqueNewProducts = newProducts
+              .where((product) => !existingIds.contains(product.id))
+              .toList();
+          
+          emit(state.copyWith(
+            productsStatus: MainStatus.loaded,
+            products: [...state.products, ...uniqueNewProducts],
+            hasMoreProducts: false,
+          ));
+        },
       );
-      
-      final newProducts = moreProducts
-          .map((json) => ProductEntity.fromJson(json))
-          .toList();
-      
-      await _productRepository.cacheProducts(newProducts);
-      
-      emit(state.copyWith(
-        productsStatus: MainStatus.loaded,
-        products: [...state.products, ...newProducts],
-        hasMoreProducts: newProducts.length >= 20,
-      ));
     } catch (e) {
       emit(state.copyWith(
         productsStatus: MainStatus.error,

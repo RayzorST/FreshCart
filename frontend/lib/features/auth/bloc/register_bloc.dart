@@ -1,16 +1,17 @@
+// [file name]: register_bloc.dart
 import 'package:bloc/bloc.dart';
 import 'package:injectable/injectable.dart';
-import 'package:client/domain/usecases/register_usecase.dart';
 import 'package:client/domain/entities/user_entity.dart';
+import 'package:client/domain/repositories/auth_repository.dart';
 
 part 'register_event.dart';
 part 'register_state.dart';
 
 @injectable
 class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
-  final RegisterUseCase _registerUseCase;
+  final AuthRepository _authRepository;
 
-  RegisterBloc(this._registerUseCase) : super(RegisterInitial()) {
+  RegisterBloc(this._authRepository) : super(RegisterInitial()) {
     on<RegisterButtonPressed>(_onRegisterButtonPressed);
   }
 
@@ -20,7 +21,7 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
   ) async {
     emit(RegisterLoading());
     
-    final result = await _registerUseCase(
+    final result = await _authRepository.register(
       email: event.email,
       password: event.password,
       firstName: event.firstName,

@@ -4,7 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/domain/entities/cart_item_entity.dart';
 import 'package:client/domain/entities/favorite_item_entity.dart';
+import 'package:client/features/main/bloc/cart_bloc.dart';
+import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/core/widgets/product_modal.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -57,7 +61,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   void _removeFromFavorites(int productId) {
     context.read<FavoritesBloc>().add(FavoriteRemoved(productId));
     
-    // Показываем уведомление
     AppSnackbar.showInfo(
       context: context, 
       message: 'Товар удален из избранного',
@@ -68,9 +71,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     if (screenWidth > 600) {
-      // Для планшетов/десктопа можно показать модалку
-      // ScreenToModal.show(context: context, child: ProductScreen(product: product));
-      context.push('/product/${product.id}', extra: product);
+      ScreenToModal.show(context: context, child: ProductScreen(product: product));
     } else {
       context.push('/product/${product.id}', extra: product);
     }
@@ -122,17 +123,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           }
         },
         builder: (context, state) {
-          if (state.status == FavoritesStatus.initial || 
-              state.status == FavoritesStatus.loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
           if (state.status == FavoritesStatus.error && state.favorites.isEmpty) {
             return _buildErrorState(state.error!);
           }
 
           if (state.favorites.isEmpty) {
             return _buildEmptyState();
+          }
+          
+          if (state.status == FavoritesStatus.initial || 
+              state.status == FavoritesStatus.loading) {
+            return const Center(child: CircularProgressIndicator());
           }
 
           return _buildFavoritesContent(context, state);
@@ -188,14 +189,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             'Пока ничего нет в избранном',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.grey[600],
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Добавляйте товары в избранное,\nчтобы они были всегда под рукой',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[500],
                 ),
           ),
           const SizedBox(height: 24),
@@ -326,13 +319,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final favorite = favorites[index];
-        final product = favorite.product;
-        
-        return FavoriteItemCard(
-          favoriteItem: favorite,
-          onRemove: () => _removeFromFavorites(product.id),
-          onTap: () => _onProductTap(product),
-        );
+        return _buildFavoriteItem(context, favorite);
       },
     );
   }
@@ -349,34 +336,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       itemCount: favorites.length,
       itemBuilder: (context, index) {
         final favorite = favorites[index];
-        final product = favorite.product;
-        
-        return FavoriteItemCard(
-          favoriteItem: favorite,
-          onRemove: () => _removeFromFavorites(product.id),
-          onTap: () => _onProductTap(product),
-        );
+        return _buildFavoriteItem(context, favorite);
       },
     );
   }
-}
 
-class FavoriteItemCard extends StatelessWidget {
-  final FavoriteItemEntity favoriteItem;
-  final VoidCallback onRemove;
-  final VoidCallback onTap;
-
-  const FavoriteItemCard({
-    super.key,
-    required this.favoriteItem,
-    required this.onRemove,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final product = favoriteItem.product;
-    final price = product.price;
+  Widget _buildFavoriteItem(BuildContext context, FavoriteItemEntity favorite) {
+    final product = favorite.product;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 0),
@@ -392,7 +358,7 @@ class FavoriteItemCard extends StatelessWidget {
             _buildProductImage(context, product),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildProductInfo(context, product, price),
+              child: _buildProductInfo(context, product),
             ),
           ],
         ),
@@ -402,7 +368,7 @@ class FavoriteItemCard extends StatelessWidget {
 
   Widget _buildProductImage(BuildContext context, ProductEntity product) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => _onProductTap(product),
       child: Container(
         width: 80,
         height: 80,
@@ -434,7 +400,7 @@ class FavoriteItemCard extends StatelessWidget {
     );
   }
 
-  Widget _buildProductInfo(BuildContext context, ProductEntity product, double price) {
+  Widget _buildProductInfo(BuildContext context, ProductEntity product) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -443,7 +409,7 @@ class FavoriteItemCard extends StatelessWidget {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: onTap,
+                onTap: () => _onProductTap(product),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -467,7 +433,7 @@ class FavoriteItemCard extends StatelessWidget {
                 ),
               ),
             ),
-            _buildFavoriteButton(),
+            _buildFavoriteButton(product.id),
           ],
         ),
         const SizedBox(height: 8),
@@ -476,16 +442,42 @@ class FavoriteItemCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '$price ₽',
+              '${product.price} ₽',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.primary,
                   ),
             ),
-            QuantityControls(
-              productId: product.id,
-              quantity: 0, // Получить из CartBloc
-              onQuantityChanged: (productId, quantity) {},
+            // Ограничиваем ширину QuantityControls
+            SizedBox(
+              width: 120, // Фиксированная ширина
+              child: BlocBuilder<CartBloc, CartState>(
+                builder: (context, cartState) {
+                  CartItemEntity? cartItem;
+                  try {
+                    cartItem = cartState.cartItems.firstWhere(
+                      (item) => item.product.id == product.id,
+                    );
+                  } catch (e) {
+                    cartItem = null;
+                  }
+                  
+                  final quantity = cartItem?.quantity ?? 0;
+                  
+                  return QuantityControls(
+                    productId: product.id,
+                    quantity: quantity,
+                    onQuantityChanged: (productId, newQuantity) {
+                      if (newQuantity == 0) {
+                        context.read<CartBloc>().add(CartItemRemoved(productId));
+                      } else {
+                        context.read<CartBloc>().add(CartItemUpdated(productId, newQuantity));
+                      }
+                    },
+                    fullWidth: false, // Не fullWidth!
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -493,14 +485,14 @@ class FavoriteItemCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFavoriteButton() {
+  Widget _buildFavoriteButton(int productId) {
     return IconButton(
       icon: const Icon(
         Icons.favorite,
         color: Colors.red,
         size: 22,
       ),
-      onPressed: onRemove,
+      onPressed: () => _removeFromFavorites(productId),
       padding: const EdgeInsets.all(4),
     );
   }

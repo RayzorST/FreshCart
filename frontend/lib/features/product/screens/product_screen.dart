@@ -6,6 +6,8 @@ import 'package:client/features/product/bloc/product_bloc.dart';
 import 'package:client/core/di/di.dart';
 import 'package:client/domain/repositories/cart_repository.dart';
 import 'package:client/domain/repositories/favorite_repository.dart';
+import 'package:client/features/main/bloc/cart_bloc.dart';
+import 'package:client/features/main/bloc/favorites_bloc.dart';
 
 class ProductScreen extends StatelessWidget {
   final ProductEntity product;
@@ -17,28 +19,63 @@ class ProductScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => ProductBloc(
-        product, 
-        getIt<CartRepository>(), 
-        getIt<FavoriteRepository>()
-      )
-        ..add(ProductLoadFavoriteStatus())
-        ..add(ProductLoadCartQuantity()),
+    return MultiBlocProvider(
+      providers: [
+        // 1. ProductBloc для текущего продукта
+        BlocProvider(
+          create: (context) => ProductBloc(
+            product: product,
+            cartRepository: getIt<CartRepository>(),
+            favoriteRepository: getIt<FavoriteRepository>(),
+            cartBloc: context.read<CartBloc>()
+          ),
+        ),
+        // 2. Глобальный CartBloc через GetIt
+        BlocProvider.value(value: getIt<CartBloc>()),
+        // 3. Глобальный FavoritesBloc через GetIt
+        BlocProvider.value(value: getIt<FavoritesBloc>()),
+      ],
       child: _ProductScreenContent(product: product),
     );
   }
 }
 
-class _ProductScreenContent extends StatelessWidget {
+class _ProductScreenContent extends StatefulWidget {
   final ProductEntity product;
 
   const _ProductScreenContent({required this.product});
 
   @override
+  State<_ProductScreenContent> createState() => __ProductScreenContentState();
+}
+
+class __ProductScreenContentState extends State<_ProductScreenContent> {
+  @override
+  void initState() {
+    super.initState();
+    // Загружаем начальное состояние
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bloc = context.read<ProductBloc>();
+      bloc.add(ProductLoadFavoriteStatus());
+      bloc.add(ProductLoadCartQuantity());
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Обновляем состояние при каждом возвращении на экран
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bloc = context.read<ProductBloc>();
+      bloc.add(ProductLoadFavoriteStatus());
+      bloc.add(ProductLoadCartQuantity());
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final price = product.price;
-    final stockQuantity = product.stockQuantity;
+    final price = widget.product.price;
+    final stockQuantity = widget.product.stockQuantity ?? 0;
     final isAvailable = stockQuantity > 0;
     final maxQuantity = stockQuantity;
 
@@ -98,11 +135,6 @@ class _ProductScreenContent extends StatelessWidget {
                               
                       _buildDescriptionSection(context),
                       
-                      // TODO: Добавить характеристики если они появятся в Product
-                      // const SizedBox(height: 32),
-                      // if (product.characteristics != null)
-                      //   _buildCharacteristicsSection(context),
-                      
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -134,7 +166,7 @@ class _ProductScreenContent extends StatelessWidget {
         children: [
           Positioned.fill(
             child: Image.network(
-              product.imageUrl,
+              widget.product.imageUrl,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Center(
@@ -161,39 +193,6 @@ class _ProductScreenContent extends StatelessWidget {
               ),
             ),
           ),
-    
-          // TODO: Добавить скидку если она появится в Product
-          // if (product.discount != null)
-          //   Positioned(
-          //     top: 20,
-          //     left: 20,
-          //     child: Container(
-          //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          //       decoration: BoxDecoration(
-          //         gradient: LinearGradient(
-          //           colors: [Colors.red, Colors.orange],
-          //           begin: Alignment.topLeft,
-          //           end: Alignment.bottomRight,
-          //         ),
-          //         borderRadius: BorderRadius.circular(16),
-          //         boxShadow: [
-          //           BoxShadow(
-          //             color: Colors.red.withOpacity(0.3),
-          //             blurRadius: 8,
-          //             offset: const Offset(0, 2),
-          //           ),
-          //         ],
-          //       ),
-          //       child: Text(
-          //         '-${product.discount}%',
-          //         style: const TextStyle(
-          //           color: Colors.white,
-          //           fontSize: 14,
-          //           fontWeight: FontWeight.bold,
-          //         ),
-          //       ),
-          //     ),
-          //   ),
         ],
       ),
     );
@@ -207,14 +206,14 @@ class _ProductScreenContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                product.name,
+                widget.product.name,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   height: 1.2,
                 ),
               ),
               const SizedBox(height: 12),
-              if (product.category != null && product.category!.isNotEmpty)
+              if (widget.product.category != null && widget.product.category!.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
@@ -225,7 +224,7 @@ class _ProductScreenContent extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    product.category!,
+                    widget.product.category!,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontSize: 13,
@@ -242,8 +241,8 @@ class _ProductScreenContent extends StatelessWidget {
               onPressed: state.isLoadingFavorite ? null : () {
                 context.read<ProductBloc>().add(ProductToggleFavorite());
                 final message = state.isFavorite 
-                    ? '${product.name} удален из избранного'
-                    : '${product.name} добавлен в избранное';
+                    ? '${widget.product.name} удален из избранного'
+                    : '${widget.product.name} добавлен в избранное';
                 AppSnackbar.showInfo(context: context, message: message);
               },
               icon: state.isLoadingFavorite
@@ -288,33 +287,6 @@ class _ProductScreenContent extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        // TODO: Добавить рейтинг если он появится в Product
-        // if (product.rating != null)
-        //   Container(
-        //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        //     decoration: BoxDecoration(
-        //       color: Colors.amber.withOpacity(0.1),
-        //       borderRadius: BorderRadius.circular(8),
-        //       border: Border.all(color: Colors.amber.withOpacity(0.3)),
-        //     ),
-        //     child: Row(
-        //       children: [
-        //         Icon(
-        //           Icons.star,
-        //           color: Colors.amber,
-        //           size: 18,
-        //         ),
-        //         const SizedBox(width: 4),
-        //         Text(
-        //           product.rating.toString(),
-        //           style: TextStyle(
-        //             fontWeight: FontWeight.w600,
-        //             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-        //           ),
-        //         ),
-        //       ],
-        //     ),
-        //   ),
       ],
     );
   }
@@ -379,7 +351,9 @@ class _ProductScreenContent extends StatelessWidget {
             ),
           ),
           child: Text(
-            product.description.isNotEmpty ? product.description : 'Описание отсутствует',
+            widget.product.description?.isNotEmpty == true 
+                ? widget.product.description! 
+                : 'Описание отсутствует',
             style: TextStyle(
               fontSize: 15,
               height: 1.5,
@@ -390,72 +364,6 @@ class _ProductScreenContent extends StatelessWidget {
       ],
     );
   }
-
-  // TODO: Восстановить если добавятся характеристики
-  // Widget _buildCharacteristicsSection(BuildContext context) {
-  //   return Column(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: [
-  //       Row(
-  //         children: [
-  //           Icon(
-  //             Icons.list_alt,
-  //             color: Theme.of(context).colorScheme.primary,
-  //             size: 20,
-  //           ),
-  //           const SizedBox(width: 8),
-  //           Text(
-  //             'Характеристики',
-  //             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-  //               fontWeight: FontWeight.bold,
-  //             ),
-  //           ),
-  //         ],
-  //       ),
-  //       const SizedBox(height: 12),
-  //       Container(
-  //         padding: const EdgeInsets.all(16),
-  //         decoration: BoxDecoration(
-  //           color: Theme.of(context).colorScheme.background,
-  //           borderRadius: BorderRadius.circular(12),
-  //           border: Border.all(
-  //             color: Theme.of(context).dividerColor.withOpacity(0.3),
-  //           ),
-  //         ),
-  //         child: Column(
-  //           children: product.characteristics!.entries.map((entry) => 
-  //             Padding(
-  //               padding: const EdgeInsets.symmetric(vertical: 6),
-  //               child: Row(
-  //                 children: [
-  //                   Expanded(
-  //                     flex: 2,
-  //                     child: Text(
-  //                       '${entry.key}:',
-  //                       style: TextStyle(
-  //                         fontWeight: FontWeight.w600,
-  //                         color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   Expanded(
-  //                     flex: 3,
-  //                     child: Text(
-  //                       entry.value.toString(),
-  //                       style: TextStyle(
-  //                         color: Theme.of(context).colorScheme.onSurface,
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-  //             )
-  //           ).toList(),
-  //         ),
-  //       ),
-  //     ],
-  //   );
-  // }
 
   Widget _buildBottomPanel(BuildContext context, bool isAvailable, int maxQuantity) {
     return Container(
@@ -496,7 +404,6 @@ class _ProductScreenContent extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  
                   IconButton(
                     onPressed: state.isLoadingCart || state.quantity == 0 ? null : () {
                       context.read<ProductBloc>().add(

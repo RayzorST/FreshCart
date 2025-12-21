@@ -1,30 +1,40 @@
 part of 'order_history_bloc.dart';
 
-abstract class OrderHistoryState extends Equatable {
-  const OrderHistoryState();
-
-  @override
-  List<Object> get props => [];
+enum OrderHistoryStatus {
+  initial,
+  loading,
+  loaded,
+  error,
 }
 
-class OrderHistoryInitial extends OrderHistoryState {}
+class OrderHistoryState extends Equatable {
+  final OrderHistoryStatus status;
+  final List<OrderEntity> orders;
+  final String? error;
 
-class OrderHistoryLoading extends OrderHistoryState {}
+  const OrderHistoryState({
+    required this.status,
+    required this.orders,
+    this.error,
+  });
 
-class OrderHistoryLoaded extends OrderHistoryState {
-  final List<dynamic> orders;
+  const OrderHistoryState.initial()
+      : status = OrderHistoryStatus.initial,
+        orders = const [],
+        error = null;
 
-  const OrderHistoryLoaded({required this.orders});
+  OrderHistoryState copyWith({
+    OrderHistoryStatus? status,
+    List<OrderEntity>? orders,
+    String? error,
+  }) {
+    return OrderHistoryState(
+      status: status ?? this.status,
+      orders: orders ?? this.orders,
+      error: error ?? this.error,
+    );
+  }
 
   @override
-  List<Object> get props => [orders];
-}
-
-class OrderHistoryError extends OrderHistoryState {
-  final String message;
-
-  const OrderHistoryError({required this.message});
-
-  @override
-  List<Object> get props => [message];
+  List<Object?> get props => [status, orders, error];
 }

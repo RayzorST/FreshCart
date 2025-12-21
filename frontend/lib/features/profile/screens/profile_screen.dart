@@ -8,54 +8,42 @@ import 'package:client/features/profile/screens/order_history_screen.dart';
 import 'package:client/features/profile/screens/help_screen.dart';
 import 'package:client/features/profile/screens/settings_screen.dart';
 import 'package:client/features/profile/screens/addresses_screen.dart';
+import 'package:client/domain/entities/user_entity.dart';
+import 'package:client/domain/entities/order_entity.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => ProfileBloc()..add(LoadProfile()),
-      child: Scaffold(
-        body: MultiBlocListener(
-          listeners: [
-            BlocListener<ProfileBloc, ProfileState>(
-              listener: (context, state) {
-                if (state is LogoutSuccess) {
-                  context.read<AuthBloc>().add(LoggedOut());
-                  context.go('/login');
-                }
-              },
-            ),
-          ],
-          child: BlocBuilder<ProfileBloc, ProfileState>(
-            builder: (context, state) {
-              return _buildContent(context, state);
+    return Scaffold(
+      body: MultiBlocListener(
+        listeners: [
+          BlocListener<ProfileBloc, ProfileState>(
+            listener: (context, state) {
+              if (state.status == ProfileStatus.logoutSuccess) {
+                context.read<AuthBloc>().add(LoggedOut());
+                context.go('/login');
+              }
             },
           ),
+        ],
+        child: BlocBuilder<ProfileBloc, ProfileState>(
+          builder: (context, state) {
+            return _buildContent(context, state);
+          },
         ),
       ),
     );
   }
 
   Widget _buildContent(BuildContext context, ProfileState state) {
-    if (state is ProfileLoading) {
+    if (state.status == ProfileStatus.initial ||
+        state.status == ProfileStatus.loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (state is ProfileLoaded) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 800) {
-            return _WideProfileLayout(user: state.user, orders: state.orders);
-          } else {
-            return _NarrowProfileLayout(user: state.user, orders: state.orders);
-          }
-        },
-      );
-    }
-
-    if (state is ProfileError) {
+    if (state.status == ProfileStatus.error) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -68,7 +56,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              state.message,
+              state.error ?? 'Неизвестная ошибка',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey,
@@ -84,13 +72,21 @@ class ProfileScreen extends StatelessWidget {
       );
     }
 
-    return const Center(child: CircularProgressIndicator());
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth > 800) {
+          return _WideProfileLayout(user: state.user!, orders: state.orders);
+        } else {
+          return _NarrowProfileLayout(user: state.user!, orders: state.orders);
+        }
+      },
+    );
   }
 }
 
 class _NarrowProfileLayout extends StatelessWidget {
-  final Map<String, dynamic> user;
-  final List<dynamic> orders;
+  final UserEntity user;
+  final List<OrderEntity> orders;
 
   const _NarrowProfileLayout({required this.user, required this.orders});
 
@@ -198,7 +194,7 @@ class _NarrowProfileLayout extends StatelessWidget {
             child: Center(
               child: Text(
                 _getInitials(),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -208,7 +204,7 @@ class _NarrowProfileLayout extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            _getDisplayName(),
+            user.displayName,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -216,7 +212,7 @@ class _NarrowProfileLayout extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            user['email']?.toString() ?? 'email@example.com',
+            user.email,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.white,
                 ),
@@ -235,28 +231,18 @@ class _NarrowProfileLayout extends StatelessWidget {
   }
 
   String _getInitials() {
-    final firstName = user['first_name'] ?? '';
-    final lastName = user['last_name'] ?? '';
-    if (firstName.isNotEmpty && lastName.isNotEmpty) {
-      return '${firstName[0]}${lastName[0]}'.toUpperCase();
+    if (user.firstName != null && user.lastName != null) {
+      return '${user.firstName![0]}${user.lastName![0]}'.toUpperCase();
+    } else if (user.firstName != null && user.firstName!.isNotEmpty) {
+      return user.firstName![0].toUpperCase();
     }
-    return (user['username']?[0] ?? 'U').toString().toUpperCase();
-  }
-
-  String _getDisplayName() {
-    final firstName = user['first_name'] ?? '';
-    final lastName = user['last_name'] ?? '';
-    if (firstName.isNotEmpty && lastName.isNotEmpty) {
-      return '$firstName $lastName';
-    }
-    return user['username']?.toString() ?? 'Пользователь';
+    return user.email[0].toUpperCase();
   }
 
   String _getMemberSince() {
-    final createdAt = user['created_at'];
-    if (createdAt != null) {
+    if (user.createdAt != null) {
       try {
-        final date = DateTime.parse(createdAt);
+        final date = user.createdAt!;
         final now = DateTime.now();
         final difference = now.difference(date);
         
@@ -275,7 +261,7 @@ class _NarrowProfileLayout extends StatelessWidget {
       children: [
         Text(
           value,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -283,7 +269,7 @@ class _NarrowProfileLayout extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 12,
           ),
@@ -324,8 +310,6 @@ class _NarrowProfileLayout extends StatelessWidget {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final profileBloc = context.read<ProfileBloc>(); 
-    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -340,7 +324,7 @@ class _NarrowProfileLayout extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                profileBloc.add(Logout()); 
+                context.read<ProfileBloc>().add(Logout()); 
               },
               child: const Text('Выйти', style: TextStyle(color: Colors.red)),
             ),
@@ -352,8 +336,8 @@ class _NarrowProfileLayout extends StatelessWidget {
 }
 
 class _WideProfileLayout extends StatelessWidget {
-  final Map<String, dynamic> user;
-  final List<dynamic> orders;
+  final UserEntity user;
+  final List<OrderEntity> orders;
 
   const _WideProfileLayout({required this.user, required this.orders});
 
@@ -440,7 +424,7 @@ class _WideProfileLayout extends StatelessWidget {
           
           // Имя и email
           Text(
-            _getDisplayName(),
+            user.displayName,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -448,7 +432,7 @@ class _WideProfileLayout extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            user['email']?.toString() ?? 'email@example.com',
+            user.email,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.grey[600],
                 ),
@@ -457,22 +441,30 @@ class _WideProfileLayout extends StatelessWidget {
 
           const SizedBox(height: 32),
 
-          _buildStatCard(
-            context,
-            title: 'Активные заказы',
-            value: '0',
-            icon: Icons.pending_actions,
-            color: Colors.blue,
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  context,
+                  title: 'Активные заказы',
+                  value: orders.where((o) => !['delivered', 'completed', 'cancelled'].contains(o.status)).length.toString(),
+                  icon: Icons.pending_actions,
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatCard(
+                  context,
+                  title: 'Всего заказов',
+                  value: orders.length.toString(),
+                  icon: Icons.shopping_bag,
+                  color: Colors.green,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 20),
-          _buildStatCard(
-            context,
-            title: 'Всего заказов',
-            value: '${orders.length}',
-            icon: Icons.shopping_bag,
-            color: Colors.green,
-          ),
-          const SizedBox(width: 20),
+          const SizedBox(height: 8),
           _buildStatCard(
             context,
             title: 'С нами',
@@ -722,28 +714,18 @@ class _WideProfileLayout extends StatelessWidget {
   }
 
   String _getInitials() {
-    final firstName = user['first_name'] ?? '';
-    final lastName = user['last_name'] ?? '';
-    if (firstName.isNotEmpty && lastName.isNotEmpty) {
-      return '${firstName[0]}${lastName[0]}'.toUpperCase();
+    if (user.firstName != null && user.lastName != null) {
+      return '${user.firstName![0]}${user.lastName![0]}'.toUpperCase();
+    } else if (user.firstName != null && user.firstName!.isNotEmpty) {
+      return user.firstName![0].toUpperCase();
     }
-    return (user['username']?[0] ?? 'U').toString().toUpperCase();
-  }
-
-  String _getDisplayName() {
-    final firstName = user['first_name'] ?? '';
-    final lastName = user['last_name'] ?? '';
-    if (firstName.isNotEmpty && lastName.isNotEmpty) {
-      return '$firstName $lastName';
-    }
-    return user['username']?.toString() ?? 'Пользователь';
+    return user.email[0].toUpperCase();
   }
 
   String _getMemberSince() {
-    final createdAt = user['created_at'];
-    if (createdAt != null) {
+    if (user.createdAt != null) {
       try {
-        final date = DateTime.parse(createdAt);
+        final date = user.createdAt!;
         final now = DateTime.now();
         final difference = now.difference(date);
         
@@ -758,8 +740,6 @@ class _WideProfileLayout extends StatelessWidget {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final profileBloc = context.read<ProfileBloc>(); 
-    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -774,7 +754,7 @@ class _WideProfileLayout extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                profileBloc.add(Logout()); 
+                context.read<ProfileBloc>().add(Logout()); 
               },
               child: const Text('Выйти', style: TextStyle(color: Colors.red)),
             ),

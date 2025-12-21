@@ -7,7 +7,9 @@ abstract class AddressesEvent extends Equatable {
   List<Object> get props => [];
 }
 
-class LoadAddresses extends AddressesEvent {}
+class LoadAddresses extends AddressesEvent {
+  const LoadAddresses();
+}
 
 class AddAddress extends AddressesEvent {
   final Map<String, dynamic> addressData;

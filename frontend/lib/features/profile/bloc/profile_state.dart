@@ -1,35 +1,49 @@
 part of 'profile_bloc.dart';
 
-abstract class ProfileState extends Equatable {
-  const ProfileState();
-
-  @override
-  List<Object> get props => [];
+enum ProfileStatus {
+  initial,
+  loading,
+  loaded,
+  updating,
+  updated,
+  passwordChanged,
+  logoutSuccess,
+  error,
 }
 
-class ProfileInitial extends ProfileState {}
+class ProfileState extends Equatable {
+  final ProfileStatus status;
+  final UserEntity? user;
+  final List<OrderEntity> orders;
+  final String? error;
 
-class ProfileLoading extends ProfileState {}
+  const ProfileState({
+    required this.status,
+    this.user,
+    required this.orders,
+    this.error,
+  });
 
-class ProfileLoaded extends ProfileState {
-  final Map<String, dynamic> user;
-  final List<dynamic> orders;
+  const ProfileState.initial()
+      : status = ProfileStatus.initial,
+        user = null,
+        orders = const [],
+        error = null;
 
-  const ProfileLoaded({required this.user, required this.orders});
+  ProfileState copyWith({
+    ProfileStatus? status,
+    UserEntity? user,
+    List<OrderEntity>? orders,
+    String? error,
+  }) {
+    return ProfileState(
+      status: status ?? this.status,
+      user: user ?? this.user,
+      orders: orders ?? this.orders,
+      error: error ?? this.error,
+    );
+  }
 
   @override
-  List<Object> get props => [user, orders];
+  List<Object?> get props => [status, user, orders, error];
 }
-
-class ProfileError extends ProfileState {
-  final String message;
-
-  const ProfileError({required this.message});
-
-  @override
-  List<Object> get props => [message];
-}
-
-class PasswordChanged extends ProfileState {}
-
-class LogoutSuccess extends ProfileState {}

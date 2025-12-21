@@ -1,57 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/features/profile/bloc/order_history_bloc.dart';
-import 'package:client/api/client.dart';
+import 'package:client/domain/entities/order_entity.dart';
 
 class OrderHistoryScreen extends StatelessWidget {
   const OrderHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => OrderHistoryBloc()..add(LoadOrders()),
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'Мои заказы',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Мои заказы',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
         ),
-        body: BlocBuilder<OrderHistoryBloc, OrderHistoryState>(
-          builder: (context, state) {
-            if (state is OrderHistoryLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      ),
+      body: BlocBuilder<OrderHistoryBloc, OrderHistoryState>(
+        builder: (context, state) {
+          if (state.status == OrderHistoryStatus.initial ||
+              state.status == OrderHistoryStatus.loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            if (state is OrderHistoryLoaded) {
-              return state.orders.isEmpty 
-                  ? _buildEmptyState(context)
-                  : _buildOrdersList(context, state.orders);
-            }
+          if (state.status == OrderHistoryStatus.error) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.read<OrderHistoryBloc>().add(const LoadOrders()),
+                    child: const Text('Повторить'),
+                  ),
+                ],
+              ),
+            );
+          }
 
-            if (state is OrderHistoryError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-                    const SizedBox(height: 16),
-                    Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => context.read<OrderHistoryBloc>().add(LoadOrders()),
-                      child: const Text('Повторить'),
-                    ),
-                  ],
-                ),
-              );
-            }
+          if (state.orders.isEmpty) {
+            return _buildEmptyState(context);
+          }
 
-            return const SizedBox();
-          },
-        ),
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              ...state.orders.map((order) => _buildOrderCard(context, order)),
+            ],
+          );
+        },
       ),
     );
   }
@@ -81,19 +82,10 @@ class OrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOrdersList(BuildContext context, List<dynamic> orders) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        ...orders.map((order) => _buildOrderCard(context, order)),
-      ],
-    );
-  }
-
-  Widget _buildOrderCard(BuildContext context, dynamic order) {
-    final status = order['status'] ?? 'pending';
-    final items = order['items'] ?? [];
-
+  Widget _buildOrderCard(BuildContext context, OrderEntity order) {
+    final statusColor = _getStatusColor(order.status);
+    final statusText = _getStatusText(order.status);
+    
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
@@ -106,7 +98,7 @@ class OrderHistoryScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Заказ #${order['id']}',
+                  'Заказ #${order.id}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -115,13 +107,13 @@ class OrderHistoryScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(status).withOpacity(0.1),
+                    color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    _getStatusText(status),
+                    statusText,
                     style: TextStyle(
-                      color: _getStatusColor(status),
+                      color: statusColor,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -131,11 +123,11 @@ class OrderHistoryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             
-            _buildStatusIndicator(status),
+            _buildStatusIndicator(order.status),
             const SizedBox(height: 12),
             
             Text(
-              _formatDate(order['created_at']),
+              _formatDate(order.createdAt),
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 14,
@@ -143,7 +135,7 @@ class OrderHistoryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              _getItemsPreview(items),
+              _getItemsPreview(order.items),
               style: const TextStyle(fontSize: 14),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -153,7 +145,7 @@ class OrderHistoryScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${order['total_amount']?.toStringAsFixed(0) ?? '0'} ₽',
+                  '${order.totalAmount.toStringAsFixed(0)} ₽',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -184,6 +176,12 @@ class OrderHistoryScreen extends StatelessWidget {
         return 'Доставлен';
       case 'cancelled':
         return 'Отменен';
+      case 'processing':
+        return 'В обработке';
+      case 'shipped':
+        return 'Отправлен';
+      case 'completed':
+        return 'Завершен';
       default:
         return status;
     }
@@ -192,10 +190,13 @@ class OrderHistoryScreen extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'pending':
+      case 'processing':
         return Colors.orange;
       case 'confirmed':
+      case 'shipped':
         return Colors.blue;
       case 'delivered':
+      case 'completed':
         return Colors.green;
       case 'cancelled':
         return Colors.red;
@@ -204,24 +205,19 @@ class OrderHistoryScreen extends StatelessWidget {
     }
   }
 
-  String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      final months = [
-        'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
-        'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
-      ];
-      return '${date.day} ${months[date.month - 1]} ${date.year}';
-    } catch (e) {
-      return dateString;
-    }
+  String _formatDate(DateTime date) {
+    final months = [
+      'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
+      'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
-  String _getItemsPreview(List<dynamic> items) {
+  String _getItemsPreview(List<OrderItemEntity> items) {
     if (items.isEmpty) return 'Нет товаров';
     
     final itemNames = items.take(3).map((item) {
-      return item['product']?['name'] ?? 'Товар';
+      return item.product.name;
     }).toList();
     
     final preview = itemNames.join(', ');
@@ -236,22 +232,26 @@ class OrderHistoryScreen extends StatelessWidget {
     
     if (status == 'cancelled') {
       steps = [
-        StatusStep(icon: Icons.shopping_cart, label: 'Заказ создан', isActive: true),
-        StatusStep(icon: Icons.close, label: 'Отменен', isActive: true, isCancelled: true),
+        StatusStep(icon: Icons.shopping_cart, isActive: true),
+        StatusStep(icon: Icons.close,  isActive: true, isCancelled: true),
+      ];
+    } else if (status == 'pending' || status == 'processing') {
+      steps = [
+        StatusStep(icon: Icons.shopping_cart,  isActive: true),
+        StatusStep(icon: Icons.local_shipping,  isActive: false),
+        StatusStep(icon: Icons.check_circle,  isActive: false),
+      ];
+    } else if (status == 'confirmed' || status == 'shipped') {
+      steps = [
+        StatusStep(icon: Icons.shopping_cart, isActive: true),
+        StatusStep(icon: Icons.local_shipping, isActive: true),
+        StatusStep(icon: Icons.check_circle, isActive: false),
       ];
     } else {
       steps = [
-        StatusStep(icon: Icons.shopping_cart, label: 'Заказ создан', isActive: true),
-        StatusStep(
-          icon: Icons.local_shipping, 
-          label: 'Подтвержден', 
-          isActive: status == 'confirmed' || status == 'delivered'
-        ),
-        StatusStep(
-          icon: Icons.check_circle, 
-          label: 'Доставлен', 
-          isActive: status == 'delivered'
-        ),
+        StatusStep(icon: Icons.shopping_cart, isActive: true),
+        StatusStep(icon: Icons.local_shipping, isActive: true),
+        StatusStep(icon: Icons.check_circle, isActive: true),
       ];
     }
 
@@ -278,30 +278,31 @@ class OrderHistoryScreen extends StatelessWidget {
   }
 
   Widget _buildStatusStep(StatusStep step) {
-    return Column(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: step.isActive 
-                ? (step.isCancelled ? Colors.red : Colors.green)
-                : Colors.grey[300],
-            shape: BoxShape.circle,
+    return SizedBox(
+      width: 32,
+      child: Column(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: step.isActive 
+                  ? (step.isCancelled ? Colors.red : Colors.green)
+                  : Colors.grey[300],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              step.icon,
+              color: Colors.white,
+              size: 16,
+            ),
           ),
-          child: Icon(
-            step.icon,
-            color: Colors.white,
-            size: 16,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  void _showOrderDetails(BuildContext context, dynamic order) {
-    final items = order['items'] ?? [];
-    
+  void _showOrderDetails(BuildContext context, OrderEntity order) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -324,18 +325,19 @@ class OrderHistoryScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                'Детали заказа #${order['id']}',
+                'Заказ #${order.id}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 16),
-              _buildDetailRow('Статус', _getStatusText(order['status'])),
-              _buildDetailRow('Дата', _formatDate(order['created_at'])),
-              _buildDetailRow('Адрес доставки', order['shipping_address'] ?? 'Не указан'),
-              if (order['notes'] != null) 
-                _buildDetailRow('Примечание', order['notes']!),
+              _buildDetailRow('Статус', _getStatusText(order.status)),
+              _buildDetailRow('Дата заказа', _formatDate(order.createdAt)),
+              _buildDetailRow('Дата обновления', _formatDate(order.updatedAt)),
+              _buildDetailRow('Адрес доставки', order.shippingAddress),
+              if (order.notes != null && order.notes!.isNotEmpty) 
+                _buildDetailRow('Примечание', order.notes!),
               
               const SizedBox(height: 16),
               const Text(
@@ -346,7 +348,7 @@ class OrderHistoryScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              ...items.map((item) => _buildOrderItem(item)).toList(),
+              ...order.items.map((item) => _buildOrderItem(item)).toList(),
               
               const SizedBox(height: 16),
               Container(
@@ -366,7 +368,7 @@ class OrderHistoryScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${order['total_amount']?.toStringAsFixed(0) ?? '0'} ₽',
+                      '${order.totalAmount.toStringAsFixed(0)} ₽',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -411,7 +413,7 @@ class OrderHistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderItem(dynamic item) {
+  Widget _buildOrderItem(OrderItemEntity item) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -423,12 +425,19 @@ class OrderHistoryScreen extends StatelessWidget {
               color: Colors.grey[200],
               borderRadius: BorderRadius.circular(8),
             ),
-            child: item['product']?['image_url'] != null
+            child: item.product.imageUrl.isNotEmpty
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
-                      '${ApiClient.baseUrl}/images/products/${ item['product']['id']}/image',
+                      item.product.imageUrl,
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          Icons.shopping_bag,
+                          color: Colors.grey[400],
+                          size: 20,
+                        );
+                      },
                     ),
                   )
                 : Icon(
@@ -443,11 +452,11 @@ class OrderHistoryScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item['product']?['name'] ?? 'Товар',
+                  item.product.name,
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
                 Text(
-                  '${item['quantity']} × ${item['price']} ₽',
+                  '${item.quantity} × ${item.price.toStringAsFixed(0)} ₽',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 12,
@@ -457,7 +466,7 @@ class OrderHistoryScreen extends StatelessWidget {
             ),
           ),
           Text(
-            '${(item['quantity'] * item['price']).toStringAsFixed(0)} ₽',
+            '${(item.quantity * item.price).toStringAsFixed(0)} ₽',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
             ),
@@ -470,13 +479,11 @@ class OrderHistoryScreen extends StatelessWidget {
 
 class StatusStep {
   final IconData icon;
-  final String label;
   final bool isActive;
   final bool isCancelled;
 
   StatusStep({
     required this.icon,
-    required this.label,
     required this.isActive,
     this.isCancelled = false,
   });

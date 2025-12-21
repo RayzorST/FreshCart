@@ -7,4 +7,6 @@ abstract class OrderHistoryEvent extends Equatable {
   List<Object> get props => [];
 }
 
-class LoadOrders extends OrderHistoryEvent {}
+class LoadOrders extends OrderHistoryEvent {
+  const LoadOrders();
+}

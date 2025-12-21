@@ -8,24 +8,15 @@ class CartLoaded extends CartEvent {
   const CartLoaded();
 }
 
-class CartItemAdded extends CartEvent {
-  final CartItemEntity item;
-
-  const CartItemAdded(this.item);
-}
-
 class CartItemUpdated extends CartEvent {
-  final CartItemEntity item;
+  final int productId;
+  final int quantity;
 
-  const CartItemUpdated(this.item);
+  const CartItemUpdated(this.productId, this.quantity);
 }
 
 class CartItemRemoved extends CartEvent {
   final int productId;
 
   const CartItemRemoved(this.productId);
-}
-
-class CartSyncedWithServer extends CartEvent {
-  const CartSyncedWithServer();
 }

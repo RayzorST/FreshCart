@@ -119,7 +119,7 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'order-history',
           pageBuilder: (context, state) => MaterialPage(
             child: BlocProvider(
-              create: (context) => OrderHistoryBloc()..add(LoadOrders()),
+              create: (context) => getIt<OrderHistoryBloc>()..add(LoadOrders()),
               child: const OrderHistoryScreen(),
             ),
           ),
@@ -129,7 +129,7 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'addresses',
           pageBuilder: (context, state) => MaterialPage(
             child: BlocProvider(
-              create: (context) => AddressesBloc()..add(LoadAddresses()),
+              create: (context) => getIt<AddressesBloc>()..add(LoadAddresses()),
               child: const AddressesScreen(),
             ),
           ),
@@ -241,56 +241,87 @@ class _FreshCartAppState extends State<FreshCartApp> {
     );
   }
 
- @override
-  Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (context) => getIt<AuthBloc>()..add(AppStarted()),
-          lazy: false,
-        ),
-        BlocProvider(
-          create: (context) => SettingsBloc()..add(LoadThemeSettings()),
-          lazy: false,
-        ),
-        BlocProvider(create: (context) => getIt<MainBloc>()),
-        BlocProvider(create: (context) => getIt<FavoritesBloc>()..add(const FavoritesLoaded())),
-        BlocProvider(create: (context) => PromotionsBloc()),
-        BlocProvider(create: (context) => getIt<CartBloc>()..add(const CartLoaded())),
-      ],
-      child: Builder(
-        builder: (context) {
-          return BlocListener<AuthBloc, AuthState>(
-            listener: (context, authState) {
-
-              if (authState is AuthAuthenticated) {
-                context.read<SettingsBloc>().add(LoadNotificationSettings());
-                Future.microtask(() => _router.go('/'));
-              } else if (authState is AuthUnauthenticated) {
-                Future.microtask(() => _router.go('/login'));
-              }
-            },
-            child: BlocBuilder<AuthBloc, AuthState>(
-              builder: (context, authState) {
-                return BlocBuilder<SettingsBloc, SettingsState>(
-                  builder: (context, settingsState) {
-                    final theme = _getTheme(settingsState);
+@override
+Widget build(BuildContext context) {
+  return MultiBlocProvider(
+    providers: [
+      BlocProvider(
+        create: (context) => getIt<AuthBloc>()..add(AppStarted()),
+        lazy: false,
+      ),
+      BlocProvider(
+        create: (context) => SettingsBloc()..add(LoadThemeSettings()),
+        lazy: false,
+      ),
+    ],
+    child: Builder(
+      builder: (context) {
+        return BlocListener<AuthBloc, AuthState>(
+          listener: (context, authState) {
+            if (authState is AuthAuthenticated) {
+              context.read<SettingsBloc>().add(LoadNotificationSettings());
+              Future.microtask(() => _router.go('/'));
+            } else if (authState is AuthUnauthenticated) {
+              Future.microtask(() => _router.go('/login'));
+            }
+          },
+          child: BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, authState) {
+              return MultiBlocProvider(
+                providers: [
+                  BlocProvider(create: (context) => getIt<MainBloc>()),
+                  BlocProvider(create: (context) => getIt<FavoritesBloc>()),
+                  BlocProvider(create: (context) => getIt<PromotionsBloc>()),
+                  BlocProvider(create: (context) => getIt<CartBloc>()),
+                  
+                  if (authState is AuthAuthenticated) ...[
+                    BlocProvider(
+                      create: (context) => getIt<ProfileBloc>()..add(const LoadProfile()),
+                      lazy: false,
+                    ),
+                    BlocProvider(
+                      create: (context) => getIt<OrderHistoryBloc>(),
+                    ),
+                    BlocProvider(
+                      create: (context) => getIt<AddressesBloc>(),
+                    ),
+                  ],
+                ],
+                child: Builder(
+                  builder: (context) {
+                    if (authState is AuthAuthenticated) {
+                      Future.microtask(() {
+                        context.read<MainBloc>().add(const PromotionsLoaded());
+                        context.read<MainBloc>().add(const CategoriesLoaded());
+                        context.read<MainBloc>().add(const ProductsLoaded());
+                        context.read<CartBloc>().add(const CartLoaded());
+                        context.read<FavoritesBloc>().add(const FavoritesLoaded());
+                        context.read<PromotionsBloc>().add(const PromotionsListLoaded());
+                      });
+                    }
                     
-                    return MaterialApp.router(
-                      title: 'FreshCart',
-                      theme: theme,
-                      routerConfig: _router,
-                      debugShowCheckedModeBanner: false,
+                    return BlocBuilder<SettingsBloc, SettingsState>(
+                      builder: (context, settingsState) {
+                        final theme = _getTheme(settingsState);
+                        
+                        return MaterialApp.router(
+                          title: 'FreshCart',
+                          theme: theme,
+                          routerConfig: _router,
+                          debugShowCheckedModeBanner: false,
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
+                ),
+              );
+            },
+          ),
+        );
+      },
+    ),
+  );
+}
 
   ThemeData _getTheme(SettingsState state) {
     if (state is SettingsLoaded) {

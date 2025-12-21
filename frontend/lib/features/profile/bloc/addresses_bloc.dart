@@ -1,12 +1,17 @@
 import 'package:bloc/bloc.dart';
-import 'package:client/api/client.dart';
+import 'package:client/domain/entities/address_entity.dart';
+import 'package:client/domain/repositories/address_repository.dart';
 import 'package:equatable/equatable.dart';
+import 'package:injectable/injectable.dart';
 
 part 'addresses_event.dart';
 part 'addresses_state.dart';
 
+@injectable
 class AddressesBloc extends Bloc<AddressesEvent, AddressesState> {
-  AddressesBloc() : super(AddressesInitial()) {
+  final AddressRepository _addressRepository;
+
+  AddressesBloc(this._addressRepository) : super(const AddressesState.initial()) {
     on<LoadAddresses>(_onLoadAddresses);
     on<AddAddress>(_onAddAddress);
     on<UpdateAddress>(_onUpdateAddress);
@@ -18,12 +23,30 @@ class AddressesBloc extends Bloc<AddressesEvent, AddressesState> {
     LoadAddresses event,
     Emitter<AddressesState> emit,
   ) async {
-    emit(AddressesLoading());
+    emit(state.copyWith(status: AddressesStatus.loading));
+
     try {
-      final addresses = await ApiClient.getAddresses();
-      emit(AddressesLoaded(addresses: addresses));
+      final result = await _addressRepository.getAddresses();
+
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: AddressesStatus.error,
+            error: error,
+          ));
+        },
+        (addresses) {
+          emit(state.copyWith(
+            status: AddressesStatus.loaded,
+            addresses: addresses,
+          ));
+        },
+      );
     } catch (e) {
-      emit(AddressesError(message: e.toString()));
+      emit(state.copyWith(
+        status: AddressesStatus.error,
+        error: 'Ошибка загрузки адресов: $e',
+      ));
     }
   }
 
@@ -31,11 +54,28 @@ class AddressesBloc extends Bloc<AddressesEvent, AddressesState> {
     AddAddress event,
     Emitter<AddressesState> emit,
   ) async {
+    emit(state.copyWith(status: AddressesStatus.saving));
+
     try {
-      await ApiClient.createAddress(event.addressData);
-      add(LoadAddresses()); // Перезагружаем список
+      final result = await _addressRepository.createAddress(event.addressData);
+
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: AddressesStatus.error,
+            error: error,
+          ));
+        },
+        (_) {
+          emit(state.copyWith(status: AddressesStatus.saved));
+          add(LoadAddresses());
+        },
+      );
     } catch (e) {
-      emit(AddressesError(message: e.toString()));
+      emit(state.copyWith(
+        status: AddressesStatus.error,
+        error: 'Ошибка добавления адреса: $e',
+      ));
     }
   }
 
@@ -43,11 +83,31 @@ class AddressesBloc extends Bloc<AddressesEvent, AddressesState> {
     UpdateAddress event,
     Emitter<AddressesState> emit,
   ) async {
+    emit(state.copyWith(status: AddressesStatus.saving));
+
     try {
-      await ApiClient.updateAddress(event.addressId, event.addressData);
-      add(LoadAddresses());
+      final result = await _addressRepository.updateAddress(
+        event.addressId,
+        event.addressData,
+      );
+
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: AddressesStatus.error,
+            error: error,
+          ));
+        },
+        (_) {
+          emit(state.copyWith(status: AddressesStatus.saved));
+          add(LoadAddresses());
+        },
+      );
     } catch (e) {
-      emit(AddressesError(message: e.toString()));
+      emit(state.copyWith(
+        status: AddressesStatus.error,
+        error: 'Ошибка обновления адреса: $e',
+      ));
     }
   }
 
@@ -56,10 +116,24 @@ class AddressesBloc extends Bloc<AddressesEvent, AddressesState> {
     Emitter<AddressesState> emit,
   ) async {
     try {
-      await ApiClient.deleteAddress(event.addressId);
-      add(LoadAddresses());
+      final result = await _addressRepository.deleteAddress(event.addressId);
+
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: AddressesStatus.error,
+            error: error,
+          ));
+        },
+        (_) {
+          add(LoadAddresses());
+        },
+      );
     } catch (e) {
-      emit(AddressesError(message: e.toString()));
+      emit(state.copyWith(
+        status: AddressesStatus.error,
+        error: 'Ошибка удаления адреса: $e',
+      ));
     }
   }
 
@@ -68,10 +142,24 @@ class AddressesBloc extends Bloc<AddressesEvent, AddressesState> {
     Emitter<AddressesState> emit,
   ) async {
     try {
-      await ApiClient.setDefaultAddress(event.addressId);
-      add(LoadAddresses());
+      final result = await _addressRepository.setDefaultAddress(event.addressId);
+
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: AddressesStatus.error,
+            error: error,
+          ));
+        },
+        (_) {
+          add(LoadAddresses());
+        },
+      );
     } catch (e) {
-      emit(AddressesError(message: e.toString()));
+      emit(state.copyWith(
+        status: AddressesStatus.error,
+        error: 'Ошибка установки адреса по умолчанию: $e',
+      ));
     }
   }
 }

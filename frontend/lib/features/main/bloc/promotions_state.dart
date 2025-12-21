@@ -9,8 +9,8 @@ enum PromotionsStatus {
 
 class PromotionsState extends Equatable {
   final PromotionsStatus status;
-  final Map<String, dynamic>? currentPromotion;
-  final List<dynamic> promotionsList;
+  final PromotionEntity? currentPromotion;
+  final List<PromotionEntity> promotionsList;
   final String? error;
 
   const PromotionsState({
@@ -28,8 +28,8 @@ class PromotionsState extends Equatable {
 
   PromotionsState copyWith({
     PromotionsStatus? status,
-    Map<String, dynamic>? currentPromotion,
-    List<dynamic>? promotionsList,
+    PromotionEntity? currentPromotion,
+    List<PromotionEntity>? promotionsList,
     String? error,
   }) {
     return PromotionsState(

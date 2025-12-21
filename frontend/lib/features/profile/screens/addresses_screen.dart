@@ -2,46 +2,55 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/profile/bloc/addresses_bloc.dart';
+import 'package:client/domain/entities/address_entity.dart';
 
 class AddressesScreen extends StatelessWidget {
   const AddressesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => AddressesBloc()..add(LoadAddresses()),
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'Мои адреса',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Мои адреса',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
         ),
-        body: const _AddressesContent(),
       ),
-    );
-  }
-}
+      body: BlocConsumer<AddressesBloc, AddressesState>(
+        listener: (context, state) {
+          if (state.status == AddressesStatus.error) {
+            AppSnackbar.showError(context: context, message: state.error!);
+          }
+          if (state.status == AddressesStatus.saved) {
+            AppSnackbar.showSuccess(context: context, message: 'Адрес сохранен');
+          }
+        },
+        builder: (context, state) {
+          if (state.status == AddressesStatus.initial ||
+              state.status == AddressesStatus.loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-class _AddressesContent extends StatelessWidget {
-  const _AddressesContent();
+          if (state.status == AddressesStatus.error) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.read<AddressesBloc>().add(const LoadAddresses()),
+                    child: const Text('Повторить'),
+                  ),
+                ],
+              ),
+            );
+          }
 
-  @override
-  Widget build(BuildContext context) {
-    return BlocConsumer<AddressesBloc, AddressesState>(
-      listener: (context, state) {
-        if (state is AddressesError) {
-          AppSnackbar.showError(context: context, message: state.message);
-        }
-      },
-      builder: (context, state) {
-        if (state is AddressesLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (state is AddressesLoaded) {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -53,34 +62,12 @@ class _AddressesContent extends StatelessWidget {
               _buildAddAddressCard(context),
             ],
           );
-        }
-
-        if (state is AddressesError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-                const SizedBox(height: 16),
-                Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => context.read<AddressesBloc>().add(LoadAddresses()),
-                  child: const Text('Повторить'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return const SizedBox();
-      },
+        },
+      ),
     );
   }
 
-  Widget _buildAddressCard(BuildContext context, dynamic address) {
-    final isDefault = address['is_default'] ?? false;
-    
+  Widget _buildAddressCard(BuildContext context, AddressEntity address) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
@@ -98,21 +85,18 @@ class _AddressesContent extends StatelessWidget {
           ),
         ),
         title: Text(
-          address['title'] ?? 'Адрес',
+          address.title,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(address['address_line'] ?? ''),
-            if (address['city'] != null) 
-              Text('г. ${address['city']}', style: TextStyle(color: Colors.grey[600])),
-          ],
+        subtitle: Text(
+          '${address.addressLine}, г. ${address.city}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isDefault)
+            if (address.isDefault)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -128,11 +112,11 @@ class _AddressesContent extends StatelessWidget {
                   ),
                 ),
               ),
-            if (!isDefault) ...[
+            if (!address.isDefault) ...[
               IconButton(
                 icon: Icon(Icons.star_outline, color: Colors.grey[600]),
                 onPressed: () => context.read<AddressesBloc>().add(
-                  SetDefaultAddress(address['id'])
+                  SetDefaultAddress(address.id)
                 ),
                 tooltip: 'Сделать адресом по умолчанию',
               ),
@@ -190,13 +174,13 @@ class _AddressesContent extends StatelessWidget {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, dynamic address) {
+  void _showDeleteDialog(BuildContext context, AddressEntity address) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Удаление адреса'),
-          content: Text('Вы уверены, что хотите удалить адрес "${address['title'] ?? 'Адрес'}"?'),
+          content: Text('Вы уверены, что хотите удалить адрес "${address.title}"?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -205,7 +189,7 @@ class _AddressesContent extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                context.read<AddressesBloc>().add(DeleteAddress(address['id']));
+                context.read<AddressesBloc>().add(DeleteAddress(address.id));
               },
               child: const Text('Удалить', style: TextStyle(color: Colors.red)),
             ),
@@ -219,6 +203,7 @@ class _AddressesContent extends StatelessWidget {
     final titleController = TextEditingController();
     final addressController = TextEditingController();
     final cityController = TextEditingController();
+    final postalCodeController = TextEditingController();
     bool isDefault = false;
 
     showDialog(
@@ -242,18 +227,26 @@ class _AddressesContent extends StatelessWidget {
                   TextField(
                     controller: addressController,
                     decoration: const InputDecoration(
-                      labelText: 'Адрес',
+                      labelText: 'Адрес (улица, дом)*',
                       border: OutlineInputBorder(),
                     ),
-                    maxLines: 2,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: cityController,
                     decoration: const InputDecoration(
-                      labelText: 'Город',
+                      labelText: 'Город*',
                       border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: postalCodeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Почтовый индекс',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
@@ -272,20 +265,26 @@ class _AddressesContent extends StatelessWidget {
               ),
               FilledButton(
                 onPressed: () {
-                  if (titleController.text.isEmpty || addressController.text.isEmpty) {
+                  if (titleController.text.isEmpty || 
+                      addressController.text.isEmpty || 
+                      cityController.text.isEmpty) {
                     AppSnackbar.showWarning(context: context, message: 'Заполните обязательные поля');
                     return;
                   }
 
-                  context.read<AddressesBloc>().add(AddAddress({
+                  final addressData = {
                     'title': titleController.text,
                     'address_line': addressController.text,
-                    'city': cityController.text.isEmpty ? null : cityController.text,
+                    'city': cityController.text,
                     'is_default': isDefault,
-                  }));
+                  };
 
+                  if (postalCodeController.text.isNotEmpty) {
+                    addressData['postal_code'] = postalCodeController.text;
+                  }
+
+                  context.read<AddressesBloc>().add(AddAddress(addressData));
                   Navigator.of(context).pop();
-                  AppSnackbar.showSuccess(context: context, message: 'Адрес добавлен');
                 },
                 child: const Text('Сохранить'),
               ),
@@ -296,11 +295,12 @@ class _AddressesContent extends StatelessWidget {
     );
   }
 
-  void _showEditAddressDialog(BuildContext context, dynamic address) {
-    final titleController = TextEditingController(text: address['title']);
-    final addressController = TextEditingController(text: address['address_line']);
-    final cityController = TextEditingController(text: address['city'] ?? '');
-    bool isDefault = address['is_default'] ?? false;
+  void _showEditAddressDialog(BuildContext context, AddressEntity address) {
+    final titleController = TextEditingController(text: address.title);
+    final addressController = TextEditingController(text: address.addressLine);
+    final cityController = TextEditingController(text: address.city);
+    final postalCodeController = TextEditingController(text: address.postalCode ?? '');
+    bool isDefault = address.isDefault;
 
     showDialog(
       context: context,
@@ -323,24 +323,32 @@ class _AddressesContent extends StatelessWidget {
                   TextField(
                     controller: addressController,
                     decoration: const InputDecoration(
-                      labelText: 'Адрес',
+                      labelText: 'Адрес (улица, дом)*',
                       border: OutlineInputBorder(),
                     ),
-                    maxLines: 2,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: cityController,
                     decoration: const InputDecoration(
-                      labelText: 'Город',
+                      labelText: 'Город*',
                       border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: postalCodeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Почтовый индекс',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     title: const Text('Адрес по умолчанию'),
                     value: isDefault,
-                    onChanged: address['is_default'] == true 
+                    onChanged: address.isDefault
                         ? null
                         : (value) => setState(() => isDefault = value ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -355,23 +363,26 @@ class _AddressesContent extends StatelessWidget {
               ),
               FilledButton(
                 onPressed: () {
-                  if (titleController.text.isEmpty || addressController.text.isEmpty) {
+                  if (titleController.text.isEmpty || 
+                      addressController.text.isEmpty || 
+                      cityController.text.isEmpty) {
                     AppSnackbar.showWarning(context: context, message: 'Заполните обязательные поля');
                     return;
                   }
 
-                  context.read<AddressesBloc>().add(UpdateAddress(
-                    address['id'],
-                    {
-                      'title': titleController.text,
-                      'address_line': addressController.text,
-                      'city': cityController.text.isEmpty ? null : cityController.text,
-                      'is_default': isDefault,
-                    },
-                  ));
+                  final addressData = {
+                    'title': titleController.text,
+                    'address_line': addressController.text,
+                    'city': cityController.text,
+                    'is_default': isDefault,
+                  };
 
+                  if (postalCodeController.text.isNotEmpty) {
+                    addressData['postal_code'] = postalCodeController.text;
+                  }
+
+                  context.read<AddressesBloc>().add(UpdateAddress(address.id, addressData));
                   Navigator.of(context).pop();
-                  AppSnackbar.showInfo(context: context, message: 'Адрес обновлен');
                 },
                 child: const Text('Сохранить'),
               ),

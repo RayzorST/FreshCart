@@ -1,57 +1,51 @@
 import 'product_entity.dart';
 
 class CartItemEntity {
-  final int? id;
+  final int id;
   final ProductEntity product;
   final int quantity;
-  final double? appliedPrice;
-  final bool isSynced;
+  final double? discountPrice;
+  final List<Map<String, dynamic>>? appliedPromotions;
   final DateTime addedAt;
 
   CartItemEntity({
-    this.id,
+    required this.id,
     required this.product,
-    this.quantity = 1,
-    this.appliedPrice,
-    this.isSynced = false,
+    required this.quantity,
+    this.discountPrice,
+    this.appliedPromotions,
     required this.addedAt,
   });
 
-  double get totalPrice => (appliedPrice ?? product.price) * quantity;
+  double get totalPrice => (discountPrice ?? product.price) * quantity;
   
   double get discountAmount {
-    if (appliedPrice == null || appliedPrice! >= product.price) return 0.0;
-    return (product.price - appliedPrice!) * quantity;
+    if (discountPrice == null || discountPrice! >= product.price) return 0.0;
+    return (product.price - discountPrice!) * quantity;
   }
   
-  bool get hasDiscount => appliedPrice != null && appliedPrice! < product.price;
+  bool get hasDiscount => discountPrice != null && discountPrice! < product.price;
 
-  CartItemEntity copyWith({
-    int? id,
-    ProductEntity? product,
-    int? quantity,
-    double? appliedPrice,
-    bool? isSynced,
-    DateTime? addedAt,
-  }) {
+  factory CartItemEntity.fromJson(Map<String, dynamic> json) {
+    final appliedPromotionsRaw = json['applied_promotions'] as List<dynamic>?;
+    final List<Map<String, dynamic>>? appliedPromotions;
+    
+    if (appliedPromotionsRaw != null && appliedPromotionsRaw.isNotEmpty) {
+      // Если есть промоции, пытаемся преобразовать
+      appliedPromotions = appliedPromotionsRaw
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    } else {
+      appliedPromotions = null;
+    }
+    
     return CartItemEntity(
-      id: id ?? this.id,
-      product: product ?? this.product,
-      quantity: quantity ?? this.quantity,
-      appliedPrice: appliedPrice ?? this.appliedPrice,
-      isSynced: isSynced ?? this.isSynced,
-      addedAt: addedAt ?? this.addedAt,
+      id: json['id'] as int,
+      product: ProductEntity.fromJson(json['product'] as Map<String, dynamic>),
+      quantity: json['quantity'] as int,
+      discountPrice: json['discount_price'] as double?,
+      appliedPromotions: appliedPromotions,
+      addedAt: DateTime.parse(json['created_at'] as String),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      if (id != null) 'id': id,
-      'product_id': product.id,
-      'quantity': quantity,
-      if (appliedPrice != null) 'applied_price': appliedPrice,
-      'is_synced': isSynced,
-      'added_at': addedAt.toIso8601String(),
-    };
   }
 }

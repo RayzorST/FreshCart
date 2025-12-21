@@ -3,9 +3,9 @@ import 'package:client/api/client.dart';
 class ProductEntity {
   final int id;
   final String name;
-  final String description;
+  final String? description;
   final double price;
-  final int stockQuantity;
+  final int? stockQuantity;
   final String? category;
   final bool isActive;
   final DateTime createdAt;
@@ -14,9 +14,9 @@ class ProductEntity {
   ProductEntity({
     required this.id,
     required this.name,
-    required this.description,
+    this.description,
     required this.price,
-    required this.stockQuantity,
+    this.stockQuantity,
     this.category,
     required this.isActive,
     required this.createdAt,
@@ -29,9 +29,9 @@ class ProductEntity {
     return ProductEntity(
       id: json['id'] as int,
       name: json['name'] as String,
-      description: json['description'] as String? ?? '',
+      description: json['description'] as String?,
       price: (json['price'] as num).toDouble(),
-      stockQuantity: json['stock_quantity'] as int? ?? 0,
+      stockQuantity: json['stock_quantity'] as int?,
       category: json['category'] != null 
           ? json['category'] is String 
               ? json['category'] as String

@@ -31,9 +31,10 @@ class _ImagePickerView extends StatelessWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Анализ блюда'),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
+          title: Text(
+            'Анализ блюда',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
         ),
         body: Container(
           width: double.infinity,

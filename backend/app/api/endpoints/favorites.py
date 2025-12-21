@@ -43,13 +43,16 @@ async def get_favorites(
                     "name": favorite.product.category.name
                 },
                 "stock_quantity": favorite.product.stock_quantity,
+                "is_active": favorite.product.is_active,
+                "created_at": favorite.product.created_at,
+                "updated_at": favorite.product.updated_at,
             }
         }
         result.append(favorite_data)
     
     return result
 
-@router.post("/", response_model=FavoriteResponse)
+@router.post("/", response_model=FavoriteWithProductResponse)
 async def add_to_favorites(
     favorite_data: FavoriteCreate,
     current_user: User = Depends(get_current_user),
@@ -82,8 +85,30 @@ async def add_to_favorites(
     db.add(favorite)
     db.commit()
     db.refresh(favorite)
+
+    favorite_data = {
+            "id": favorite.id,
+            "user_id": favorite.user_id,
+            "product_id": favorite.product_id,
+            "created_at": favorite.created_at,
+            "product": {
+                "id": favorite.product.id,
+                "name": favorite.product.name,
+                "description": favorite.product.description,
+                "price": favorite.product.price,
+                "image_url": favorite.product.image_url,
+                "category": {
+                    "id": favorite.product.category.id,
+                    "name": favorite.product.category.name
+                },
+                "stock_quantity": favorite.product.stock_quantity,
+                "is_active": favorite.product.is_active,
+                "created_at": favorite.product.created_at,
+                "updated_at": favorite.product.updated_at,
+            }
+        }
     
-    return favorite
+    return favorite_data
 
 @router.delete("/items/{product_id}")
 async def remove_from_favorites(

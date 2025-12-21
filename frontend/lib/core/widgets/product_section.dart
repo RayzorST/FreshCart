@@ -1,14 +1,14 @@
-import 'package:client/domain/entities/cart_item_entity.dart';
-import 'package:client/domain/entities/product_entity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:client/core/widgets/quantity_controls.dart';
+import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/domain/entities/cart_item_entity.dart';
 import 'package:client/features/main/bloc/main_bloc.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/product_modal.dart';
 import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/core/widgets/quantity_controls.dart';
 
 class ProductGridSection extends StatefulWidget {
   const ProductGridSection({super.key});
@@ -214,8 +214,8 @@ class _ProductGridSectionState extends State<ProductGridSection> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
-            final product = state.products[index]; // Теперь это Product, а не dynamic
-            return ProductCard(product: product); // Передаем Product
+            final product = state.products[index];
+            return ProductCard(product: product);
           },
         ),
         
@@ -264,24 +264,6 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final productId = product.id;
-
-    // Получаем информацию о избранном из FavoritesBloc
-    final isFavorite = context.select<FavoritesBloc, bool>((bloc) {
-      return bloc.state.favorites.any((favItem) => favItem.product.id == productId);
-    });
-
-    // Получаем количество из корзины
-    final cartItem = context.select<CartBloc, CartItemEntity?>((bloc) {
-      try {
-        return bloc.state.cartItems.firstWhere(
-          (item) => item.product.id == productId,
-        );
-      } catch (e) {
-        return null;
-      }
-    });
-
-    final quantity = cartItem?.quantity ?? 0;
 
     return Card(
       elevation: 0,
@@ -349,31 +331,33 @@ class ProductCard extends StatelessWidget {
                   
                   const Spacer(),
                   
-                  // Кнопки управления количеством
-                  QuantityControls(
-                    productId: productId,
-                    quantity: quantity,
-                    onQuantityChanged: (productId, newQuantity) {
-                      final cartBloc = context.read<CartBloc>();
-                      
-                      if (newQuantity == 0) {
-                        // Удаляем из корзины
-                        cartBloc.add(CartItemRemoved(productId));
-                      } else if (cartItem != null) {
-                        // Обновляем существующий товар
-                        final updatedCartItem = cartItem.copyWith(
-                          quantity: newQuantity,
-                          product: product, // Сохраняем продукт
+                  BlocBuilder<CartBloc, CartState>(
+                    builder: (context, cartState) {
+                      CartItemEntity? cartItem;
+                      try {
+                        cartItem = cartState.cartItems.firstWhere(
+                          (item) => item.product.id == productId,
                         );
-                        cartBloc.add(CartItemUpdated(updatedCartItem));
-                      } else {
-                        // Добавляем новый товар
-                        final newCartItem = _createCartItem(newQuantity);
-                        cartBloc.add(CartItemAdded(newCartItem));
+                      } catch (e) {
+                        cartItem = null;
                       }
+                      
+                      final quantity = cartItem?.quantity ?? 0;
+                      
+                      return QuantityControls(
+                        productId: productId,
+                        quantity: quantity,
+                        onQuantityChanged: (productId, newQuantity) {
+                          if (newQuantity == 0) {
+                            context.read<CartBloc>().add(CartItemRemoved(productId));
+                          } else {
+                            context.read<CartBloc>().add(CartItemUpdated(productId, newQuantity));
+                          }
+                        },
+                        fullWidth: true,
+                      );
                     },
-                    fullWidth: true,
-                  ),
+                  )
                 ],
               ),
             ),
@@ -381,27 +365,30 @@ class ProductCard extends StatelessWidget {
             Positioned(
               top: 8,
               right: 8,
-              child: IconButton(
-                icon: Icon(
-                  isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: isFavorite ? Colors.red : Colors.grey[600],
-                  size: 20,
-                ),
-                onPressed: () {
-                  final favoritesBloc = context.read<FavoritesBloc>();
-                  final newFavoriteState = !isFavorite;
+              child: BlocBuilder<FavoritesBloc, FavoritesState>(
+                builder: (context, favoritesState) {
+                  final isFavorite = favoritesState.favorites.any((favItem) => favItem.product.id == productId);
                   
-                  favoritesBloc.add(FavoriteToggled(
-                    productId: productId,
-                    isFavorite: newFavoriteState,
-                    product: newFavoriteState ? product : null,
-                  ));
+                  return IconButton(
+                    icon: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? Colors.red : Colors.grey[600],
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      context.read<FavoritesBloc>().add(FavoriteToggled(
+                        productId: productId,
+                        isFavorite: !isFavorite,
+                        product: product,
+                      ));
+                    },
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                  );
                 },
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
-                ),
               ),
             ),
           ],
@@ -421,13 +408,5 @@ class ProductCard extends StatelessWidget {
     } else {
       context.push('/product/${product.id}', extra: product);
     }
-  }
-
-  CartItemEntity _createCartItem(int quantity) {
-    return CartItemEntity(
-      product: product,
-      quantity: quantity,
-      addedAt: DateTime.now(),
-    );
   }
 }

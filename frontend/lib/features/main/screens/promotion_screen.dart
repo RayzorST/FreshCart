@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/features/main/bloc/promotions_bloc.dart';
+import 'package:client/domain/entities/promotion_entity.dart';
 
 class PromotionScreen extends StatefulWidget {
   final int? promotionId;
@@ -64,11 +65,13 @@ class _PromotionScreenState extends State<PromotionScreen> {
     );
   }
 
-  Widget _buildPromotionContent(BuildContext context, Map<String, dynamic> promotion) {
-    final promotionType = promotion['promotion_type'];
-    final isPercentage = promotionType == 'percentage';
-    final isFixed = promotionType == 'fixed';
-    final isGift = promotionType == 'gift';
+  Widget _buildPromotionContent(BuildContext context, PromotionEntity promotion) {
+    // Определяем тип акции по данным
+    final promotionType = _getPromotionType(promotion);
+    final isPercentage = promotion.discountPercent != null;
+    final isFixed = promotion.fixedDiscount != null;
+    final hasGift = promotion.title.toLowerCase().contains('подарок') || 
+                    promotion.title.toLowerCase().contains('gift');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -114,7 +117,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
                 
                 // Название акции
                 Text(
-                  promotion['name'] ?? 'Акция',
+                  promotion.title,
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -125,9 +128,9 @@ class _PromotionScreenState extends State<PromotionScreen> {
                 const SizedBox(height: 8),
                 
                 // Описание
-                if (promotion['description'] != null)
+                if (promotion.description != null && promotion.description!.isNotEmpty)
                   Text(
-                    promotion['description'],
+                    promotion.description!,
                     style: const TextStyle(
                       fontSize: 16,
                       color: Colors.white,
@@ -138,7 +141,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
                 const SizedBox(height: 16),
                 
                 // Значение акции
-                if (isPercentage || isFixed)
+                if (isPercentage)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
@@ -146,9 +149,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      isPercentage 
-                          ? 'СКИДКА ${promotion['value']}%'
-                          : 'СКИДКА ${(promotion['value'] / 100).toStringAsFixed(0)} ₽',
+                      'СКИДКА ${promotion.discountPercent!.toStringAsFixed(0)}%',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -157,7 +158,24 @@ class _PromotionScreenState extends State<PromotionScreen> {
                     ),
                   ),
                 
-                if (isGift && promotion['gift_product_id'] != null)
+                if (isFixed)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'СКИДКА ${promotion.fixedDiscount!.toStringAsFixed(0)} ₽',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _getPrimaryColor(promotionType),
+                      ),
+                    ),
+                  ),
+                
+                if (hasGift)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
@@ -197,27 +215,27 @@ class _PromotionScreenState extends State<PromotionScreen> {
             ),
             child: Column(
               children: [
-                if (promotion['min_order_amount'] != 0) ...[
+                if (promotion.minimumAmount != null && promotion.minimumAmount! > 0) ...[
                   _buildDetailItem(
                     Icons.shopping_cart,
                     'Минимальная сумма заказа',
-                    '${(promotion['min_order_amount'] / 100).toStringAsFixed(2)} ₽',
-                  ),
-                  const Divider(),
-                ],
-                if (promotion['min_quantity'] != 0) ...[
-                  _buildDetailItem(
-                    Icons.filter_alt,
-                    'Минимальное количество',
-                    '${promotion['min_quantity']} шт.',
+                    '${promotion.minimumAmount!.toStringAsFixed(2)} ₽',
                   ),
                   const Divider(),
                 ],
                 _buildDetailItem(
                   Icons.calendar_today,
                   'Действует до',
-                  _formatDate(promotion['end_date']),
+                  promotion.endDate != null ? _formatDate(promotion.endDate!) : 'Бессрочно',
                 ),
+                if (promotion.startDate != null) ...[
+                  const Divider(),
+                  _buildDetailItem(
+                    Icons.calendar_today,
+                    'Начало действия',
+                    _formatDate(promotion.startDate!),
+                  ),
+                ],
               ],
             ),
           ),
@@ -228,26 +246,26 @@ class _PromotionScreenState extends State<PromotionScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _getStatusColor(promotion['is_active'] ?? true).withOpacity(0.1),
+              color: _getStatusColor(promotion.isValid).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _getStatusColor(promotion['is_active'] ?? true).withOpacity(0.3),
+                color: _getStatusColor(promotion.isValid).withOpacity(0.3),
               ),
             ),
             child: Row(
               children: [
                 Icon(
-                  promotion['is_active'] ?? true ? Icons.check_circle : Icons.pause_circle,
-                  color: _getStatusColor(promotion['is_active'] ?? true),
+                  promotion.isValid ? Icons.check_circle : Icons.pause_circle,
+                  color: _getStatusColor(promotion.isValid),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    promotion['is_active'] ?? true 
+                    promotion.isValid 
                         ? 'Акция активна и применяется автоматически'
                         : 'Акция временно неактивна',
                     style: TextStyle(
-                      color: _getStatusColor(promotion['is_active'] ?? true),
+                      color: _getStatusColor(promotion.isValid),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -283,6 +301,32 @@ class _PromotionScreenState extends State<PromotionScreen> {
               ],
             ),
           ),
+          
+          // Изображение акции (если есть)
+          if (promotion.imageUrl != null && promotion.imageUrl!.isNotEmpty)
+            Column(
+              children: [
+                const SizedBox(height: 24),
+                Text(
+                  'Изображение акции',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    image: DecorationImage(
+                      image: NetworkImage(promotion.imageUrl!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -387,6 +431,17 @@ class _PromotionScreenState extends State<PromotionScreen> {
     );
   }
 
+  // Определяем тип акции по данным PromotionEntity
+  String _getPromotionType(PromotionEntity promotion) {
+    if (promotion.discountPercent != null) return 'percentage';
+    if (promotion.fixedDiscount != null) return 'fixed';
+    if (promotion.title.toLowerCase().contains('подарок') || 
+        promotion.title.toLowerCase().contains('gift')) {
+      return 'gift';
+    }
+    return 'default';
+  }
+
   Color _getPrimaryColor(String promotionType) {
     switch (promotionType) {
       case 'percentage':
@@ -438,16 +493,11 @@ class _PromotionScreenState extends State<PromotionScreen> {
       case 'percentage': return 'Процентная скидка';
       case 'fixed': return 'Фиксированная скидка';
       case 'gift': return 'Подарок';
-      default: return type;
+      default: return 'Акция';
     }
   }
 
-  String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
-    } catch (e) {
-      return dateString;
-    }
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 }

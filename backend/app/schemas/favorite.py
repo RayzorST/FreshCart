@@ -17,4 +17,4 @@ class FavoriteResponse(FavoriteBase):
         from_attributes = True
 
 class FavoriteWithProductResponse(FavoriteResponse):
-    product: dict  # Будем включать информацию о продукте
+    product: dict

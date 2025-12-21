@@ -18,7 +18,7 @@ class SettingsScreen extends StatelessWidget {
               ),
         ),
       ),
-      body: BlocBuilder<SettingsBloc, SettingsState>( // ЗАМЕНИ BlocConsumer на BlocBuilder
+      body: BlocBuilder<SettingsBloc, SettingsState>( 
         builder: (context, state) {
           if (state is SettingsInitial || state is SettingsLoading) {
             return const Center(child: CircularProgressIndicator());

@@ -7,7 +7,9 @@ abstract class ProfileEvent extends Equatable {
   List<Object> get props => [];
 }
 
-class LoadProfile extends ProfileEvent {}
+class LoadProfile extends ProfileEvent {
+  const LoadProfile();
+}
 
 class UpdateProfile extends ProfileEvent {
   final Map<String, dynamic> profileData;

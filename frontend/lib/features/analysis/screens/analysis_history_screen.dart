@@ -56,10 +56,10 @@ class _AnalysisHistoryView extends StatelessWidget {
     //final textTheme = Theme.of(context).textTheme;
 
     return AppBar(
-      title: const Text('История анализов'),
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      foregroundColor: colorScheme.onSurface,
+      title: Text(
+        'История анализов',
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
       actions: [
         BlocBuilder<AnalysisHistoryBloc, AnalysisHistoryState>(
           builder: (context, state) {

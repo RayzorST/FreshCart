@@ -1,12 +1,17 @@
 import 'package:bloc/bloc.dart';
-import 'package:client/api/client.dart';
 import 'package:equatable/equatable.dart';
+import 'package:injectable/injectable.dart';
+import 'package:client/domain/entities/promotion_entity.dart';
+import 'package:client/domain/repositories/promotion_repository.dart';
 
 part 'promotions_event.dart';
 part 'promotions_state.dart';
 
+@injectable
 class PromotionsBloc extends Bloc<PromotionsEvent, PromotionsState> {
-  PromotionsBloc() : super(const PromotionsState.initial()) {
+  final PromotionRepository _promotionRepository;
+
+  PromotionsBloc(this._promotionRepository) : super(const PromotionsState.initial()) {
     on<PromotionLoaded>(_onPromotionLoaded);
     on<PromotionsListLoaded>(_onPromotionsListLoaded);
     on<PromotionRefreshed>(_onPromotionRefreshed);
@@ -27,11 +32,22 @@ class PromotionsBloc extends Bloc<PromotionsEvent, PromotionsState> {
     emit(state.copyWith(status: PromotionsStatus.loading));
     
     try {
-      final promotion = await ApiClient.getPromotion(event.promotionId!);
-      emit(state.copyWith(
-        status: PromotionsStatus.loaded,
-        currentPromotion: promotion,
-      ));
+      final result = await _promotionRepository.getPromotionById(event.promotionId!);
+      
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: PromotionsStatus.error,
+            error: error,
+          ));
+        },
+        (promotion) {
+          emit(state.copyWith(
+            status: PromotionsStatus.loaded,
+            currentPromotion: promotion,
+          ));
+        },
+      );
     } catch (e) {
       emit(state.copyWith(
         status: PromotionsStatus.error,
@@ -47,11 +63,22 @@ class PromotionsBloc extends Bloc<PromotionsEvent, PromotionsState> {
     emit(state.copyWith(status: PromotionsStatus.loading));
     
     try {
-      final promotions = await ApiClient.getPromotions();
-      emit(state.copyWith(
-        status: PromotionsStatus.loaded,
-        promotionsList: promotions,
-      ));
+      final result = await _promotionRepository.getPromotions();
+      
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: PromotionsStatus.error,
+            error: error,
+          ));
+        },
+        (promotions) {
+          emit(state.copyWith(
+            status: PromotionsStatus.loaded,
+            promotionsList: promotions,
+          ));
+        },
+      );
     } catch (e) {
       emit(state.copyWith(
         status: PromotionsStatus.error,
@@ -67,10 +94,16 @@ class PromotionsBloc extends Bloc<PromotionsEvent, PromotionsState> {
     if (event.promotionId == null) return;
 
     try {
-      final promotion = await ApiClient.getPromotion(event.promotionId!);
-      emit(state.copyWith(
-        currentPromotion: promotion,
-      ));
+      final result = await _promotionRepository.getPromotionById(event.promotionId!);
+      
+      result.fold(
+        (error) {
+          emit(state.copyWith(error: error));
+        },
+        (promotion) {
+          emit(state.copyWith(currentPromotion: promotion));
+        },
+      );
     } catch (e) {
       emit(state.copyWith(
         error: 'Ошибка обновления акции: $e',
