@@ -1,21 +1,25 @@
+import 'package:client/core/types/promotion_type.dart';
+
 class PromotionEntity {
   final int id;
   final String title; // name в JSON
   final String? description;
-  final String? imageUrl; // может быть null в вашем примере
+  final String? imageUrl;
   final double? discountPercent; // value для percentage
   final double? fixedDiscount; // value для fixed
   final double? minimumAmount; // min_order_amount
-  final DateTime? startDate;
-  final DateTime? endDate;
+  final DateTime startDate;
+  final DateTime endDate;
   final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final String promotionType; // promotion_type
+  final PromotionType promotionType; // promotion_type
   final int? value; // значение акции
   final int? giftProductId; // gift_product_id
   final int? minQuantity; // min_quantity
   final int? priority; // priority
+  final List<int>? categoryIds; // IDs категорий
+  final List<int>? productIds; // IDs товаров
 
   PromotionEntity({
     required this.id,
@@ -25,8 +29,8 @@ class PromotionEntity {
     this.discountPercent,
     this.fixedDiscount,
     this.minimumAmount,
-    this.startDate,
-    this.endDate,
+    required this.startDate,
+    required this.endDate,
     required this.isActive,
     this.createdAt,
     this.updatedAt,
@@ -35,13 +39,15 @@ class PromotionEntity {
     this.giftProductId,
     this.minQuantity,
     this.priority,
+    this.categoryIds,
+    this.productIds,
   });
 
   factory PromotionEntity.fromJson(Map<String, dynamic> json) {
     // Обязательные поля
     final id = json['id'] as int? ?? 0;
-    final title = json['name'] as String? ?? 'Акция'; // поле name в JSON
-    final promotionType = json['promotion_type'] as String? ?? 'percentage';
+    final title = json['name'] as String? ?? 'Акция';
+    final promotionType = PromotionType.fromString(json['promotion_type'] as String? ?? 'percentage');
     
     // Опциональные строки
     final description = json['description'] as String?;
@@ -53,22 +59,22 @@ class PromotionEntity {
     final dynamic value = json['value'];
     
     if (value != null) {
-      if (promotionType == 'percentage' && value is int) {
+      if (promotionType == PromotionType.percentage && value is int) {
         discountPercent = value.toDouble();
-      } else if (promotionType == 'fixed' && value is int) {
+      } else if (promotionType == PromotionType.fixed && value is int) {
         fixedDiscount = value.toDouble();
       } else if (value is double) {
-        if (promotionType == 'percentage') {
+        if (promotionType == PromotionType.percentage) {
           discountPercent = value;
-        } else if (promotionType == 'fixed') {
+        } else if (promotionType == PromotionType.fixed) {
           fixedDiscount = value;
         }
       } else if (value is String) {
         final doubleValue = double.tryParse(value);
         if (doubleValue != null) {
-          if (promotionType == 'percentage') {
+          if (promotionType == PromotionType.percentage) {
             discountPercent = doubleValue;
-          } else if (promotionType == 'fixed') {
+          } else if (promotionType == PromotionType.fixed) {
             fixedDiscount = doubleValue;
           }
         }
@@ -82,10 +88,14 @@ class PromotionEntity {
     final priority = json['priority'] as int?;
     
     // Даты
-    final startDate = _parseDateTime(json['start_date']);
-    final endDate = _parseDateTime(json['end_date']);
+    final startDate = _parseDateTime(json['start_date']) ?? DateTime.now();
+    final endDate = _parseDateTime(json['end_date']) ?? DateTime.now().add(const Duration(days: 30));
     
-    // Булево значение с дефолтом true
+    // Списки ID
+    final categoryIds = _parseIdList(json['category_ids']);
+    final productIds = _parseIdList(json['product_ids']);
+    
+    // Булево значение
     final isActive = json['is_active'] as bool? ?? true;
     
     // Даты создания/обновления
@@ -110,6 +120,8 @@ class PromotionEntity {
       giftProductId: giftProductId,
       minQuantity: minQuantity,
       priority: priority,
+      categoryIds: categoryIds,
+      productIds: productIds,
     );
   }
 
@@ -135,23 +147,37 @@ class PromotionEntity {
     return null;
   }
 
+  static List<int>? _parseIdList(dynamic value) {
+    if (value == null) return null;
+    if (value is List) {
+      return value.whereType<int>().toList();
+    }
+    return null;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'name': title, // обратно в name
+      'name': title,
       'description': description,
       'image_url': imageUrl,
-      'promotion_type': promotionType,
-      'value': value,
+      'promotion_type': promotionType.value,
+      'value': promotionType == PromotionType.percentage 
+          ? discountPercent?.toInt() 
+          : promotionType == PromotionType.fixed 
+              ? fixedDiscount?.toInt() 
+              : value,
       'discount_percent': discountPercent,
       'fixed_discount': fixedDiscount,
       'minimum_amount': minimumAmount,
       'gift_product_id': giftProductId,
       'min_quantity': minQuantity,
-      'start_date': startDate?.toIso8601String(),
-      'end_date': endDate?.toIso8601String(),
+      'start_date': startDate.toIso8601String(),
+      'end_date': endDate.toIso8601String(),
       'is_active': isActive,
       'priority': priority,
+      'category_ids': categoryIds,
+      'product_ids': productIds,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -159,8 +185,21 @@ class PromotionEntity {
 
   bool get isValid {
     final now = DateTime.now();
-    return isActive &&
-        (startDate == null || startDate!.isBefore(now)) &&
-        (endDate == null || endDate!.isAfter(now));
+    return isActive && startDate.isBefore(now) && endDate.isAfter(now);
+  }
+
+  String get discountText {
+    switch (promotionType) {
+      case PromotionType.percentage:
+        return '${discountPercent?.toStringAsFixed(0)}%';
+      case PromotionType.fixed:
+        return '${fixedDiscount?.toStringAsFixed(0)} ₽';
+      case PromotionType.gift:
+        return 'Подарок';
+      case PromotionType.bundle:
+        return 'Набор';
+      case PromotionType.freeShipping:
+        return 'Бесплатная доставка';
+    }
   }
 }

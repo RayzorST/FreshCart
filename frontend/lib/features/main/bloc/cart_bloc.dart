@@ -1,4 +1,3 @@
-// [file name]: cart_bloc.dart
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:injectable/injectable.dart';

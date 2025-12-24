@@ -1,39 +1,33 @@
-import 'package:client/api/client.dart';
-
-class CategoryEntity {
+// tag_entity.dart
+class TagEntity {
   final int id;
   final String name;
   final String? description;
-  final int? parentId;
-  final int? productCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final int? productCount;
 
-  CategoryEntity({
+  TagEntity({
     required this.id,
     required this.name,
     this.description,
-    this.parentId,
-    this.productCount,
     this.createdAt,
     this.updatedAt,
+    this.productCount,
   });
 
-  String get imageUrl => '${ApiClient.baseUrl}/images/categories/$id/image';
-
-  factory CategoryEntity.fromJson(Map<String, dynamic> json) {
-    return CategoryEntity(
+  factory TagEntity.fromJson(Map<String, dynamic> json) {
+    return TagEntity(
       id: json['id'] as int,
       name: json['name'] as String,
       description: json['description'] as String?,
-      parentId: json['parent_id'] as int?,
-      productCount: json['product_count'] as int?,
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'] as String) 
           : null,
       updatedAt: json['updated_at'] != null 
           ? DateTime.parse(json['updated_at'] as String) 
           : null,
+      productCount: json['product_count'] as int?,
     );
   }
 
@@ -42,11 +36,18 @@ class CategoryEntity {
       'id': id,
       'name': name,
       'description': description,
-      'image_url': imageUrl,
-      'parent_id': parentId,
-      'product_count': productCount,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+      'product_count': productCount,
     };
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is TagEntity && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 }

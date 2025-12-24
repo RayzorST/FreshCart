@@ -1,12 +1,15 @@
+// order_management_bloc.dart
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:client/api/client.dart';
-import 'package:flutter/foundation.dart';
+import 'package:client/domain/entities/order_entity.dart';
+import 'package:client/domain/repositories/order_management_repository.dart';
 
 part 'order_management_event.dart';
 part 'order_management_state.dart';
 
 class OrderManagementBloc extends Bloc<OrderManagementEvent, OrderManagementState> {
-  OrderManagementBloc() : super(const OrderManagementInitial()) {
+  final OrderManagementRepository repository;
+
+  OrderManagementBloc({required this.repository}) : super(const OrderManagementInitial()) {
     on<LoadOrders>(_onLoadOrders);
     on<UpdateOrderStatus>(_onUpdateOrderStatus);
     on<ChangeStatusFilter>(_onChangeStatusFilter);
@@ -18,17 +21,15 @@ class OrderManagementBloc extends Bloc<OrderManagementEvent, OrderManagementStat
   ) async {
     emit(const OrderManagementLoading());
     
-    try {
-      final orders = await ApiClient.getAdminOrders(
-        status: event.status == 'all' ? null : event.status,
-      );
-      emit(OrderManagementLoaded(
+    final result = await repository.getOrders(status: event.status);
+    
+    result.fold(
+      (error) => emit(OrderManagementError(error)),
+      (orders) => emit(OrderManagementLoaded(
         orders: orders,
         selectedStatus: event.status ?? 'all',
-      ));
-    } catch (e) {
-      emit(OrderManagementError('Ошибка загрузки заказов: $e'));
-    }
+      )),
+    );
   }
 
   Future<void> _onUpdateOrderStatus(
@@ -39,15 +40,23 @@ class OrderManagementBloc extends Bloc<OrderManagementEvent, OrderManagementStat
 
     final currentState = state as OrderManagementLoaded;
     
-    try {
-      await ApiClient.updateOrderStatus(event.orderId, event.newStatus);
-      
-      // Перезагружаем заказы после обновления статуса
-      add(LoadOrders(status: currentState.selectedStatus));
-    } catch (e) {
-      // Можно добавить обработку ошибок через Snackbar или другое состояние
-      rethrow;
-    }
+    final result = await repository.updateOrderStatus(event.orderId, event.newStatus);
+    
+    result.fold(
+      (error) {
+        // Можно отобразить ошибку, но оставить текущие данные
+        emit(OrderManagementError(error));
+        // Восстанавливаем предыдущее состояние
+        emit(OrderManagementLoaded(
+          orders: currentState.orders,
+          selectedStatus: currentState.selectedStatus,
+        ));
+      },
+      (_) {
+        // Перезагружаем заказы после успешного обновления статуса
+        add(LoadOrders(status: currentState.selectedStatus));
+      },
+    );
   }
 
   Future<void> _onChangeStatusFilter(

@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:client/api/client.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/admin/bloc/product_management_bloc.dart';
+import 'package:client/data/repositories/product_management_repository_impl.dart';
+import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/domain/entities/category_entity.dart';
+import 'package:client/domain/entities/tag_entity.dart';
 
 class ProductManagement extends StatelessWidget {
   const ProductManagement({super.key});
@@ -13,7 +16,9 @@ class ProductManagement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ProductManagementBloc()..add(const LoadProductData()),
+      create: (context) => ProductManagementBloc(
+        repository: ProductManagementRepositoryImpl(),
+      )..add(const LoadProductData()),
       child: const _ProductManagementView(),
     );
   }
@@ -112,7 +117,7 @@ class _ProductManagementView extends StatelessWidget {
     );
   }
 
-  Widget _buildProductsList(BuildContext context, List<dynamic> products, List<dynamic> categories, List<dynamic> tags) {
+  Widget _buildProductsList(BuildContext context, List<ProductEntity> products, List<CategoryEntity> categories, List<TagEntity> tags) {
     if (products.isEmpty) {
       return const Center(child: Text('Товары не найдены'));
     }
@@ -132,8 +137,8 @@ class _ProductManagementView extends StatelessWidget {
           categories: categories,
           tags: tags,
           onEdit: () => _showEditProductDialog(context, product, categories, tags),
-          onDelete: () => _deleteProduct(context, product['id']),
-          onToggleActive: () => _toggleProductActive(context, product['id'], !product['is_active']),
+          onDelete: () => _deleteProduct(context, product.id),
+          onToggleActive: () => _toggleProductActive(context, product.id, !product.isActive),
         );
       },
     );
@@ -161,7 +166,7 @@ class _ProductManagementView extends StatelessWidget {
                         children: [
                           Text(
                             'Категории',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith( // Добавлен context
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -187,31 +192,25 @@ class _ProductManagementView extends StatelessWidget {
                                       height: 32,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(6),
-                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1), // Добавлен context
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                                       ),
-                                      child: category['image_url'] != null
-                                          ? ClipRRect(
-                                              borderRadius: BorderRadius.circular(6),
-                                              child: Image.network(
-                                                category['image_url'],
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  return Icon(
-                                                    Icons.category,
-                                                    size: 16,
-                                                    color: Theme.of(context).colorScheme.primary, // Добавлен context
-                                                  );
-                                                },
-                                              ),
-                                            )
-                                          : Icon(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.network(
+                                          category.imageUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Icon(
                                               Icons.category,
                                               size: 16,
-                                              color: Theme.of(context).colorScheme.primary, // Добавлен context
-                                            ),
+                                              color: Theme.of(context).colorScheme.primary,
+                                            );
+                                          },
+                                        ),
+                                      ),
                                     ),
                                     title: Text(
-                                      category['name'],
+                                      category.name,
                                       style: const TextStyle(fontSize: 14),
                                     ),
                                     trailing: Row(
@@ -224,7 +223,7 @@ class _ProductManagementView extends StatelessWidget {
                                         ),
                                         IconButton(
                                           icon: const Icon(Icons.delete, size: 16),
-                                          onPressed: () => _deleteCategory(context, category['id']),
+                                          onPressed: () => _deleteCategory(context, category.id),
                                           color: Colors.red,
                                         ),
                                       ],
@@ -252,7 +251,7 @@ class _ProductManagementView extends StatelessWidget {
                         children: [
                           Text(
                             'Теги',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith( // Добавлен context
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -278,20 +277,20 @@ class _ProductManagementView extends StatelessWidget {
                                       height: 32,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(6),
-                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1), // Добавлен context
+                                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                                       ),
                                       child: Icon(
                                         Icons.local_offer,
                                         size: 16,
-                                        color: Theme.of(context).colorScheme.primary, // Добавлен context
+                                        color: Theme.of(context).colorScheme.primary,
                                       ),
                                     ),
                                     title: Text(
-                                      tag['name'],
+                                      tag.name,
                                       style: const TextStyle(fontSize: 14),
                                     ),
                                     subtitle: Text(
-                                      '${tag['products_count'] ?? 0} товаров',
+                                      '${tag.productCount ?? 0} товаров',
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                     trailing: Row(
@@ -304,7 +303,7 @@ class _ProductManagementView extends StatelessWidget {
                                         ),
                                         IconButton(
                                           icon: const Icon(Icons.delete, size: 16),
-                                          onPressed: () => _deleteTag(context, tag['id']),
+                                          onPressed: () => _deleteTag(context, tag.id),
                                           color: Colors.red,
                                         ),
                                       ],
@@ -326,19 +325,22 @@ class _ProductManagementView extends StatelessWidget {
 
   // Методы для работы с продуктами
   void _showCreateProductDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => ProductEditDialog(
-        categories: _getCategoriesFromState(context),
-        tags: _getTagsFromState(context),
-        onSave: (productData) {
-          context.read<ProductManagementBloc>().add(CreateProduct(productData));
-        },
-      ),
-    );
+    final state = context.read<ProductManagementBloc>().state;
+    if (state is ProductManagementLoaded) {
+      showDialog(
+        context: context,
+        builder: (context) => ProductEditDialog(
+          categories: state.categories,
+          tags: state.tags,
+          onSave: (productData) {
+            context.read<ProductManagementBloc>().add(CreateProduct(productData));
+          },
+        ),
+      );
+    }
   }
 
-  void _showEditProductDialog(BuildContext context, Map<String, dynamic> product, List<dynamic> categories, List<dynamic> tags) {
+  void _showEditProductDialog(BuildContext context, ProductEntity product, List<CategoryEntity> categories, List<TagEntity> tags) {
     showDialog(
       context: context,
       builder: (context) => ProductEditDialog(
@@ -347,7 +349,7 @@ class _ProductManagementView extends StatelessWidget {
         tags: tags,
         onSave: (productData) {
           context.read<ProductManagementBloc>().add(UpdateProduct(
-            productId: product['id'],
+            productId: product.id,
             productData: productData,
           ));
         },
@@ -377,14 +379,14 @@ class _ProductManagementView extends StatelessWidget {
     );
   }
 
-  void _showEditCategoryDialog(BuildContext context, Map<String, dynamic> category) {
+  void _showEditCategoryDialog(BuildContext context, CategoryEntity category) {
     showDialog(
       context: context,
       builder: (context) => CategoryEditDialog(
         category: category,
         onSave: (categoryData) {
           context.read<ProductManagementBloc>().add(UpdateCategory(
-            categoryId: category['id'],
+            categoryId: category.id,
             categoryData: categoryData,
           ));
         },
@@ -407,14 +409,14 @@ class _ProductManagementView extends StatelessWidget {
     );
   }
 
-  void _showEditTagDialog(BuildContext context, Map<String, dynamic> tag) {
+  void _showEditTagDialog(BuildContext context, TagEntity tag) {
     showDialog(
       context: context,
       builder: (context) => TagEditDialog(
         tag: tag,
         onSave: (tagData) {
           context.read<ProductManagementBloc>().add(UpdateTag(
-            tagId: tag['id'],
+            tagId: tag.id,
             tagData: tagData,
           ));
         },
@@ -425,23 +427,13 @@ class _ProductManagementView extends StatelessWidget {
   void _deleteTag(BuildContext context, int tagId) {
     context.read<ProductManagementBloc>().add(DeleteTag(tagId));
   }
-
-  List<dynamic> _getCategoriesFromState(BuildContext context) {
-    final state = context.read<ProductManagementBloc>().state;
-    return state is ProductManagementLoaded ? state.categories : [];
-  }
-
-  List<dynamic> _getTagsFromState(BuildContext context) {
-    final state = context.read<ProductManagementBloc>().state;
-    return state is ProductManagementLoaded ? state.tags : [];
-  }
 }
 
-// Карточка продукта (остается без изменений)
+// Карточка продукта (обновленная для Entity)
 class ProductCard extends StatelessWidget {
-  final Map<String, dynamic> product;
-  final List<dynamic> categories;
-  final List<dynamic> tags;
+  final ProductEntity product;
+  final List<CategoryEntity> categories;
+  final List<TagEntity> tags;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onToggleActive;
@@ -459,8 +451,8 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final category = categories.firstWhere(
-      (cat) => cat['id'] == product['category_id'],
-      orElse: () => {'name': 'Не указана'},
+      (cat) => cat.id.toString() == product.category,
+      orElse: () => CategoryEntity(id: -1, name: 'Не указана'),
     );
 
     return Card(
@@ -477,26 +469,20 @@ class ProductCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 color: Colors.grey[200],
               ),
-              child: product['image_url'] != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        '${ApiClient.baseUrl}/images/products/${product['id']}/image',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.shopping_bag,
-                            size: 40,
-                            color: Colors.grey[400],
-                          );
-                        },
-                      ),
-                    )
-                  : Icon(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  product.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
                       Icons.shopping_bag,
                       size: 40,
                       color: Colors.grey[400],
-                    ),
+                    );
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             
@@ -505,7 +491,7 @@ class ProductCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    product['name'] ?? 'Без названия',
+                    product.name,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -515,7 +501,7 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${product['price']} ₽',
+                  '${product.price} ₽',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.green,
@@ -528,7 +514,7 @@ class ProductCard extends StatelessWidget {
             
             // Категория и статус
             Text(
-              category['name'],
+              category.name,
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             
@@ -538,18 +524,18 @@ class ProductCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  '${product['stock_quantity']} шт.',
+                  '${product.stockQuantity ?? 0} шт.',
                   style: const TextStyle(fontSize: 12),
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: product['is_active'] ? Colors.green : Colors.red,
+                    color: product.isActive ? Colors.green : Colors.red,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    product['is_active'] ? 'Активен' : 'Неактивен',
+                    product.isActive ? 'Активен' : 'Неактивен',
                     style: const TextStyle(color: Colors.white, fontSize: 10),
                   ),
                 ),
@@ -564,9 +550,9 @@ class ProductCard extends StatelessWidget {
               children: [
                 IconButton(
                   icon: Icon(
-                    product['is_active'] ? Icons.visibility_off : Icons.visibility,
+                    product.isActive ? Icons.visibility_off : Icons.visibility,
                     size: 18,
-                    color: product['is_active'] ? Colors.orange : Colors.green,
+                    color: product.isActive ? Colors.orange : Colors.green,
                   ),
                   onPressed: onToggleActive,
                 ),
@@ -587,11 +573,11 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-// Диалог редактирования продукта (остается без изменений)
+// Диалог редактирования продукта (обновленный для Entity)
 class ProductEditDialog extends StatefulWidget {
-  final Map<String, dynamic>? product;
-  final List<dynamic> categories;
-  final List<dynamic> tags;
+  final ProductEntity? product;
+  final List<CategoryEntity> categories;
+  final List<TagEntity> tags;
   final Function(Map<String, dynamic>) onSave;
 
   const ProductEditDialog({
@@ -620,11 +606,11 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
   void initState() {
     super.initState();
     if (widget.product != null) {
-      _nameController.text = widget.product!['name'] ?? '';
-      _descriptionController.text = widget.product!['description'] ?? '';
-      _priceController.text = widget.product!['price']?.toString() ?? '';
-      _stockController.text = widget.product!['stock_quantity']?.toString() ?? '';
-      _selectedCategoryId = widget.product!['category_id']?.toString();
+      _nameController.text = widget.product!.name;
+      _descriptionController.text = widget.product!.description ?? '';
+      _priceController.text = widget.product!.price.toString();
+      _stockController.text = widget.product!.stockQuantity?.toString() ?? '0';
+      _selectedCategoryId = widget.product!.category;
     }
   }
 
@@ -696,8 +682,8 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                 decoration: const InputDecoration(labelText: 'Категория'),
                 items: widget.categories.map<DropdownMenuItem<String>>((category) {
                   return DropdownMenuItem<String>(
-                    value: category['id'].toString(),
-                    child: Text(category['name']),
+                    value: category.id.toString(),
+                    child: Text(category.name),
                   );
                 }).toList(),
                 onChanged: (value) {
@@ -760,9 +746,9 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
   }
 }
 
-// Диалог редактирования категории (остается без изменений)
+// Диалог редактирования категории (обновленный для Entity)
 class CategoryEditDialog extends StatefulWidget {
-  final Map<String, dynamic>? category;
+  final CategoryEntity? category;
   final Function(Map<String, dynamic>) onSave;
 
   const CategoryEditDialog({
@@ -785,7 +771,7 @@ class _CategoryEditDialogState extends State<CategoryEditDialog> {
   void initState() {
     super.initState();
     if (widget.category != null) {
-      _nameController.text = widget.category!['name'] ?? '';
+      _nameController.text = widget.category!.name;
     }
   }
 
@@ -861,9 +847,9 @@ class _CategoryEditDialogState extends State<CategoryEditDialog> {
   }
 }
 
-// Диалог редактирования тега (остается без изменений)
+// Диалог редактирования тега (обновленный для Entity)
 class TagEditDialog extends StatefulWidget {
-  final Map<String, dynamic>? tag;
+  final TagEntity? tag;
   final Function(Map<String, dynamic>) onSave;
 
   const TagEditDialog({
@@ -884,7 +870,7 @@ class _TagEditDialogState extends State<TagEditDialog> {
   void initState() {
     super.initState();
     if (widget.tag != null) {
-      _nameController.text = widget.tag!['name'] ?? '';
+      _nameController.text = widget.tag!.name;
     }
   }
 

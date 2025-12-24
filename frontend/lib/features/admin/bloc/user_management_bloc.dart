@@ -1,12 +1,15 @@
+// user_management_bloc.dart
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:client/api/client.dart';
-import 'package:flutter/foundation.dart';
+import 'package:client/domain/entities/user_entity.dart';
+import 'package:client/domain/repositories/user_management_repository.dart';
 
 part 'user_management_event.dart';
 part 'user_management_state.dart';
 
 class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> {
-  UserManagementBloc() : super(const UserManagementInitial()) {
+  final UserManagementRepository repository;
+
+  UserManagementBloc({required this.repository}) : super(const UserManagementInitial()) {
     on<LoadUsers>(_onLoadUsers);
     on<BlockUser>(_onBlockUser);
     on<UnblockUser>(_onUnblockUser);
@@ -19,50 +22,56 @@ class UserManagementBloc extends Bloc<UserManagementEvent, UserManagementState> 
   ) async {
     emit(const UserManagementLoading());
     
-    try {
-      final users = await ApiClient.getAdminUsers();
-      emit(UserManagementLoaded(users));
-    } catch (e) {
-      emit(UserManagementError('Ошибка загрузки пользователей: $e'));
-    }
+    final result = await repository.getUsers();
+    
+    result.fold(
+      (error) => emit(UserManagementError(error)),
+      (users) => emit(UserManagementLoaded(users)),
+    );
   }
 
   Future<void> _onBlockUser(
     BlockUser event,
     Emitter<UserManagementState> emit,
   ) async {
-    try {
-      await ApiClient.blockUser(event.userId);
-      emit(const UserManagementOperationSuccess('Пользователь заблокирован'));
-      add(const LoadUsers());
-    } catch (e) {
-      emit(UserManagementError('Ошибка при блокировке: $e'));
-    }
+    final result = await repository.blockUser(event.userId);
+    
+    result.fold(
+      (error) => emit(UserManagementError(error)),
+      (_) {
+        emit(const UserManagementOperationSuccess('Пользователь заблокирован'));
+        add(const LoadUsers());
+      },
+    );
   }
 
   Future<void> _onUnblockUser(
     UnblockUser event,
     Emitter<UserManagementState> emit,
   ) async {
-    try {
-      await ApiClient.unblockUser(event.userId);
-      emit(const UserManagementOperationSuccess('Пользователь разблокирован'));
-      add(const LoadUsers());
-    } catch (e) {
-      emit(UserManagementError('Ошибка при разблокировке: $e'));
-    }
+    final result = await repository.unblockUser(event.userId);
+    
+    result.fold(
+      (error) => emit(UserManagementError(error)),
+      (_) {
+        emit(const UserManagementOperationSuccess('Пользователь разблокирован'));
+        add(const LoadUsers());
+      },
+    );
   }
 
   Future<void> _onChangeUserRole(
     ChangeUserRole event,
     Emitter<UserManagementState> emit,
   ) async {
-    try {
-      await ApiClient.setUserRole(event.userId, event.newRole);
-      emit(UserManagementOperationSuccess('Роль изменена на ${event.newRole}'));
-      add(const LoadUsers());
-    } catch (e) {
-      emit(UserManagementError('Ошибка при смене роли: $e'));
-    }
+    final result = await repository.changeUserRole(event.userId, event.newRole);
+    
+    result.fold(
+      (error) => emit(UserManagementError(error)),
+      (_) {
+        emit(UserManagementOperationSuccess('Роль изменена на ${event.newRole}'));
+        add(const LoadUsers());
+      },
+    );
   }
 }

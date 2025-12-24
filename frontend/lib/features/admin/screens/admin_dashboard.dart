@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/features/admin/bloc/admin_dashboard_bloc.dart';
+import 'package:client/data/repositories/admin_dashboard_repository_impl.dart';
+import 'package:client/domain/entities/admin_stats_entity.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -9,7 +11,9 @@ class AdminDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => AdminDashboardBloc()..add(const LoadAdminStats()),
+      create: (context) => AdminDashboardBloc(
+        repository: AdminDashboardRepositoryImpl(),
+      )..add(const LoadAdminStats()),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -63,7 +67,7 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, Map<String, dynamic> stats) {
+  Widget _buildStatsGrid(BuildContext context, AdminStatsEntity stats) {
     return GridView.count(
       shrinkWrap: true,
       crossAxisCount: 4,
@@ -73,28 +77,28 @@ class AdminDashboard extends StatelessWidget {
         _buildStatCard(
           context,
           'Пользователи',
-          stats['total_users']?.toString() ?? '0',
+          stats.totalUsers.toString(),
           Icons.people,
           Colors.blue,
         ),
         _buildStatCard(
           context,
           'Товары',
-          stats['total_products']?.toString() ?? '0',
+          stats.totalProducts.toString(),
           Icons.shopping_bag,
           Colors.green,
         ),
         _buildStatCard(
           context,
           'Заказы',
-          stats['total_orders']?.toString() ?? '0',
+          stats.totalOrders.toString(),
           Icons.receipt_long,
           Colors.orange,
         ),
         _buildStatCard(
           context,
           'Акции',
-          stats['total_promotions']?.toString() ?? '0',
+          stats.activePromotions.toString(),
           Icons.local_offer,
           Colors.purple,
         ),

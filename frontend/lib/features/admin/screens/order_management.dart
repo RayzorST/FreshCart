@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/admin/bloc/order_management_bloc.dart';
+import 'package:client/data/repositories/order_management_repository_impl.dart';
+import 'package:client/domain/entities/order_entity.dart';
 
 class OrderManagement extends StatelessWidget {
   const OrderManagement({super.key});
@@ -10,7 +12,9 @@ class OrderManagement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => OrderManagementBloc()..add(const LoadOrders(status: 'all')),
+      create: (context) => OrderManagementBloc(
+        repository: OrderManagementRepositoryImpl(),
+      )..add(const LoadOrders(status: 'all')),
       child: const _OrderManagementView(),
     );
   }
@@ -102,7 +106,7 @@ class _OrderManagementView extends StatelessWidget {
             ),
           );
         } else if (state is OrderManagementLoaded) {
-          return _buildOrdersList(context, state.orders);
+          return _buildOrdersList(context, state.filteredOrders);
         } else {
           return const Center(child: Text('Загрузка...'));
         }
@@ -110,7 +114,7 @@ class _OrderManagementView extends StatelessWidget {
     );
   }
 
-  Widget _buildOrdersList(BuildContext context, List<dynamic> orders) {
+  Widget _buildOrdersList(BuildContext context, List<OrderEntity> orders) {
     if (orders.isEmpty) {
       return const Center(child: Text('Заказы не найдены'));
     }
@@ -122,7 +126,7 @@ class _OrderManagementView extends StatelessWidget {
           final order = orders[index];
           return OrderCard(
             order: order,
-            onStatusChange: (newStatus) => _updateOrderStatus(context, order['id'], newStatus),
+            onStatusChange: (newStatus) => _updateOrderStatus(context, order.id, newStatus),
           );
         },
       ),
@@ -142,7 +146,7 @@ class _OrderManagementView extends StatelessWidget {
 }
 
 class OrderCard extends StatelessWidget {
-  final Map<String, dynamic> order;
+  final OrderEntity order;
   final Function(String) onStatusChange;
 
   const OrderCard({
@@ -153,8 +157,8 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _getStatusColor(order['status']);
-    final statusText = _getStatusText(order['status']);
+    final statusColor = _getStatusColor(order.status);
+    final statusText = _getStatusText(order.status);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -167,7 +171,7 @@ class OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Заказ #${order['id']}',
+                  'Заказ #${order.id}',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Container(
@@ -185,14 +189,14 @@ class OrderCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text('Пользователь: ${order['user']?['email'] ?? 'Неизвестно'}'),
-            Text('Адрес: ${order['shipping_address']}'),
-            Text('Сумма: ${order['total_amount']} ₽'),
-            Text('Дата: ${DateTime.parse(order['created_at']).toString().substring(0, 16)}'),
+            Text('Пользователь ID: ${order.userId}'),
+            Text('Адрес: ${order.shippingAddress}'),
+            Text('Сумма: ${order.totalAmount} ₽'),
+            Text('Дата: ${order.createdAt.toString().substring(0, 16)}'),
             const SizedBox(height: 8),
-            ...order['items'].map<Widget>((item) => Padding(
+            ...order.items.map<Widget>((item) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text('• ${item['product']?['name']} - ${item['quantity']} шт. x ${item['price']} ₽'),
+              child: Text('• ${item.product.name} - ${item.quantity} шт. x ${item.price} ₽'),
             )).toList(),
             const SizedBox(height: 12),
             Row(
@@ -200,7 +204,7 @@ class OrderCard extends StatelessWidget {
                 const Text('Изменить статус:'),
                 const SizedBox(width: 8),
                 DropdownButton<String>(
-                  value: order['status'],
+                  value: order.status,
                   items: const [
                     DropdownMenuItem(value: 'pending', child: Text('Ожидание')),
                     DropdownMenuItem(value: 'confirmed', child: Text('Подтвердить')),

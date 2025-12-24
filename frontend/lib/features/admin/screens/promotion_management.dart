@@ -1,7 +1,12 @@
+// promotion_management.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/admin/bloc/promotion_management_bloc.dart';
+import 'package:client/features/admin/bloc/product_management_bloc.dart';
+import 'package:client/data/repositories/promotion_management_repository_impl.dart';
+import 'package:client/domain/entities/promotion_entity.dart';
+import 'package:client/core/widgets/promotion_form_dialog.dart';
 
 class PromotionManagement extends StatelessWidget {
   const PromotionManagement({super.key});
@@ -9,7 +14,9 @@ class PromotionManagement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => PromotionManagementBloc()..add(const LoadPromotions()),
+      create: (context) => PromotionManagementBloc(
+        repository: PromotionManagementRepositoryImpl(),
+      )..add(const LoadPromotions()),
       child: const _PromotionManagementView(),
     );
   }
@@ -43,21 +50,42 @@ class _PromotionManagementView extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Управление акциями',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        ElevatedButton.icon(
-          onPressed: () => _showCreatePromotionDialog(context),
-          icon: const Icon(Icons.add),
-          label: const Text('Создать акцию'),
-        ),
-      ],
+    return BlocBuilder<PromotionManagementBloc, PromotionManagementState>(
+      builder: (context, state) {
+        int activeCount = 0;
+        int totalCount = 0;
+        
+        if (state is PromotionManagementLoaded) {
+          activeCount = state.activePromotions.length;
+          totalCount = state.promotions.length;
+        }
+        
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Управление акциями',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Row(
+              children: [
+                Text(
+                  'Активных: $activeCount/$totalCount',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: () => _showCreatePromotionDialog(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Создать акцию'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -95,7 +123,7 @@ class _PromotionManagementView extends StatelessWidget {
     );
   }
 
-  Widget _buildPromotionsList(BuildContext context, List<dynamic> promotions) {
+  Widget _buildPromotionsList(BuildContext context, List<PromotionEntity> promotions) {
     if (promotions.isEmpty) {
       return const Center(child: Text('Акции не найдены'));
     }
@@ -107,32 +135,58 @@ class _PromotionManagementView extends StatelessWidget {
           final promotion = promotions[index];
           return PromotionCard(
             promotion: promotion,
-            onDelete: () => _deletePromotion(context, promotion['id']),
+            onDelete: () => _deletePromotion(context, promotion.id),
+            onEdit: () => null,
           );
         },
       ),
     );
   }
 
+  // promotion_management.dart (обновляем метод _showCreatePromotionDialog)
   void _showCreatePromotionDialog(BuildContext context) {
+    final productManagementState = context.read<ProductManagementBloc>().state;
+    
+    if (productManagementState is! ProductManagementLoaded) {
+      AppSnackbar.showError(context: context, message: 'Не удалось загрузить данные товаров');
+      return;
+    }
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Создать акцию'),
-        content: const Text('Форма создания акции будет здесь'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Создать акцию
-              Navigator.of(context).pop();
-            },
-            child: const Text('Создать'),
-          ),
-        ],
+      builder: (context) => PromotionFormDialog(
+        categories: productManagementState.categories,
+        products: productManagementState.products,
+        onSave: (promotionData) {
+          Navigator.of(context).pop();
+          context.read<PromotionManagementBloc>().add(CreatePromotion(promotionData));
+        },
+      ),
+    );
+  }
+
+  // Также добавим метод для редактирования
+  void _showEditPromotionDialog(BuildContext context, PromotionEntity promotion) {
+    final productManagementState = context.read<ProductManagementBloc>().state;
+    
+    if (productManagementState is! ProductManagementLoaded) {
+      AppSnackbar.showError(context: context, message: 'Не удалось загрузить данные товаров');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => PromotionFormDialog(
+        promotion: promotion,
+        categories: productManagementState.categories,
+        products: productManagementState.products,
+        onSave: (promotionData) {
+          Navigator.of(context).pop();
+          context.read<PromotionManagementBloc>().add(UpdatePromotion(
+            promotionId: promotion.id,
+            promotionData: promotionData,
+          ));
+        },
       ),
     );
   }
@@ -142,15 +196,25 @@ class _PromotionManagementView extends StatelessWidget {
   }
 }
 
+// promotion_management.dart (обновляем метод форматирования даты)
 class PromotionCard extends StatelessWidget {
-  final Map<String, dynamic> promotion;
+  final PromotionEntity promotion;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   const PromotionCard({
     super.key,
     required this.promotion,
     required this.onDelete,
+    required this.onEdit,
   });
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    return '$day.$month.$year';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -161,33 +225,48 @@ class PromotionCard extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: promotion['is_active'] ? Colors.green : Colors.grey,
+            color: promotion.isValid ? Colors.green : Colors.grey,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
-            promotion['is_active'] ? Icons.local_offer : Icons.local_offer_outlined,
+            promotion.isValid ? Icons.local_offer : Icons.local_offer_outlined,
             color: Colors.white,
           ),
         ),
-        title: Text(promotion['name']),
+        title: Text(promotion.title),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Тип: ${promotion['promotion_type']}'),
-            Text('Скидка: ${promotion['discount_value']}%'),
-            Text('Период: ${promotion['start_date'].toString().substring(0, 10)} - ${promotion['end_date'].toString().substring(0, 10)}'),
+            Text('Тип: ${promotion.promotionType.displayName}'),
+            if (promotion.discountPercent != null)
+              Text('Скидка: ${promotion.discountPercent}%'),
+            if (promotion.fixedDiscount != null)
+              Text('Фиксированная скидка: ${promotion.fixedDiscount} ₽'),
+            Text('Период: ${_formatDate(promotion.startDate)} - '
+                 '${_formatDate(promotion.endDate)}'),
             Text(
-              promotion['is_active'] ? 'Активна' : 'Неактивна',
+              promotion.isValid ? 'Активна' : 'Неактивна',
               style: TextStyle(
-                color: promotion['is_active'] ? Colors.green : Colors.grey,
+                color: promotion.isValid ? Colors.green : Colors.grey,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: onDelete,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, size: 18),
+              onPressed: onEdit,
+              tooltip: 'Редактировать',
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+              onPressed: onDelete,
+              tooltip: 'Удалить',
+            ),
+          ],
         ),
       ),
     );

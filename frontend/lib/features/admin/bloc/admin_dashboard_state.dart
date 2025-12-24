@@ -14,7 +14,7 @@ class AdminDashboardLoading extends AdminDashboardState {
 }
 
 class AdminDashboardLoaded extends AdminDashboardState {
-  final Map<String, dynamic> stats;
+  final AdminStatsEntity stats;
 
   const AdminDashboardLoaded(this.stats);
 
@@ -23,19 +23,17 @@ class AdminDashboardLoaded extends AdminDashboardState {
     if (identical(this, other)) return true;
   
     return other is AdminDashboardLoaded &&
-      _mapsEqual(other.stats, stats);
-  }
-
-  bool _mapsEqual(Map<String, dynamic> map1, Map<String, dynamic> map2) {
-    if (map1.length != map2.length) return false;
-    for (final key in map1.keys) {
-      if (map1[key] != map2[key]) return false;
-    }
-    return true;
+      other.stats.totalUsers == stats.totalUsers &&
+      other.stats.totalOrders == stats.totalOrders &&
+      other.stats.totalRevenue == stats.totalRevenue;
   }
 
   @override
-  int get hashCode => stats.hashCode;
+  int get hashCode => Object.hash(
+    stats.totalUsers,
+    stats.totalOrders,
+    stats.totalRevenue,
+  );
 }
 
 class AdminDashboardError extends AdminDashboardState {

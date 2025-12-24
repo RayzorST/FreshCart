@@ -19,3 +19,13 @@ class DeletePromotion extends PromotionManagementEvent {
 
   const DeletePromotion(this.promotionId);
 }
+
+class UpdatePromotion extends PromotionManagementEvent {
+  final int promotionId;
+  final Map<String, dynamic> promotionData;
+
+  const UpdatePromotion({
+    required this.promotionId,
+    required this.promotionData,
+  });
+}

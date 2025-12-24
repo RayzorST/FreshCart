@@ -22,6 +22,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final profile = await ApiClient.getProfile();
 
       final user = UserEntity(
+        id: profile['id'] as int,
         email: profile['email'] as String,
         firstName: profile['first_name'] as String?,
         lastName: profile['last_name'] as String?,
@@ -55,6 +56,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await saveToken(token);
 
       final user = UserEntity(
+        id: 0,
         email: email,
         firstName: firstName,
         lastName: lastName,
@@ -112,6 +114,7 @@ class AuthRepositoryImpl implements AuthRepository {
     if (userJsonString != null) {
       final userJson = json.decode(userJsonString) as Map<String, dynamic>;
       return UserEntity(
+        id: 0,
         email: userJson['email'] as String,
         firstName: userJson['firstName'] as String?,
         lastName: userJson['lastName'] as String?,
@@ -134,6 +137,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final profile = await ApiClient.getProfile();
 
       final user = UserEntity(
+        id: 0,
         email: profile['email'] as String,
         firstName: profile['first_name'] as String?,
         lastName: profile['last_name'] as String?,

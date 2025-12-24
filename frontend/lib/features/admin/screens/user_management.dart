@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/admin/bloc/user_management_bloc.dart';
+import 'package:client/data/repositories/user_management_repository_impl.dart';
+import 'package:client/domain/entities/user_entity.dart';
 
 class UserManagement extends StatelessWidget {
   const UserManagement({super.key});
@@ -10,7 +12,9 @@ class UserManagement extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => UserManagementBloc()..add(const LoadUsers()),
+      create: (context) => UserManagementBloc(
+        repository: UserManagementRepositoryImpl(),
+      )..add(const LoadUsers()),
       child: const _UserManagementView(),
     );
   }
@@ -44,11 +48,32 @@ class _UserManagementView extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Text(
-      'Управление пользователями',
-      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-        fontWeight: FontWeight.bold,
-      ),
+    return BlocBuilder<UserManagementBloc, UserManagementState>(
+      builder: (context, state) {
+        if (state is UserManagementLoaded) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Управление пользователями',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Всего: ${state.totalUsers} | Активных: ${state.activeUsersCount}',
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          );
+        }
+        return Text(
+          'Управление пользователями',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        );
+      },
     );
   }
 
@@ -86,7 +111,7 @@ class _UserManagementView extends StatelessWidget {
     );
   }
 
-  Widget _buildUsersList(BuildContext context, List<dynamic> users) {
+  Widget _buildUsersList(BuildContext context, List<UserEntity> users) {
     if (users.isEmpty) {
       return const Center(child: Text('Пользователи не найдены'));
     }
@@ -104,9 +129,9 @@ class _UserManagementView extends StatelessWidget {
           final user = users[index];
           return UserCard(
             user: user,
-            onBlock: user['is_active'] ? () => _blockUser(context, user['id']) : null,
-            onUnblock: !user['is_active'] ? () => _unblockUser(context, user['id']) : null,
-            onChangeRole: (newRole) => _changeUserRole(context, user['id'], newRole),
+            onBlock: user.isActive ? () => _blockUser(context, user.id) : null,
+            onUnblock: !user.isActive ? () => _unblockUser(context, user.id) : null,
+            onChangeRole: (newRole) => _changeUserRole(context, user.id, newRole),
           );
         },
       ),
@@ -130,7 +155,7 @@ class _UserManagementView extends StatelessWidget {
 }
 
 class UserCard extends StatelessWidget {
-  final Map<String, dynamic> user;
+  final UserEntity user;
   final VoidCallback? onBlock;
   final VoidCallback? onUnblock;
   final Function(String) onChangeRole;
@@ -156,9 +181,9 @@ class UserCard extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: user['is_active'] ? Colors.green : Colors.red,
+                  backgroundColor: user.isActive ? Colors.green : Colors.red,
                   child: Text(
-                    user['first_name']?.toString().substring(0, 1) ?? 'U',
+                    user.displayName.substring(0, 1).toUpperCase(),
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
@@ -168,7 +193,7 @@ class UserCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${user['first_name']} ${user['last_name']}',
+                        user.displayName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -177,7 +202,7 @@ class UserCard extends StatelessWidget {
                         maxLines: 1,
                       ),
                       Text(
-                        user['email'],
+                        user.email,
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
@@ -198,20 +223,27 @@ class UserCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Роль: ${user['role']?['name'] ?? 'user'}',
+                  'Роль: ${user.role ?? 'user'}',
                   style: const TextStyle(fontSize: 14),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user['is_active'] ? 'Активен' : 'Заблокирован',
+                  user.isActive ? 'Активен' : 'Заблокирован',
                   style: TextStyle(
-                    color: user['is_active'] ? Colors.green : Colors.red,
+                    color: user.isActive ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
                 ),
+                if (user.phone != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Телефон: ${user.phone}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
               ],
             ),
             

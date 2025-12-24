@@ -166,6 +166,57 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> uploadCategoryImageBase64(int categoryId, String base64Image) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/images/categories/$categoryId/image'),
+      headers: _headers,
+      body: json.encode({
+        'image_data': base64Image,
+      }),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> uploadCategoryImageFile(
+    int categoryId, 
+    String filePath, 
+    List<int> fileBytes
+  ) async {
+    // Создаем multipart запрос
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/images/categories/$categoryId/image-file'),
+    );
+
+    // Добавляем заголовки
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+
+    // Добавляем файл
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        fileBytes,
+        filename: filePath.split('/').last,
+      ),
+    );
+
+    // Отправляем запрос
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> deleteCategoryImage(int categoryId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/images/categories/$categoryId/image'),
+      headers: _headers,
+    );
+    return _handleResponse(response);
+  }
+
   // Cart
   static Future<Map<String, dynamic>> getCart() async {
     final response = await http.get(

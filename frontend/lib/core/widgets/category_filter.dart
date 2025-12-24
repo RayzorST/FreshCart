@@ -19,7 +19,7 @@ class CategoryFilterWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [   
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: (isWideScreen ? 8 : 0)),
               child: Row(
                 children: [
                   Text(

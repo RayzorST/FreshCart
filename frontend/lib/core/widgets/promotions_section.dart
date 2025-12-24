@@ -80,7 +80,7 @@ class PromotionsSection extends StatelessWidget {
 
     return ListView.builder(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(left: 20, right: 20),
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 0),
       itemCount: state.promotions.length,
       itemBuilder: (context, index) {
         final promotion = state.promotions[index];

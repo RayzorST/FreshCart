@@ -1,11 +1,15 @@
+// admin_dashboard_bloc.dart
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:client/api/client.dart';
+import 'package:client/domain/entities/admin_stats_entity.dart';
+import 'package:client/domain/repositories/admin_dashboard_repository.dart';
 
 part 'admin_dashboard_event.dart';
 part 'admin_dashboard_state.dart';
 
 class AdminDashboardBloc extends Bloc<AdminDashboardEvent, AdminDashboardState> {
-  AdminDashboardBloc() : super(const AdminDashboardInitial()) {
+  final AdminDashboardRepository repository;
+
+  AdminDashboardBloc({required this.repository}) : super(const AdminDashboardInitial()) {
     on<LoadAdminStats>(_onLoadAdminStats);
   }
 
@@ -15,11 +19,11 @@ class AdminDashboardBloc extends Bloc<AdminDashboardEvent, AdminDashboardState> 
   ) async {
     emit(const AdminDashboardLoading());
     
-    try {
-      final stats = await ApiClient.getAdminStats();
-      emit(AdminDashboardLoaded(stats));
-    } catch (e) {
-      emit(AdminDashboardError('Ошибка загрузки статистики: $e'));
-    }
+    final result = await repository.getAdminStats();
+    
+    result.fold(
+      (error) => emit(AdminDashboardError(error)),
+      (stats) => emit(AdminDashboardLoaded(stats)),
+    );
   }
 }

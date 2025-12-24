@@ -115,24 +115,17 @@ class PromotionService:
                             products: Dict[int, Product]) -> bool:
         """
         Применяет одну акцию к товарам
-        """
-        print(f"=== APPLYING PROMOTION: {promotion.name} ===")
-        print(f"Type: {promotion.promotion_type}, Value: {promotion.value}")
-        
+        """    
         # Проверяем минимальную сумму заказа
         cart_total = sum(item['price'] * item['quantity'] for item in items)
-        print(f"Cart total: {cart_total}, Min order: {promotion.min_order_amount}")
         
         if cart_total < promotion.min_order_amount / 100:
-            print(f"❌ Cart total {cart_total} < min order {promotion.min_order_amount}")
             return False
         
         # Фильтруем товары, подходящие под акцию
         applicable_items = self.get_applicable_items(items, promotion, products)
-        print(f"Applicable items: {len(applicable_items)}")
         
         if not applicable_items:
-            print("❌ No applicable items")
             return False
         
         # Применяем акцию в зависимости от типа
@@ -144,7 +137,6 @@ class PromotionService:
         elif promotion.promotion_type == PromotionType.GIFT:
             result = self.apply_gift_promotion(applicable_items, promotion, products)
         
-        print(f"✅ Promotion applied: {result}")
         return result
 
     def get_applicable_items(self, items: List[Dict], promotion: Promotion, 
@@ -154,29 +146,21 @@ class PromotionService:
         """
         applicable_items = []
         
-        print(f"Checking promotion categories: {[pc.category_id for pc in promotion.categories]}")
-        print(f"Checking promotion products: {[pp.product_id for pp in promotion.products]}")
-        
         # Проверяем товары по категориям
         if promotion.categories:
             promotion_category_ids = [pc.category_id for pc in promotion.categories]
-            print(f"Promotion category IDs: {promotion_category_ids}")
             
             for item in items:
                 product = products.get(item['product_id'])
                 if product:
-                    print(f"Product {product.id}: category {product.category_id}, in promotion categories: {product.category_id in promotion_category_ids}")
-                    print(f"Product {product.id} : {promotion.gift_product_id} | {product.id == promotion.gift_product_id}")
                     if product.category_id in promotion_category_ids:
                         applicable_items.append(item)
         
         # Проверяем конкретные товары
         elif promotion.products:
             promotion_product_ids = [pp.product_id for pp in promotion.products]
-            print(f"Promotion product IDs: {promotion_product_ids}")
             
             for item in items:
-                print(f"Product {item['product_id']} in promotion products: {item['product_id'] in promotion_product_ids or item['product_id'] == promotion.gift_product_id}")
                 if item['product_id'] in promotion_product_ids or item['product_id'] == promotion.gift_product_id:
                     applicable_items.append(item)
         
@@ -190,10 +174,7 @@ class PromotionService:
         for item in applicable_items:
             if item['quantity'] >= promotion.min_quantity or item['product_id'] == promotion.gift_product_id:
                 filtered_items.append(item)
-            else:
-                print(f"Item {item['product_id']} quantity {item['quantity']} < min {promotion.min_quantity}")
         
-        print(f"After quantity filter: {len(filtered_items)} items")
         return filtered_items
 
     def apply_percentage_discount(self, items: List[Dict], promotion: Promotion) -> bool:
