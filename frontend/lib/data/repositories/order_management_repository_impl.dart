@@ -12,7 +12,7 @@ class OrderManagementRepositoryImpl implements OrderManagementRepository {
         status: status == 'all' ? null : status,
       );
       
-      final orders = (response as List)
+      final orders = (response)
           .map((json) => OrderEntity.fromJson(json as Map<String, dynamic>))
           .toList();
       

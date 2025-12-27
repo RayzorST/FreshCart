@@ -24,6 +24,16 @@ class UpdateProduct extends ProductManagementEvent {
   });
 }
 
+class UploadProductImage extends ProductManagementEvent {
+  final int productId;
+  final String? base64Image;
+
+  const UploadProductImage({
+    required this.productId,
+    this.base64Image,
+  });
+}
+
 class DeleteProduct extends ProductManagementEvent {
   final int productId;
 
@@ -53,6 +63,16 @@ class UpdateCategory extends ProductManagementEvent {
   const UpdateCategory({
     required this.categoryId,
     required this.categoryData,
+  });
+}
+
+class UploadCategoryImage extends ProductManagementEvent {
+  final int categoryId;
+  final String? base64Image;
+
+  const UploadCategoryImage({
+    required this.categoryId,
+    this.base64Image,
   });
 }
 

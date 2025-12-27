@@ -521,6 +521,18 @@ class ApiClient {
     _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> uploadProductImageBase64(
+    int productId, 
+    String base64Image
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/images/products/$productId/image'),
+      headers: _headers,
+      body: json.encode({'image_data': base64Image}),
+    );
+    return _handleResponse(response);
+  }
+
   // Admin - Orders
   static Future<List<dynamic>> getAdminOrders({String? status, int skip = 0, int limit = 100}) async {
     final params = <String, String>{

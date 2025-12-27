@@ -433,6 +433,7 @@ async def create_product_admin(
     admin: User = Depends(get_current_admin)
 ):
     """Создание товара (админ)"""
+    # Проверяем категорию
     if product_data.category_id:
         category = db.query(Category).filter(Category.id == product_data.category_id).first()
         if not category:
@@ -441,7 +442,15 @@ async def create_product_admin(
                 detail="Category not found"
             )
     
-    product = Product(**product_data.dict())
+    # Создаем продукт без тегов
+    product_dict = product_data.dict(exclude={'tag_ids'})
+    product = Product(**product_dict)
+    
+    # Добавляем теги если они есть
+    if product_data.tag_ids:
+        tags = db.query(Tag).filter(Tag.id.in_(product_data.tag_ids)).all()
+        product.tags = tags
+    
     db.add(product)
     db.commit()
     db.refresh(product)
@@ -461,10 +470,29 @@ async def update_product_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
-
-    update_data = product_data.dict(exclude_unset=True)
+    
+    # Обновляем базовые поля
+    update_data = product_data.dict(exclude_unset=True, exclude={'tag_ids'})
     for field, value in update_data.items():
         setattr(product, field, value)
+    
+    # Обновляем категорию если нужно
+    if product_data.category_id is not None:
+        if product_data.category_id == 0:  # Удаляем категорию
+            product.category_id = None
+        else:
+            category = db.query(Category).filter(Category.id == product_data.category_id).first()
+            if not category:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Category not found"
+                )
+            product.category_id = product_data.category_id
+    
+    # Обновляем теги если они переданы
+    if product_data.tag_ids is not None:
+        tags = db.query(Tag).filter(Tag.id.in_(product_data.tag_ids)).all()
+        product.tags = tags
     
     db.commit()
     db.refresh(product)
@@ -476,22 +504,23 @@ async def delete_product_admin(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):
-    """Полное удаление товара (админ)"""
+    """Удаление товара (админ)"""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
-
-    # Удаляем связи с тегами
-    db.query(ProductTag).filter(ProductTag.product_id == product_id).delete()
     
-    # Полное удаление товара
+    # Сначала очищаем связи с тегами
+    product.tags = []
+    db.commit()
+    
+    # Теперь удаляем сам товар
     db.delete(product)
     db.commit()
     
-    return {"message": "Product permanently deleted"}
+    return {"message": "Product deleted successfully"}
 
 # В products.py добавим админ-эндпоинты для категорий
 
@@ -590,30 +619,27 @@ async def delete_category_admin(
 # В products.py добавим админ-эндпоинты для тегов
 
 @router.get("/admin/tags", response_model=List[TagResponse])
-async def get_all_tags_admin(
-    skip: int = 0,
-    limit: int = 100,
-    search: Optional[str] = Query(None),
+async def get_all_tags(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):
     """Получение всех тегов (админ)"""
-    query = db.query(Tag)
+    tags = db.query(Tag).all()
+
+    #for tag in tags:
+    #    tag.product_count = len(db.query(Product).where(tag in Product.product_tags).count())
     
-    if search:
-        query = query.filter(Tag.name.ilike(f"%{search}%"))
-    
-    tags = query.offset(skip).limit(limit).all()
     return tags
 
 @router.post("/admin/tags", response_model=TagResponse)
-async def create_tag_admin(
+async def create_tag(
     tag_data: TagCreate,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):
     """Создание тега (админ)"""
-    existing_tag = db.query(Tag).filter(func.lower(Tag.name) == func.lower(tag_data.name)).first()
+    # Проверяем уникальность имени
+    existing_tag = db.query(Tag).filter(Tag.name == tag_data.name).first()
     if existing_tag:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -627,7 +653,7 @@ async def create_tag_admin(
     return tag
 
 @router.put("/admin/tags/{tag_id}", response_model=TagResponse)
-async def update_tag_admin(
+async def update_tag(
     tag_id: int,
     tag_data: TagCreate,
     db: Session = Depends(get_db),
@@ -641,23 +667,24 @@ async def update_tag_admin(
             detail="Tag not found"
         )
     
-    existing_tag = db.query(Tag).filter(
-        func.lower(Tag.name) == func.lower(tag_data.name),
-        Tag.id != tag_id
-    ).first()
-    if existing_tag:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tag with this name already exists"
-        )
-
-    tag.name = tag_data.name
+    # Проверяем уникальность имени (если имя изменилось)
+    if tag_data.name != tag.name:
+        existing_tag = db.query(Tag).filter(Tag.name == tag_data.name).first()
+        if existing_tag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tag with this name already exists"
+            )
+    
+    for field, value in tag_data.dict().items():
+        setattr(tag, field, value)
+    
     db.commit()
     db.refresh(tag)
     return tag
 
 @router.delete("/admin/tags/{tag_id}")
-async def delete_tag_admin(
+async def delete_tag(
     tag_id: int,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
@@ -669,13 +696,9 @@ async def delete_tag_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tag not found"
         )
-
-    # Удаляем связи с продуктами
-    db.query(ProductTag).filter(ProductTag.tag_id == tag_id).delete()
     
     db.delete(tag)
     db.commit()
-    
     return {"message": "Tag deleted successfully"}
 
 @router.get("/admin/tags/{tag_id}/products", response_model=List[ProductResponse])

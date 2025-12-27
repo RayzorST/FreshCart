@@ -1,4 +1,3 @@
-// user_management.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
@@ -129,8 +128,8 @@ class _UserManagementView extends StatelessWidget {
           final user = users[index];
           return UserCard(
             user: user,
-            onBlock: user.isActive ? () => _blockUser(context, user.id) : null,
-            onUnblock: !user.isActive ? () => _unblockUser(context, user.id) : null,
+            onBlock: user.isActive! ? () => _blockUser(context, user.id) : null,
+            onUnblock: !user.isActive! ? () => _unblockUser(context, user.id) : null,
             onChangeRole: (newRole) => _changeUserRole(context, user.id, newRole),
           );
         },
@@ -177,11 +176,10 @@ class UserCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Верхняя часть с аватаром и основной информацией
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: user.isActive ? Colors.green : Colors.red,
+                  backgroundColor: user.isActive! ? Colors.green : Colors.red,
                   child: Text(
                     user.displayName.substring(0, 1).toUpperCase(),
                     style: const TextStyle(color: Colors.white),
@@ -230,9 +228,9 @@ class UserCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user.isActive ? 'Активен' : 'Заблокирован',
+                  user.isActive! ? 'Активен' : 'Заблокирован',
                   style: TextStyle(
-                    color: user.isActive ? Colors.green : Colors.red,
+                    color: user.isActive! ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),

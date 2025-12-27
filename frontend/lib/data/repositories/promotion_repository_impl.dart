@@ -37,8 +37,8 @@ class PromotionRepositoryImpl implements PromotionRepository {
       final promotions = response
           .map((promotion) => PromotionEntity.fromJson(promotion as Map<String, dynamic>))
           .where((promo) => 
-              (promo.startDate == null || promo.startDate!.isBefore(now)) &&
-              (promo.endDate == null || promo.endDate!.isAfter(now)))
+              promo.startDate.isBefore(now) &&
+              promo.endDate.isAfter(now))
           .toList();
       return Right(promotions);
     } catch (e) {

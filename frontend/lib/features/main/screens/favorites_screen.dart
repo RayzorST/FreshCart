@@ -422,9 +422,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    if (product.category != null && product.category!.isNotEmpty)
+                    if (product.category != null)
                       Text(
-                        product.category!,
+                        product.category!.name,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                             ),

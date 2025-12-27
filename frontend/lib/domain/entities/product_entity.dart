@@ -1,4 +1,6 @@
 import 'package:client/api/client.dart';
+import 'package:client/domain/entities/category_entity.dart';
+import 'package:client/domain/entities/tag_entity.dart';
 
 class ProductEntity {
   final int id;
@@ -6,10 +8,12 @@ class ProductEntity {
   final String? description;
   final double price;
   final int? stockQuantity;
-  final String? category;
+  final int? categoryId;
+  final CategoryEntity? category;
+  final List<TagEntity> tags; 
   final bool isActive;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
 
   ProductEntity({
     required this.id,
@@ -17,7 +21,9 @@ class ProductEntity {
     this.description,
     required this.price,
     this.stockQuantity,
+    this.categoryId,
     this.category,
+    required this.tags,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -26,21 +32,50 @@ class ProductEntity {
   String get imageUrl => '${ApiClient.baseUrl}/images/products/$id/image';
 
   factory ProductEntity.fromJson(Map<String, dynamic> json) {
-    return ProductEntity(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      price: (json['price'] as num).toDouble(),
-      stockQuantity: json['stock_quantity'] as int?,
-      category: json['category'] != null 
-          ? json['category'] is String 
-              ? json['category'] as String
-              : (json['category'] as Map)['name'] as String?
-          : null,
-      isActive: json['is_active'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-    );
+    try {
+      // Парсим категорию
+      CategoryEntity? category;
+      if (json['category'] != null && json['category'] is Map<String, dynamic>) {
+        category = CategoryEntity.fromJson(json['category'] as Map<String, dynamic>);
+      }
+      
+      // Парсим теги
+      List<TagEntity> tags = [];
+      if (json['tags'] != null && json['tags'] is List) {
+        final tagsList = json['tags'] as List;
+        for (var tag in tagsList) {
+          if (tag is Map<String, dynamic>) {
+            tags.add(TagEntity.fromJson(tag));
+          }
+        }
+      }
+      
+      return ProductEntity(
+        id: json['id'] is int ? json['id'] as int : int.parse(json['id'].toString()),
+        name: json['name'].toString(),
+        description: json['description']?.toString(),
+        price: (json['price'] is num ? json['price'] as num : 
+                double.tryParse(json['price'].toString()) ?? 0.0).toDouble(),
+        stockQuantity: json['stock_quantity'] is int ? 
+            json['stock_quantity'] as int : 
+            int.tryParse(json['stock_quantity'].toString()),
+        categoryId: json['category_id'] is int ? 
+            json['category_id'] as int : 
+            int.tryParse(json['category_id'].toString()),
+        category: category,
+        tags: tags,
+        isActive: json['is_active'] is bool ? 
+            json['is_active'] as bool : 
+            (json['is_active']?.toString().toLowerCase() == 'true'),
+        createdAt: DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now(),
+        updatedAt: json['updated_at'] != null ? 
+            DateTime.tryParse(json['updated_at'].toString()) : 
+            null,
+      );
+    } catch (e) {
+
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -50,10 +85,13 @@ class ProductEntity {
       'description': description,
       'price': price,
       'stock_quantity': stockQuantity,
-      'category': category,
+      'category_id': categoryId,
+      'category': category?.toJson(),
+      'tags': tags.map((tag) => tag.toJson()).toList(),
       'is_active': isActive,
+      'image_url': imageUrl,
       'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 

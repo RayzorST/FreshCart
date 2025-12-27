@@ -1,4 +1,3 @@
-// product_management_bloc.dart
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/domain/entities/category_entity.dart';
@@ -16,9 +15,11 @@ class ProductManagementBloc extends Bloc<ProductManagementEvent, ProductManageme
     on<CreateProduct>(_onCreateProduct);
     on<UpdateProduct>(_onUpdateProduct);
     on<DeleteProduct>(_onDeleteProduct);
+    on<UploadProductImage>(_onUploadProductImage);
     on<ToggleProductActive>(_onToggleProductActive);
     on<CreateCategory>(_onCreateCategory);
     on<UpdateCategory>(_onUpdateCategory);
+    on<UploadCategoryImage>(_onUploadCategoryImage);
     on<DeleteCategory>(_onDeleteCategory);
     on<CreateTag>(_onCreateTag);
     on<UpdateTag>(_onUpdateTag);
@@ -71,6 +72,31 @@ class ProductManagementBloc extends Bloc<ProductManagementEvent, ProductManageme
         add(const LoadProductData());
       },
     );
+  }
+
+  Future<void> _onUploadProductImage(
+    UploadProductImage event,
+    Emitter<ProductManagementState> emit,
+  ) async {
+    try {
+      final result = await repository.uploadProductImage(
+        event.productId,
+        null,
+        event.base64Image,
+      );
+      
+      result.fold(
+        (error) => emit(ProductManagementError(error)),
+        (_) {
+          emit(const ProductManagementOperationSuccess('Изображение товара загружено'));
+          add(const LoadProductData());
+        },
+      );
+    } catch (e) {
+      if (!isClosed) {
+        emit(ProductManagementError('Ошибка загрузки изображения товара: $e'));
+      }
+    }
   }
 
   Future<void> _onDeleteProduct(
@@ -131,6 +157,31 @@ class ProductManagementBloc extends Bloc<ProductManagementEvent, ProductManageme
         add(const LoadProductData());
       },
     );
+  }
+
+  Future<void> _onUploadCategoryImage(
+    UploadCategoryImage event,
+    Emitter<ProductManagementState> emit,
+  ) async {
+    try {
+      final result = await repository.uploadCategoryImage(
+        event.categoryId,
+        null,
+        event.base64Image,
+      );
+      
+      result.fold(
+        (error) => emit(ProductManagementError(error)),
+        (_) {
+          emit(const ProductManagementOperationSuccess('Изображение категории загружено'));
+          add(const LoadProductData());
+        },
+      );
+    } catch (e) {
+      if (!isClosed) {
+        emit(ProductManagementError('Ошибка загрузки изображения: $e'));
+      }
+    }
   }
 
   Future<void> _onDeleteCategory(

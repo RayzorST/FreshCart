@@ -213,7 +213,7 @@ class __ProductScreenContentState extends State<_ProductScreenContent> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (widget.product.category != null && widget.product.category!.isNotEmpty)
+              if (widget.product.category != null )
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
@@ -224,7 +224,7 @@ class __ProductScreenContentState extends State<_ProductScreenContent> {
                     ),
                   ),
                   child: Text(
-                    widget.product.category!,
+                    widget.product.category!.name,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontSize: 13,

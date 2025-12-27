@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
 
 from app.core.security import (
     verify_password, 
@@ -11,7 +11,7 @@ from app.core.security import (
 )
 from app.core.config import settings
 from app.models.database import get_db
-from app.models.user import User, UserSettings
+from app.models.user import User, UserSettings, Role
 from app.schemas.user import UserCreate, UserResponse, Token, UserLogin, UserUpdate, ChangePassword, NotificationSettings, NotificationSettingsResponse
 
 router = APIRouter()
@@ -213,7 +213,7 @@ async def get_all_users(
     users = db.query(User).offset(skip).limit(limit).all()
     return users
 
-@router.put("/admin/users/{user_id}/block")
+@router.put("/admin/users/{user_id}/block", response_model=UserResponse)
 async def block_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -230,9 +230,9 @@ async def block_user(
     user.is_active = False
     db.commit()
     
-    return {"message": "User blocked successfully"}
+    return user
 
-@router.put("/admin/users/{user_id}/unblock")
+@router.put("/admin/users/{user_id}/unblock", response_model=UserResponse)
 async def unblock_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -249,4 +249,48 @@ async def unblock_user(
     user.is_active = True
     db.commit()
     
-    return {"message": "User unblocked successfully"}
+    return user
+
+@router.put("/admin/users/{user_id}/role", response_model=UserResponse)
+async def set_user_role(
+    user_id: int,
+    role_data: Dict[str, str],
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """
+    Изменение роли пользователя (админ)
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден"
+        )
+
+    role_name = role_data.get("role_name")
+    if not role_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Не указано название роли (role_name)"
+        )
+    
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Роль '{role_name}' не найдена"
+        )
+    
+    if user.id == admin.id and role_name != admin.role.name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя изменить свою собственную роль"
+        )
+    
+    user.role_id = role.id
+    
+    db.commit()
+    db.refresh(user)
+    
+    return user

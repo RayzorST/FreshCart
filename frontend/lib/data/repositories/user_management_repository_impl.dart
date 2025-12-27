@@ -10,7 +10,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
     try {
       final response = await ApiClient.getAdminUsers();
       
-      final users = (response as List)
+      final users = (response)
           .map((json) => UserEntity.fromJson(json as Map<String, dynamic>))
           .toList();
       
@@ -24,7 +24,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
   Future<Either<String, UserEntity>> blockUser(int userId) async {
     try {
       final response = await ApiClient.blockUser(userId);
-      final user = UserEntity.fromJson(response as Map<String, dynamic>);
+      final user = UserEntity.fromJson(response);
       return Right(user);
     } catch (e) {
       return Left('Ошибка при блокировке пользователя: $e');
@@ -35,7 +35,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
   Future<Either<String, UserEntity>> unblockUser(int userId) async {
     try {
       final response = await ApiClient.unblockUser(userId);
-      final user = UserEntity.fromJson(response as Map<String, dynamic>);
+      final user = UserEntity.fromJson(response);
       return Right(user);
     } catch (e) {
       return Left('Ошибка при разблокировке пользователя: $e');
@@ -46,7 +46,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
   Future<Either<String, UserEntity>> changeUserRole(int userId, String newRole) async {
     try {
       final response = await ApiClient.setUserRole(userId, newRole);
-      final user = UserEntity.fromJson(response as Map<String, dynamic>);
+      final user = UserEntity.fromJson(response);
       return Right(user);
     } catch (e) {
       return Left('Ошибка при смене роли пользователя: $e');

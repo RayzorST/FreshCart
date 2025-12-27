@@ -226,16 +226,14 @@ class _PromotionScreenState extends State<PromotionScreen> {
                 _buildDetailItem(
                   Icons.calendar_today,
                   'Действует до',
-                  promotion.endDate != null ? _formatDate(promotion.endDate!) : 'Бессрочно',
+                  _formatDate(promotion.endDate),
                 ),
-                if (promotion.startDate != null) ...[
-                  const Divider(),
-                  _buildDetailItem(
-                    Icons.calendar_today,
-                    'Начало действия',
-                    _formatDate(promotion.startDate!),
-                  ),
-                ],
+                const Divider(),
+                _buildDetailItem(
+                  Icons.calendar_today,
+                  'Начало действия',
+                  _formatDate(promotion.startDate),
+                ),
               ],
             ),
           ),

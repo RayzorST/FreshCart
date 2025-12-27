@@ -10,7 +10,7 @@ class PromotionManagementRepositoryImpl implements PromotionManagementRepository
     try {
       final response = await ApiClient.getAdminPromotions();
       
-      final promotions = (response as List)
+      final promotions = (response)
           .map((json) => PromotionEntity.fromJson(json as Map<String, dynamic>))
           .toList();
       
@@ -24,7 +24,7 @@ class PromotionManagementRepositoryImpl implements PromotionManagementRepository
   Future<Either<String, PromotionEntity>> createPromotion(Map<String, dynamic> promotionData) async {
     try {
       final response = await ApiClient.createAdminPromotion(promotionData);
-      final promotion = PromotionEntity.fromJson(response as Map<String, dynamic>);
+      final promotion = PromotionEntity.fromJson(response);
       return Right(promotion);
     } catch (e) {
       return Left('Ошибка создания акции: $e');
@@ -48,7 +48,7 @@ class PromotionManagementRepositoryImpl implements PromotionManagementRepository
   ) async {
     try {
       final response = await ApiClient.updateAdminPromotion(promotionId, promotionData);
-      final promotion = PromotionEntity.fromJson(response as Map<String, dynamic>);
+      final promotion = PromotionEntity.fromJson(response);
       return Right(promotion);
     } catch (e) {
       return Left('Ошибка обновления акции: $e');

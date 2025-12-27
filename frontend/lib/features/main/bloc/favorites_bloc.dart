@@ -207,11 +207,12 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
   ) {
     if (query.isEmpty) return favorites;
 
+    // Ищем только по названию продукта, так как у нас нет доступа к названиям категорий
+    // В FavoriteItemEntity хранится только ProductEntity с categoryId
     return favorites.where((favorite) {
       final productName = favorite.product.name.toLowerCase();
-      final category = favorite.product.category?.toLowerCase() ?? '';
-      return productName.contains(query.toLowerCase()) || 
-             category.contains(query.toLowerCase());
+      // Убираем поиск по категории, т.к. нет доступа к названию категории
+      return productName.contains(query.toLowerCase());
     }).toList();
   }
 }

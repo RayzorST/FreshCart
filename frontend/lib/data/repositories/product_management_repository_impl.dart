@@ -1,4 +1,5 @@
-// product_management_repository_impl.dart
+import 'dart:io';
+import 'dart:convert';
 import 'package:dartz/dartz.dart';
 import 'package:client/api/client.dart';
 import 'package:client/domain/entities/product_entity.dart';
@@ -15,16 +16,15 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
         ApiClient.getAdminCategories(),
         ApiClient.getAdminTags(),
       ]);
-      
-      final products = (productsResponse as List)
+      final products = (productsResponse)
           .map((json) => ProductEntity.fromJson(json as Map<String, dynamic>))
           .toList();
       
-      final categories = (categoriesResponse as List)
+      final categories = (categoriesResponse)
           .map((json) => CategoryEntity.fromJson(json as Map<String, dynamic>))
           .toList();
       
-      final tags = (tagsResponse as List)
+      final tags = (tagsResponse)
           .map((json) => TagEntity.fromJson(json as Map<String, dynamic>))
           .toList();
       
@@ -42,7 +42,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   Future<Either<String, ProductEntity>> createProduct(Map<String, dynamic> productData) async {
     try {
       final response = await ApiClient.createAdminProduct(productData);
-      final product = ProductEntity.fromJson(response as Map<String, dynamic>);
+      final product = ProductEntity.fromJson(response);
       return Right(product);
     } catch (e) {
       return Left('Ошибка создания товара: $e');
@@ -53,7 +53,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   Future<Either<String, ProductEntity>> updateProduct(int productId, Map<String, dynamic> productData) async {
     try {
       final response = await ApiClient.updateAdminProduct(productId, productData);
-      final product = ProductEntity.fromJson(response as Map<String, dynamic>);
+      final product = ProductEntity.fromJson(response);
       return Right(product);
     } catch (e) {
       return Left('Ошибка обновления товара: $e');
@@ -61,10 +61,31 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   }
 
   @override
+  Future<Either<String, void>> uploadProductImage(
+    int productId, 
+    File? imageFile,
+    String? base64Image,
+  ) async {
+    try {
+      if (base64Image != null) {
+        await ApiClient.uploadProductImageBase64(
+          productId, 
+          base64Image,
+        );
+        return Right(null);
+      } else {
+        return Left('Не выбрано изображение');
+      }
+    } catch (e) {
+      return Left('Ошибка загрузки изображения товара: $e');
+    }
+  }
+
+  @override
   Future<Either<String, void>> deleteProduct(int productId) async {
     try {
       await ApiClient.deleteAdminProduct(productId);
-      return const Right(null);
+      return Right(null);
     } catch (e) {
       return Left('Ошибка удаления товара: $e');
     }
@@ -76,7 +97,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
       final response = await ApiClient.updateAdminProduct(productId, {
         'is_active': isActive,
       });
-      final product = ProductEntity.fromJson(response as Map<String, dynamic>);
+      final product = ProductEntity.fromJson(response);
       return Right(product);
     } catch (e) {
       return Left('Ошибка изменения статуса товара: $e');
@@ -87,7 +108,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   Future<Either<String, CategoryEntity>> createCategory(Map<String, dynamic> categoryData) async {
     try {
       final response = await ApiClient.createAdminCategory(categoryData);
-      final category = CategoryEntity.fromJson(response as Map<String, dynamic>);
+      final category = CategoryEntity.fromJson(response);
       return Right(category);
     } catch (e) {
       return Left('Ошибка создания категории: $e');
@@ -98,7 +119,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   Future<Either<String, CategoryEntity>> updateCategory(int categoryId, Map<String, dynamic> categoryData) async {
     try {
       final response = await ApiClient.updateAdminCategory(categoryId, categoryData);
-      final category = CategoryEntity.fromJson(response as Map<String, dynamic>);
+      final category = CategoryEntity.fromJson(response);
       return Right(category);
     } catch (e) {
       return Left('Ошибка обновления категории: $e');
@@ -106,10 +127,39 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   }
 
   @override
+  Future<Either<String, void>> uploadCategoryImage(
+    int categoryId, 
+    File? imageFile,
+    String? base64Image,
+  ) async {
+    try {
+      if (base64Image != null) {
+        await ApiClient.uploadCategoryImageBase64(
+          categoryId, 
+          base64Image,
+        );
+        return Right(null);
+      } else if (imageFile != null) {
+        final bytes = await imageFile.readAsBytes();
+        final base64String = base64Encode(bytes);
+        await ApiClient.uploadCategoryImageBase64(
+          categoryId, 
+          base64String,
+        );
+        return Right(null);
+      } else {
+        return Left('Не выбрано изображение');
+      }
+    } catch (e) {
+      return Left('Ошибка загрузки изображения: $e');
+    }
+  }
+
+  @override
   Future<Either<String, void>> deleteCategory(int categoryId) async {
     try {
       await ApiClient.deleteAdminCategory(categoryId);
-      return const Right(null);
+      return Right(null);
     } catch (e) {
       return Left('Ошибка удаления категории: $e');
     }
@@ -119,7 +169,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   Future<Either<String, TagEntity>> createTag(Map<String, dynamic> tagData) async {
     try {
       final response = await ApiClient.createAdminTag(tagData);
-      final tag = TagEntity.fromJson(response as Map<String, dynamic>);
+      final tag = TagEntity.fromJson(response);
       return Right(tag);
     } catch (e) {
       return Left('Ошибка создания тега: $e');
@@ -130,7 +180,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   Future<Either<String, TagEntity>> updateTag(int tagId, Map<String, dynamic> tagData) async {
     try {
       final response = await ApiClient.updateAdminTag(tagId, tagData);
-      final tag = TagEntity.fromJson(response as Map<String, dynamic>);
+      final tag = TagEntity.fromJson(response);
       return Right(tag);
     } catch (e) {
       return Left('Ошибка обновления тега: $e');
@@ -141,7 +191,7 @@ class ProductManagementRepositoryImpl implements ProductManagementRepository {
   Future<Either<String, void>> deleteTag(int tagId) async {
     try {
       await ApiClient.deleteAdminTag(tagId);
-      return const Right(null);
+      return Right(null);
     } catch (e) {
       return Left('Ошибка удаления тега: $e');
     }

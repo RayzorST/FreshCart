@@ -21,6 +21,10 @@ class Tag(Base):
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Связь через ассоциативный класс
+    products = relationship("Product", secondary="product_tags", back_populates="tags")
+    product_tags = relationship("ProductTag", back_populates="tag")
+
 class Product(Base):
     __tablename__ = "products"
     
@@ -36,6 +40,9 @@ class Product(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     category = relationship("Category", back_populates="products")
+    
+    # Связь через ассоциативный класс
+    tags = relationship("Tag", secondary="product_tags", back_populates="products")
     product_tags = relationship("ProductTag", back_populates="product")
 
 class ProductTag(Base):
@@ -51,4 +58,4 @@ class ProductTag(Base):
     )
     
     product = relationship("Product", back_populates="product_tags")
-    tag = relationship("Tag")
+    tag = relationship("Tag", back_populates="product_tags")

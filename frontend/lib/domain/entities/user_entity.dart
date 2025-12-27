@@ -8,11 +8,11 @@ class UserEntity {
   final String? avatarUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final String? role; // Добавляем роль
-  final bool? isBlocked; // Добавляем статус блокировки
+  final String? role;
+  final bool? isActive;
 
   UserEntity({
-    required this.id, // Обязательный id
+    required this.id,
     required this.email,
     this.firstName,
     this.lastName,
@@ -21,7 +21,7 @@ class UserEntity {
     this.createdAt,
     this.updatedAt,
     this.role,
-    this.isBlocked,
+    this.isActive,
   });
 
   factory UserEntity.fromJson(Map<String, dynamic> json) {
@@ -38,8 +38,8 @@ class UserEntity {
       updatedAt: json['updated_at'] != null 
           ? DateTime.parse(json['updated_at'] as String) 
           : null,
-      role: json['role']?['name'] as String? ?? 'user', // Извлекаем роль
-      isBlocked: json['is_blocked'] as bool? ?? false,
+      role: json['role']?['name'] as String? ?? 'user',
+      isActive: json['is_active'] as bool? ?? false,
     );
   }
 
@@ -54,7 +54,7 @@ class UserEntity {
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'role': role,
-      'is_blocked': isBlocked,
+      'is_active': isActive,
     };
   }
 
@@ -69,7 +69,6 @@ class UserEntity {
   }
 
   bool get isAdmin => role == 'admin';
-  bool get isActive => !(isBlocked ?? false);
 
   UserEntity copyWith({
     int? id,
@@ -93,7 +92,7 @@ class UserEntity {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       role: role ?? this.role,
-      isBlocked: isBlocked ?? this.isBlocked,
+      isActive: isActive ?? this.isActive,
     );
   }
 }

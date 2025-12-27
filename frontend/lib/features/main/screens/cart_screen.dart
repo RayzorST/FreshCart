@@ -460,7 +460,7 @@ class _CartScreenState extends State<CartScreen> {
                     const SizedBox(height: 4),
                     if (item.product.category != null)
                       Text(
-                        item.product.category!,
+                        item.product.category!.name,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                             ),

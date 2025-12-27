@@ -1,14 +1,15 @@
-// product_management.dart
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/admin/bloc/product_management_bloc.dart';
 import 'package:client/data/repositories/product_management_repository_impl.dart';
 import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/domain/entities/category_entity.dart';
 import 'package:client/domain/entities/tag_entity.dart';
+import 'package:client/core/widgets/product_edit_dialog.dart';
 
 class ProductManagement extends StatelessWidget {
   const ProductManagement({super.key});
@@ -72,10 +73,32 @@ class _ProductManagementView extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            ElevatedButton.icon(
-              onPressed: () => _showCreateProductDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Добавить товар'),
+            BlocBuilder<ProductManagementBloc, ProductManagementState>(
+              builder: (context, state) {
+                if (state is ProductManagementLoaded) {
+                  return ElevatedButton.icon(
+                    onPressed: () => _showCreateProductDialog(
+                      context, 
+                      state.categories, 
+                      state.tags
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Добавить товар'),
+                  );
+                } else {
+                  return ElevatedButton.icon(
+                    onPressed: () {
+                      // Можно показать загрузку или сообщение
+                      AppSnackbar.showInfo(
+                        context: context, 
+                        message: 'Загрузка данных...'
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Добавить товар'),
+                  );
+                }
+              },
             ),
           ],
         ),
@@ -86,7 +109,12 @@ class _ProductManagementView extends StatelessWidget {
               if (state is ProductManagementLoading) {
                 return const Center(child: CircularProgressIndicator());
               } else if (state is ProductManagementLoaded) {
-                return _buildProductsList(context, state.products, state.categories, state.tags);
+                return _buildProductsList(
+                  context, 
+                  state.products, 
+                  state.categories, 
+                  state.tags
+                );
               } else if (state is ProductManagementError) {
                 return Center(
                   child: Column(
@@ -324,36 +352,32 @@ class _ProductManagementView extends StatelessWidget {
   }
 
   // Методы для работы с продуктами
-  void _showCreateProductDialog(BuildContext context) {
-    final state = context.read<ProductManagementBloc>().state;
-    if (state is ProductManagementLoaded) {
+  void _showCreateProductDialog(BuildContext context, List<CategoryEntity> categories, List<TagEntity> tags) {
+    final productBloc = context.read<ProductManagementBloc>();
+
+    if (productBloc.state is ProductManagementLoaded) {
       showDialog(
         context: context,
         builder: (context) => ProductEditDialog(
-          categories: state.categories,
-          tags: state.tags,
-          onSave: (productData) {
-            context.read<ProductManagementBloc>().add(CreateProduct(productData));
-          },
+          categories: categories,
+          tags: tags,
+          bloc: productBloc,
         ),
       );
     }
   }
 
   void _showEditProductDialog(BuildContext context, ProductEntity product, List<CategoryEntity> categories, List<TagEntity> tags) {
+    final productBloc = context.read<ProductManagementBloc>();
+
     showDialog(
       context: context,
       builder: (context) => ProductEditDialog(
         product: product,
         categories: categories,
         tags: tags,
-        onSave: (productData) {
-          context.read<ProductManagementBloc>().add(UpdateProduct(
-            productId: product.id,
-            productData: productData,
-          ));
-        },
-      ),
+        bloc: productBloc,
+      ),  
     );
   }
 
@@ -369,27 +393,20 @@ class _ProductManagementView extends StatelessWidget {
   }
 
   void _showCreateCategoryDialog(BuildContext context) {
+    final bloc = context.read<ProductManagementBloc>();
     showDialog(
       context: context,
-      builder: (context) => CategoryEditDialog(
-        onSave: (categoryData) {
-          context.read<ProductManagementBloc>().add(CreateCategory(categoryData));
-        },
-      ),
+      builder: (context) => CategoryEditDialog(bloc: bloc),
     );
   }
 
   void _showEditCategoryDialog(BuildContext context, CategoryEntity category) {
+    final bloc = context.read<ProductManagementBloc>();
     showDialog(
       context: context,
       builder: (context) => CategoryEditDialog(
         category: category,
-        onSave: (categoryData) {
-          context.read<ProductManagementBloc>().add(UpdateCategory(
-            categoryId: category.id,
-            categoryData: categoryData,
-          ));
-        },
+        bloc: bloc,
       ),
     );
   }
@@ -399,23 +416,27 @@ class _ProductManagementView extends StatelessWidget {
   }
 
   void _showCreateTagDialog(BuildContext context) {
+    final productBloc = context.read<ProductManagementBloc>();
+
     showDialog(
       context: context,
       builder: (context) => TagEditDialog(
         onSave: (tagData) {
-          context.read<ProductManagementBloc>().add(CreateTag(tagData));
+          productBloc.add(CreateTag(tagData));
         },
       ),
     );
   }
 
   void _showEditTagDialog(BuildContext context, TagEntity tag) {
+    final productBloc = context.read<ProductManagementBloc>();
+
     showDialog(
       context: context,
       builder: (context) => TagEditDialog(
         tag: tag,
         onSave: (tagData) {
-          context.read<ProductManagementBloc>().add(UpdateTag(
+          productBloc.add(UpdateTag(
             tagId: tag.id,
             tagData: tagData,
           ));
@@ -429,7 +450,6 @@ class _ProductManagementView extends StatelessWidget {
   }
 }
 
-// Карточка продукта (обновленная для Entity)
 class ProductCard extends StatelessWidget {
   final ProductEntity product;
   final List<CategoryEntity> categories;
@@ -450,10 +470,9 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final category = categories.firstWhere(
-      (cat) => cat.id.toString() == product.category,
-      orElse: () => CategoryEntity(id: -1, name: 'Не указана'),
-    );
+    final categoryName = product.category?.name ?? 'Не указана';
+    
+    final productTags = product.tags;
 
     return Card(
       child: Padding(
@@ -461,7 +480,6 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Изображение продукта
             Container(
               height: 120,
               width: double.infinity,
@@ -486,7 +504,6 @@ class ProductCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             
-            // Название и цена
             Row(
               children: [
                 Expanded(
@@ -512,13 +529,46 @@ class ProductCard extends StatelessWidget {
             
             const SizedBox(height: 4),
             
-            // Категория и статус
             Text(
-              category.name,
+              categoryName,
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             
             const SizedBox(height: 4),
+
+            if (productTags.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 28,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: productTags.length,
+                      itemBuilder: (context, index) {
+                        final tag = productTags[index];
+                        return Container(
+                          margin: const EdgeInsets.only(right: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.blue[100]!),
+                          ),
+                          child: Text(
+                            tag.name,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+              ),
             
             // Количество и статус
             Row(
@@ -544,7 +594,6 @@ class ProductCard extends StatelessWidget {
             
             const Spacer(),
             
-            // Кнопки управления
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -573,188 +622,15 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-// Диалог редактирования продукта (обновленный для Entity)
-class ProductEditDialog extends StatefulWidget {
-  final ProductEntity? product;
-  final List<CategoryEntity> categories;
-  final List<TagEntity> tags;
-  final Function(Map<String, dynamic>) onSave;
 
-  const ProductEditDialog({
-    super.key,
-    this.product,
-    required this.categories,
-    required this.tags,
-    required this.onSave,
-  });
-
-  @override
-  State<ProductEditDialog> createState() => _ProductEditDialogState();
-}
-
-class _ProductEditDialogState extends State<ProductEditDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _stockController = TextEditingController();
-  File? _imageFile;
-  final ImagePicker _picker = ImagePicker();
-  String? _selectedCategoryId;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.product != null) {
-      _nameController.text = widget.product!.name;
-      _descriptionController.text = widget.product!.description ?? '';
-      _priceController.text = widget.product!.price.toString();
-      _stockController.text = widget.product!.stockQuantity?.toString() ?? '0';
-      _selectedCategoryId = widget.product!.category;
-    }
-  }
-
-  Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _imageFile = File(image.path);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.product == null ? 'Добавить товар' : 'Редактировать товар'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Название товара'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Введите название товара';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Описание'),
-                maxLines: 3,
-              ),
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(labelText: 'Цена'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Введите цену';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Введите корректную цену';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _stockController,
-                decoration: const InputDecoration(labelText: 'Количество на складе'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Введите количество';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Введите корректное количество';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedCategoryId,
-                decoration: const InputDecoration(labelText: 'Категория'),
-                items: widget.categories.map<DropdownMenuItem<String>>((category) {
-                  return DropdownMenuItem<String>(
-                    value: category.id.toString(),
-                    child: Text(category.name),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategoryId = value;
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Выберите категорию';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              _imageFile != null
-                  ? Column(
-                      children: [
-                        Image.file(_imageFile!, height: 100),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: _pickImage,
-                          child: const Text('Изменить изображение'),
-                        ),
-                      ],
-                    )
-                  : ElevatedButton.icon(
-                      onPressed: _pickImage,
-                      icon: const Icon(Icons.photo),
-                      label: const Text('Загрузить изображение'),
-                    ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Отмена'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              final productData = {
-                'name': _nameController.text,
-                'description': _descriptionController.text,
-                'price': double.parse(_priceController.text),
-                'stock_quantity': int.parse(_stockController.text),
-                'category_id': int.parse(_selectedCategoryId!),
-                'is_active': true,
-              };
-              widget.onSave(productData);
-              Navigator.of(context).pop();
-            }
-          },
-          child: const Text('Сохранить'),
-        ),
-      ],
-    );
-  }
-}
-
-// Диалог редактирования категории (обновленный для Entity)
 class CategoryEditDialog extends StatefulWidget {
   final CategoryEntity? category;
-  final Function(Map<String, dynamic>) onSave;
+  final ProductManagementBloc bloc;
 
   const CategoryEditDialog({
     super.key,
     this.category,
-    required this.onSave,
+    required this.bloc,
   });
 
   @override
@@ -764,8 +640,9 @@ class CategoryEditDialog extends StatefulWidget {
 class _CategoryEditDialogState extends State<CategoryEditDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  File? _imageFile;
-  final ImagePicker _picker = ImagePicker();
+  Uint8List? _imageBytes; // Изменим с File на Uint8List для веба
+  String? _imageBase64;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -776,11 +653,76 @@ class _CategoryEditDialogState extends State<CategoryEditDialog> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _imageFile = File(image.path);
+    // Для Flutter Web используем html.FileUploadInputElement
+    final html.FileUploadInputElement uploadInput = html.FileUploadInputElement();
+    uploadInput.accept = 'image/*';
+    
+    uploadInput.onChange.listen((e) {
+      final files = uploadInput.files;
+      if (files != null && files.isNotEmpty) {
+        final file = files[0];
+        final reader = html.FileReader();
+        
+        reader.onLoadEnd.listen((e) async {
+          setState(() {
+            _imageBytes = reader.result as Uint8List;
+            _imageBase64 = base64Encode(_imageBytes!);
+          });
+        });
+        
+        reader.readAsArrayBuffer(file);
+      }
+    });
+    
+    uploadInput.click();
+  }
+
+  Future<void> _saveCategory() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 1. Сохраняем категорию
+      final categoryData = {'name': _nameController.text};
+      
+      if (widget.category == null) {
+        // Создаем новую категорию
+        widget.bloc.add(CreateCategory(categoryData));
+        AppSnackbar.showInfo(context: context, message: 'Категория создана');
+      } else {
+        // Обновляем существующую категорию
+        widget.bloc.add(UpdateCategory(
+          categoryId: widget.category!.id,
+          categoryData: categoryData,
+        ));
+      }
+
+      // 2. Если есть изображение - загружаем его
+      if (_imageBase64 != null && widget.category != null) {
+        widget.bloc.add(UploadCategoryImage(
+          categoryId: widget.category!.id,
+          base64Image: _imageBase64,
+        ));
+      }
+
+      // 3. Закрываем диалог
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       });
+
+    } catch (e) {
+      AppSnackbar.showError(context: context, message: 'Ошибка: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -796,58 +738,61 @@ class _CategoryEditDialogState extends State<CategoryEditDialog> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Название категории'),
+                decoration: const InputDecoration(
+                  labelText: 'Название категории',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Введите название категории';
+                    return 'Введите название';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-              _imageFile != null
-                  ? Column(
-                      children: [
-                        Image.file(_imageFile!, height: 100),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: _pickImage,
-                          child: const Text('Изменить изображение'),
-                        ),
-                      ],
-                    )
-                  : ElevatedButton.icon(
+              
+              // Изображение
+              if (_imageBytes != null)
+                Column(
+                  children: [
+                    Image.memory(_imageBytes!, height: 100), // Используем Image.memory для веба
+                    const SizedBox(height: 8),
+                    TextButton(
                       onPressed: _pickImage,
-                      icon: const Icon(Icons.photo),
-                      label: const Text('Загрузить изображение'),
+                      child: const Text('Изменить изображение'),
                     ),
+                  ],
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: _pickImage,
+                  icon: const Icon(Icons.photo),
+                  label: const Text('Загрузить изображение'),
+                ),
             ],
           ),
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
           child: const Text('Отмена'),
         ),
         ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              final categoryData = {
-                'name': _nameController.text,
-              };
-              widget.onSave(categoryData);
-              Navigator.of(context).pop();
-            }
-          },
-          child: const Text('Сохранить'),
+          onPressed: _isLoading ? null : _saveCategory,
+          child: _isLoading 
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Сохранить'),
         ),
       ],
     );
   }
 }
 
-// Диалог редактирования тега (обновленный для Entity)
 class TagEditDialog extends StatefulWidget {
   final TagEntity? tag;
   final Function(Map<String, dynamic>) onSave;

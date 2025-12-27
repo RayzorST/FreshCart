@@ -1,4 +1,3 @@
-// tag_entity.dart
 class TagEntity {
   final int id;
   final String name;

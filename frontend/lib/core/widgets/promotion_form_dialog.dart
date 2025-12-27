@@ -1,11 +1,8 @@
-// promotion_form_dialog.dart (без intl)
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/domain/entities/promotion_entity.dart';
 import 'package:client/core/types/promotion_type.dart';
 import 'package:client/domain/entities/category_entity.dart';
 import 'package:client/domain/entities/product_entity.dart';
-import 'package:client/features/admin/bloc/product_management_bloc.dart';
 
 class PromotionFormDialog extends StatefulWidget {
   final PromotionEntity? promotion;

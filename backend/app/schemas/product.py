@@ -54,7 +54,7 @@ class ProductBase(BaseModel):
     image_url: Optional[str] = None
 
 class ProductCreate(ProductBase):
-    tags: Optional[List[str]] = None  # Список названий тегов для создания
+    tag_ids: Optional[List[int]] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -64,7 +64,7 @@ class ProductUpdate(BaseModel):
     stock_quantity: Optional[int] = None
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
-    tags: Optional[List[str]] = None  # Обновление списка тегов
+    tag_ids: Optional[List[int]] = None
 
 class ProductResponse(ProductBase):
     id: int
@@ -72,6 +72,7 @@ class ProductResponse(ProductBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     category: Optional[CategoryResponse] = None
+    tags: List[TagResponse] = []
     
     model_config = ConfigDict(from_attributes=True)
 

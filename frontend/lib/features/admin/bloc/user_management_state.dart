@@ -18,9 +18,8 @@ class UserManagementLoaded extends UserManagementState {
 
   const UserManagementLoaded(this.users);
 
-  // Вспомогательные методы для фильтрации
-  List<UserEntity> get activeUsers => users.where((u) => u.isActive).toList();
-  List<UserEntity> get blockedUsers => users.where((u) => !u.isActive).toList();
+  List<UserEntity> get activeUsers => users.where((u) => u.isActive!).toList();
+  List<UserEntity> get blockedUsers => users.where((u) => !u.isActive!).toList();
   
   List<UserEntity> get adminUsers => users.where((u) => u.isAdmin).toList();
   List<UserEntity> get regularUsers => users.where((u) => !u.isAdmin).toList();
