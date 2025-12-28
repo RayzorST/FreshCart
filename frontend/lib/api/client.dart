@@ -424,11 +424,59 @@ class ApiClient {
   }
 
   // History methods
-  static Future<List<dynamic>> getAnalysisHistory({int skip = 0, int limit = 20}) async {
+  static Future<List<dynamic>> getMyAnalysisHistory({
+    int skip = 0, 
+    int limit = 20,
+    double? minConfidence,
+  }) async {
+    final queryParams = {
+      'skip': skip.toString(),
+      'limit': limit.toString(),
+    };
+    
+    // Добавляем необязательные параметры
+    if (minConfidence != null) {
+      queryParams['min_confidence'] = minConfidence.toString();
+    }
+    
+    final uri = Uri.parse('$baseUrl/ai/my-history')
+        .replace(queryParameters: queryParams);
+    
     final response = await http.get(
-      Uri.parse('$baseUrl/ai/history?skip=$skip&limit=$limit'),
+      uri,
       headers: _headers,
     );
+    
+    return _handleResponse(response);
+  }
+
+  static Future<List<dynamic>> getAllAnalysisHistory({
+    int skip = 0, 
+    int limit = 20,
+    int? userId,
+    double? minConfidence,
+  }) async {
+    final queryParams = {
+      'skip': skip.toString(),
+      'limit': limit.toString(),
+    };
+    
+    if (userId != null) {
+      queryParams['user_id'] = userId.toString();
+    }
+    
+    if (minConfidence != null) {
+      queryParams['min_confidence'] = minConfidence.toString();
+    }
+    
+    final uri = Uri.parse('$baseUrl/ai/all-history')
+        .replace(queryParameters: queryParams);
+    
+    final response = await http.get(
+      uri,
+      headers: _headers,
+    );
+    
     return _handleResponse(response);
   }
 

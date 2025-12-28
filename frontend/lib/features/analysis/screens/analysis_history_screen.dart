@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:client/core/di/di.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
@@ -9,7 +10,7 @@ class AnalysisHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => AnalysisHistoryBloc()..add(AnalysisHistoryStarted()),
+      create: (context) => getIt<AnalysisHistoryBloc>()..add(AnalysisHistoryStarted()),
       child: const _AnalysisHistoryView(),
     );
   }

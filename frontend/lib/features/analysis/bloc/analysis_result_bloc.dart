@@ -1,40 +1,56 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:client/api/client.dart';
+import 'package:flutter/foundation.dart. ';
+import 'package:client/domain/repositories/analysis_repository.dart';
+import 'package:client/domain/repositories/cart_repository.dart';
+import 'package:injectable/injectable.dart';
 
 part 'analysis_result_event.dart';
 part 'analysis_result_state.dart';
 
+@injectable
 class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> {
-  AnalysisResultBloc() : super(AnalysisResultInitial()) {
+  final AnalysisRepository _analysisRepository;
+  final CartRepository _cartRepository;
+
+  AnalysisResultBloc({
+    required AnalysisRepository analysisRepository,
+    required CartRepository cartRepository,
+  })  : _analysisRepository = analysisRepository,
+        _cartRepository = cartRepository,
+        super(AnalysisResultInitial()) {
     on<AnalysisResultStarted>(_onStarted);
     on<AnalysisResultRetried>(_onRetried);
     on<AnalysisResultAddToCart>(_onAddToCart);
     on<AnalysisResultAddAllToCart>(_onAddAllToCart);
     on<AnalysisResultBackPressed>(_onBackPressed);
+    // Новые обработчики для выбора продуктов
+    on<AnalysisResultProductSelected>(_onProductSelected);
+    on<AnalysisResultProductDeselected>(_onProductDeselected);
   }
 
   Future<void> _onStarted(
     AnalysisResultStarted event,
     Emitter<AnalysisResultState> emit,
   ) async {
-    emit(AnalysisResultLoading());
+    emit(AnalysisResultLoading(message: 'Анализируем изображение...'));
     
     try {
-      final result = await ApiClient.analyzeFoodImage(event.imageData);
+      final result = await _analysisRepository.analyzeFoodImage(event.imageData);
       
-      if (result['success'] == false) {
-        emit(AnalysisResultError('Ошибка анализа: ${result['message']}'));
-        return;
-      }
-      
-      final hasProducts = _hasAvailableProducts(result);
-      emit(AnalysisResultSuccess(
-        result: result,
-        hasAvailableProducts: hasProducts,
-      ));
+      result.fold(
+        (error) => emit(AnalysisResultError('Ошибка анализа: $error')),
+        (analysisResult) {
+          emit(AnalysisResultSuccess(
+            result: analysisResult.toJson(),
+            hasAvailableProducts: analysisResult.hasAvailableProducts,
+            analyzedAt: DateTime.now(),
+            selectedProducts: [],
+          ));
+        },
+      );
     } catch (e) {
-      emit(AnalysisResultError('Ошибка анализа: ${e.toString()}'));
+      emit(AnalysisResultError('Неожиданная ошибка: ${e.toString()}'));
     }
   }
 
@@ -42,10 +58,10 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     AnalysisResultRetried event,
     Emitter<AnalysisResultState> emit,
   ) async {
-    final currentState = state;
-    if (currentState is AnalysisResultError) {
-      // Для повторного анализа нужно вернуться на предыдущий экран
-      emit(AnalysisResultNavigateBack());
+    if (event.imageData != null) {
+      add(AnalysisResultStarted(event.imageData!));
+    } else {
+      emit(AnalysisResultNavigateBack(shouldRefreshHistory: true));
     }
   }
 
@@ -53,15 +69,31 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     AnalysisResultAddToCart event,
     Emitter<AnalysisResultState> emit,
   ) async {
+    final currentState = state;
+    if (currentState is! AnalysisResultSuccess) return;
+
+    emit(AnalysisResultLoading(message: 'Добавляем в корзину...'));
+
     try {
-      await ApiClient.addToCart(event.productId, 1);
-      emit(AnalysisResultCartAction(
-        message: 'Товар добавлен в корзину',
-        isSuccess: true,
-      ));
+      final result = await _cartRepository.addToCart(
+        event.productId,
+        event.quantity,
+      );
+
+      result.fold(
+        (error) => emit(AnalysisResultCartAction(
+          message: error,
+          isSuccess: false,
+        )),
+        (cartItem) => emit(AnalysisResultCartAction(
+          message: 'Товар добавлен в корзину',
+          isSuccess: true,
+          addedCount: 1,
+        )),
+      );
     } catch (e) {
       emit(AnalysisResultCartAction(
-        message: 'Ошибка добавления',
+        message: 'Ошибка добавления в корзину: $e',
         isSuccess: false,
       ));
     }
@@ -74,30 +106,59 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     final currentState = state;
     if (currentState is! AnalysisResultSuccess) return;
 
+    emit(AnalysisResultLoading(message: 'Добавляем товары в корзину...'));
+
     try {
-      final result = currentState.result;
-      final basicAlts = List<dynamic>.from(result['basic_alternatives'] ?? []);
-      final additionalAlts = List<dynamic>.from(result['additional_alternatives'] ?? []);
+      // Добавляем только выбранные продукты
+      final selectedProducts = currentState.selectedProducts;
       
+      if (selectedProducts.isEmpty) {
+        emit(AnalysisResultCartAction(
+          message: 'Выберите продукты для добавления в корзину',
+          isSuccess: false,
+        ));
+        return;
+      }
+
       int addedCount = 0;
       int skippedCount = 0;
+      List<String> errors = [];
       
-      for (final alt in [...basicAlts, ...additionalAlts]) {
-        final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
-        for (final product in products) {
-          final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
-          if (stockQuantity > 0) {
-            await ApiClient.addToCart(product['id'], 1);
-            addedCount++;
-          } else {
+      for (final selectedProduct in selectedProducts) {
+        final productData = selectedProduct.productData;
+        final stockQuantity = (productData['stock_quantity'] ?? 1).toInt();
+        
+        if (stockQuantity > 0) {
+          try {
+            final cartResult = await _cartRepository.addToCart(
+              selectedProduct.productId,
+              1, // Количество по умолчанию
+            );
+            
+            cartResult.fold(
+              (error) {
+                skippedCount++;
+                errors.add(error);
+              },
+              (_) => addedCount++,
+            );
+          } catch (e) {
             skippedCount++;
+            errors.add('Ошибка для продукта ${selectedProduct.productId}: $e');
           }
+        } else {
+          skippedCount++;
+          errors.add('Нет в наличии: ${productData['name']}');
         }
       }
       
       String message;
       if (skippedCount > 0) {
-        message = 'Добавлено $addedCount товаров в корзину (пропущено $skippedCount - нет в наличии)';
+        message = 'Добавлено $addedCount товаров в корзину (пропущено $skippedCount)';
+        if (errors.isNotEmpty) {
+          message += '\n${errors.take(3).join(", ")}';
+          if (errors.length > 3) message += '...';
+        }
       } else {
         message = 'Добавлено $addedCount товаров в корзину';
       }
@@ -105,10 +166,12 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
       emit(AnalysisResultCartAction(
         message: message,
         isSuccess: true,
+        addedCount: addedCount,
+        skippedCount: skippedCount,
       ));
     } catch (e) {
       emit(AnalysisResultCartAction(
-        message: 'Ошибка при добавлении',
+        message: 'Ошибка при добавлении товаров: $e',
         isSuccess: false,
       ));
     }
@@ -118,22 +181,52 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     AnalysisResultBackPressed event,
     Emitter<AnalysisResultState> emit,
   ) async {
-    emit(AnalysisResultNavigateBack());
+    emit(AnalysisResultNavigateBack(shouldRefreshHistory: true));
   }
 
-  bool _hasAvailableProducts(Map<String, dynamic> result) {
-    final basicAlts = List<dynamic>.from(result['basic_alternatives'] ?? []);
-    final additionalAlts = List<dynamic>.from(result['additional_alternatives'] ?? []);
+  // Новый обработчик для выбора продукта
+  Future<void> _onProductSelected(
+    AnalysisResultProductSelected event,
+    Emitter<AnalysisResultState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! AnalysisResultSuccess) return;
+
+    // Создаем новое состояние с добавленным продуктом
+    final newState = currentState.copyWithAddedProduct(
+      productId: event.productId,
+      ingredient: event.ingredient,
+      isBasic: event.isBasic,
+      productData: event.product,
+    );
+
+    emit(newState);
     
-    for (final alt in [...basicAlts, ...additionalAlts]) {
-      final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
-      for (final product in products) {
-        final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
-        if (stockQuantity > 0) {
-          return true;
-        }
-      }
-    }
-    return false;
+    // Дополнительно можно эмитнуть уведомление о выборе
+    emit(AnalysisResultProductSelectedState(
+      ingredient: event.ingredient,
+      productId: event.productId,
+    ));
+    
+    // Возвращаемся к основному состоянию
+    emit(newState);
+  }
+
+  // Новый обработчик для отмены выбора продукта
+  Future<void> _onProductDeselected(
+    AnalysisResultProductDeselected event,
+    Emitter<AnalysisResultState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! AnalysisResultSuccess) return;
+
+    // Создаем новое состояние с удаленным продуктом
+    final newState = currentState.copyWithRemovedProduct(
+      productId: event.productId,
+      ingredient: event.ingredient,
+      isBasic: event.isBasic,
+    );
+
+    emit(newState);
   }
 }

@@ -1,9 +1,8 @@
-# app/api/endpoints/analysis.py
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import logging
 import base64
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.models.database import get_db
 from app.models.user import User
@@ -195,17 +194,35 @@ def _generate_recommendations(dish_result: Dict, basic_alts: List, additional_al
     
     return recommendations
 
-@router.get("/history", response_model=List[AnalysisHistoryResponse])
-async def get_analysis_history(
+@router.get("/my-history", response_model=List[AnalysisHistoryResponse])
+async def get_my_analysis_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение истории анализов пользователя"""
+    """Получение истории анализов текущего пользователя"""
     history_service = AnalysisHistoryService(db)
-    history = history_service.get_user_analysis_history(
+    history = history_service.get_analysis_history(
         user_id=current_user.id,
+        offset=skip,
+        limit=limit
+    )
+    return history
+
+@router.get("/all-history", response_model=List[AnalysisHistoryResponse])
+async def get_all_analysis_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    user_id: Optional[int] = Query(None, description="ID конкретного пользователя"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получение истории анализов всех или конкретного пользователя"""
+    history_service = AnalysisHistoryService(db)
+    
+    history = history_service.get_analysis_history(
+        user_id=user_id,
         offset=skip,
         limit=limit
     )

@@ -442,11 +442,9 @@ async def create_product_admin(
                 detail="Category not found"
             )
     
-    # Создаем продукт без тегов
     product_dict = product_data.dict(exclude={'tag_ids'})
     product = Product(**product_dict)
     
-    # Добавляем теги если они есть
     if product_data.tag_ids:
         tags = db.query(Tag).filter(Tag.id.in_(product_data.tag_ids)).all()
         product.tags = tags

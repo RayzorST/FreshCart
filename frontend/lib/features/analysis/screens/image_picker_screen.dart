@@ -256,7 +256,6 @@ class _ImagePickerContent extends StatelessWidget {
 
     return BlocBuilder<ImagePickerBloc, ImagePickerState>(
       builder: (context, state) {
-        final historyCount = state is ImagePickerReady ? state.historyCount : 0;
 
         return Column(
           children: [
@@ -284,24 +283,9 @@ class _ImagePickerContent extends StatelessWidget {
                     Icon(Icons.history, size: 20, color: colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
-                      'История анализов',
+                      'История блюд',
                       style: textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '$historyCount',
-                        style: textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
                       ),
                     ),
                   ],

@@ -58,7 +58,6 @@ class _AdminScreenViewState extends State<_AdminScreenView> {
   @override
   void initState() {
     super.initState();
-    // Инициализируем BLoC при создании виджета
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AdminScreenBloc>().loadAdminAccess();
     });

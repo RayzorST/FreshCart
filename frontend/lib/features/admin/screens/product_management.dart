@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
@@ -10,6 +9,7 @@ import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/domain/entities/category_entity.dart';
 import 'package:client/domain/entities/tag_entity.dart';
 import 'package:client/core/widgets/product_edit_dialog.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProductManagement extends StatelessWidget {
   const ProductManagement({super.key});
@@ -43,13 +43,11 @@ class _ProductManagementView extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Основной контент - товары
             Expanded(
               flex: 3,
               child: _buildProductsContent(context),
             ),
             const SizedBox(width: 16),
-            // Боковая панель с категориями и тегами
             Expanded(
               flex: 1,
               child: _buildSidebar(context),
@@ -653,28 +651,28 @@ class _CategoryEditDialogState extends State<CategoryEditDialog> {
   }
 
   Future<void> _pickImage() async {
-    // Для Flutter Web используем html.FileUploadInputElement
-    final html.FileUploadInputElement uploadInput = html.FileUploadInputElement();
-    uploadInput.accept = 'image/*';
-    
-    uploadInput.onChange.listen((e) {
-      final files = uploadInput.files;
-      if (files != null && files.isNotEmpty) {
-        final file = files[0];
-        final reader = html.FileReader();
-        
-        reader.onLoadEnd.listen((e) async {
-          setState(() {
-            _imageBytes = reader.result as Uint8List;
-            _imageBase64 = base64Encode(_imageBytes!);
-          });
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+          _imageBase64 = base64Encode(bytes);
         });
-        
-        reader.readAsArrayBuffer(file);
       }
-    });
-    
-    uploadInput.click();
+    } catch (e) {
+      AppSnackbar.showError(
+        context: context, 
+        message: 'Ошибка выбора изображения: $e'
+      );
+    }
   }
 
   Future<void> _saveCategory() async {

@@ -1,7 +1,6 @@
-// product_edit_dialog.dart
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:html' as html;
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/domain/entities/category_entity.dart';
@@ -59,27 +58,28 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
   }
 
   Future<void> _pickImage() async {
-    final html.FileUploadInputElement uploadInput = html.FileUploadInputElement();
-    uploadInput.accept = 'image/*';
-    
-    uploadInput.onChange.listen((e) {
-      final files = uploadInput.files;
-      if (files != null && files.isNotEmpty) {
-        final file = files[0];
-        final reader = html.FileReader();
-        
-        reader.onLoadEnd.listen((e) async {
-          setState(() {
-            _imageBytes = reader.result as Uint8List;
-            _imageBase64 = base64Encode(_imageBytes!);
-          });
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+          _imageBase64 = base64Encode(bytes);
         });
-        
-        reader.readAsArrayBuffer(file);
       }
-    });
-    
-    uploadInput.click();
+    } catch (e) {
+      AppSnackbar.showError(
+        context: context, 
+        message: 'Ошибка выбора изображения: $e'
+      );
+    }
   }
 
   void _removeImage() {

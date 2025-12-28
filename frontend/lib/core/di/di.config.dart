@@ -13,6 +13,7 @@ import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 
 import '../../data/repositories/address_repository_impl.dart' as _i1071;
+import '../../data/repositories/analysis_repository_impl.dart' as _i882;
 import '../../data/repositories/auth_repository_impl.dart' as _i895;
 import '../../data/repositories/cart_repository_impl.dart' as _i915;
 import '../../data/repositories/category_repository_impl.dart' as _i538;
@@ -22,6 +23,7 @@ import '../../data/repositories/product_repository_impl.dart' as _i876;
 import '../../data/repositories/promotion_repository_impl.dart' as _i490;
 import '../../data/repositories/user_repository_impl.dart' as _i790;
 import '../../domain/repositories/address_repository.dart' as _i956;
+import '../../domain/repositories/analysis_repository.dart' as _i184;
 import '../../domain/repositories/auth_repository.dart' as _i1073;
 import '../../domain/repositories/cart_repository.dart' as _i46;
 import '../../domain/repositories/category_repository.dart' as _i485;
@@ -30,6 +32,8 @@ import '../../domain/repositories/order_repository.dart' as _i507;
 import '../../domain/repositories/product_repository.dart' as _i933;
 import '../../domain/repositories/promotion_repository.dart' as _i501;
 import '../../domain/repositories/user_repository.dart' as _i271;
+import '../../features/analysis/bloc/analysis_history_bloc.dart' as _i202;
+import '../../features/analysis/bloc/analysis_result_bloc.dart' as _i21;
 import '../../features/auth/bloc/auth_bloc.dart' as _i55;
 import '../../features/auth/bloc/login_bloc.dart' as _i292;
 import '../../features/auth/bloc/register_bloc.dart' as _i969;
@@ -51,7 +55,13 @@ _i174.GetIt $initGetIt(
   gh.lazySingleton<_i933.ProductRepository>(
     () => _i876.ProductRepositoryImpl(),
   );
+  gh.lazySingleton<_i184.AnalysisRepository>(
+    () => _i882.AnalysisRepositoryImpl(),
+  );
   gh.lazySingleton<_i271.UserRepository>(() => _i790.UserRepositoryImpl());
+  gh.factory<_i202.AnalysisHistoryBloc>(
+    () => _i202.AnalysisHistoryBloc(gh<_i184.AnalysisRepository>()),
+  );
   gh.lazySingleton<_i956.AddressRepository>(
     () => _i1071.AddressRepositoryImpl(),
   );
@@ -73,6 +83,12 @@ _i174.GetIt $initGetIt(
   );
   gh.lazySingleton<_i485.CategoryRepository>(
     () => _i538.CategoryRepositoryImpl(),
+  );
+  gh.factory<_i21.AnalysisResultBloc>(
+    () => _i21.AnalysisResultBloc(
+      analysisRepository: gh<_i184.AnalysisRepository>(),
+      cartRepository: gh<_i46.CartRepository>(),
+    ),
   );
   gh.factory<_i40.ProfileBloc>(
     () => _i40.ProfileBloc(

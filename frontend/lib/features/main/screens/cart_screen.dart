@@ -436,6 +436,7 @@ class _CartScreenState extends State<CartScreen> {
     final hasDiscount = item.hasDiscount;
     final originalPrice = item.discountPrice ?? item.product.price;
     final discountedPrice = item.product.price;
+    final hasPromotions = item.appliedPromotions != null && item.appliedPromotions!.isNotEmpty;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,7 +470,31 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
             ),
-            _buildDeleteButton(context, item.product.id),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasPromotions)
+                  IconButton(
+                    icon: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.local_offer_outlined,
+                        color: Colors.green,
+                        size: 18,
+                      ),
+                    ),
+                    onPressed: () => _navigateToPromotionScreen(item.appliedPromotions!, context),
+                    padding: const EdgeInsets.all(4),
+                    tooltip: 'Примененные акции',
+                  ),
+                _buildDeleteButton(context, item.product.id),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -480,7 +505,7 @@ class _CartScreenState extends State<CartScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
+                Row(
                   children: [
                     if (hasDiscount) ...[
                       Text(
@@ -501,6 +526,35 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                   ],
                 ),
+                // Отображение скидки если есть
+                if (hasDiscount && hasPromotions && item.appliedPromotions != null)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.local_offer,
+                          size: 12,
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '-${item.discountAmount.toStringAsFixed(2)} ₽',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             QuantityControls(
@@ -508,7 +562,7 @@ class _CartScreenState extends State<CartScreen> {
               quantity: item.quantity,
               onQuantityChanged: (productId, newQuantity) {
                 final cartBloc = context.read<CartBloc>();
-    
+
                 if (newQuantity == 0) {
                   cartBloc.add(CartItemRemoved(productId));
                 } else {

@@ -178,14 +178,11 @@ async def upload_category_image_base64(
         )
     
     try:
-        # Удаляем старое изображение, если оно есть
         if category.image_url:
             delete_image(category.image_url)
         
-        # Сохраняем новое изображение
         image_url = await save_image_base64(image_data.image_data)
-        
-        # Обновляем URL изображения в категории
+
         category.image_url = image_url
         db.commit()
         

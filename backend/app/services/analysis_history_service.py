@@ -50,8 +50,17 @@ class AnalysisHistoryService:
         self.db.refresh(record)
         return record
     
-    def get_user_analysis_history(self, user_id: int, offset: int = 0, limit: int = 20, min_confidence: float = None):
+    def get_analysis_history(
+        self, 
+        user_id: Optional[int] = None,
+        offset: int = 0, 
+        limit: int = 20, 
+        min_confidence: float = None
+    ):
         query = self.db.query(AnalysisHistory)
+        
+        if user_id is not None:
+            query = query.filter(AnalysisHistory.user_id == user_id)
         
         if min_confidence is not None:
             query = query.filter(AnalysisHistory.confidence >= min_confidence)
