@@ -34,12 +34,6 @@ class _PromotionScreenState extends State<PromotionScreen> {
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshPromotion,
-          ),
-        ],
       ),
       body: BlocConsumer<PromotionsBloc, PromotionsState>(
         listener: (context, state) {

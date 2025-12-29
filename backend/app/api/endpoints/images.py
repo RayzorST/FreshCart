@@ -6,6 +6,7 @@ from minio.error import S3Error
 
 from app.models.database import get_db
 from app.models.product import Product, Category
+from app.models.analysis import AnalysisHistory
 from app.models.user import User
 from app.core.file_storage import save_image_base64, delete_image, save_image
 from app.core.minio_client import minio_client
@@ -370,6 +371,233 @@ async def delete_category_image(
 @router.options("/categories/{category_id}/image")
 async def options_category_image():
     """Обработчик CORS preflight запросов для изображений категорий"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
+
+# В конец файла images.py добавьте:
+
+@router.post("/analysis/{analysis_id}/image")
+async def upload_analysis_image_base64(
+    analysis_id: int,
+    image_data: ImageBase64,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Загрузка изображения для анализа в формате base64"""
+    print(f"DEBUG: Uploading base64 image for analysis {analysis_id} to MinIO")
+    
+    analysis = db.query(AnalysisHistory).filter(AnalysisHistory.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    # Проверяем права доступа (только владелец анализа может загружать изображение)
+    if analysis.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to upload image for this analysis"
+        )
+    
+    try:
+        if analysis.image_url:
+            delete_image(analysis.image_url)
+        
+        image_url = await save_image_base64(image_data.image_data)
+        
+        analysis.image_url = image_url
+        db.commit()
+        
+        return {
+            "message": "Analysis image uploaded successfully to MinIO",
+            "image_url": image_url
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading analysis image: {str(e)}"
+        )
+
+@router.post("/analysis/{analysis_id}/image-file")
+async def upload_analysis_image_file(
+    analysis_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Загрузка изображения для анализа через файл"""
+    print(f"DEBUG: Uploading file image for analysis {analysis_id} to MinIO")
+    
+    # Проверяем тип файла
+    allowed_content_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if file.content_type not in allowed_content_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only JPEG, PNG, GIF and WebP are allowed."
+        )
+    
+    analysis = db.query(AnalysisHistory).filter(AnalysisHistory.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    # Проверяем права доступа
+    if analysis.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to upload image for this analysis"
+        )
+    
+    try:
+        if analysis.image_url:
+            delete_image(analysis.image_url)
+        
+        image_url = await save_image(file)
+        
+        analysis.image_url = image_url
+        db.commit()
+        
+        return {
+            "message": "Analysis image file uploaded successfully to MinIO",
+            "image_url": image_url
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading analysis image file: {str(e)}"
+        )
+
+@router.get("/analysis/{analysis_id}/image")
+async def get_analysis_image(
+    analysis_id: int,
+    db: Session = Depends(get_db)
+):
+    """Получение изображения анализа по ID анализа"""
+    try:
+        analysis = db.query(AnalysisHistory).filter(AnalysisHistory.id == analysis_id).first()
+        if not analysis or not analysis.image_url:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Analysis or image not found"
+            )
+        
+        filename = analysis.image_url.split('/')[-1]
+        if not filename:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image filename not found"
+            )
+
+        try:
+            response = minio_client.client.get_object(
+                minio_client.bucket_name,
+                filename
+            )
+            
+            image_data = response.read()
+            
+            # Определяем Content-Type на основе расширения файла
+            content_type = "image/jpeg"  # значение по умолчанию
+            if filename.lower().endswith('.png'):
+                content_type = "image/png"
+            elif filename.lower().endswith('.gif'):
+                content_type = "image/gif"
+            elif filename.lower().endswith('.webp'):
+                content_type = "image/webp"
+            
+            return Response(
+                content=image_data,
+                media_type=content_type,
+                headers={
+                    "Content-Disposition": f"inline; filename={filename}",
+                    "Cache-Control": "public, max-age=3600",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, OPTIONS",
+                    "Access-Control-Allow-Headers": "*"
+                }
+            )
+            
+        except Exception as e:
+            print(f"MinIO error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image not found in storage"
+            )
+        finally:
+            if 'response' in locals():
+                response.close()
+                response.release_conn()
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@router.delete("/analysis/{analysis_id}/image")
+async def delete_analysis_image(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Удаление изображения анализа"""
+    analysis = db.query(AnalysisHistory).filter(AnalysisHistory.id == analysis_id).first()
+    
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    # Проверяем права доступа
+    if analysis.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete image for this analysis"
+        )
+    
+    if not analysis.image_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis has no image"
+        )
+    
+    try:
+        # Удаляем изображение из хранилища
+        delete_image(analysis.image_url)
+        
+        # Очищаем поле image_url в анализе
+        analysis.image_url = None
+        db.commit()
+        
+        return {
+            "message": "Analysis image deleted successfully",
+            "analysis_id": analysis_id
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting analysis image: {str(e)}"
+        )
+
+@router.options("/analysis/{analysis_id}/image")
+async def options_analysis_image():
+    """Обработчик CORS preflight запросов для изображений анализов"""
     return Response(
         status_code=200,
         headers={

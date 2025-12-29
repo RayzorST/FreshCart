@@ -488,6 +488,58 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  static Future<Map<String, dynamic>> uploadAnalysisImageBase64(
+    int analysisId, 
+    String base64Image
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/images/analysis/$analysisId/image'),
+      headers: _headers,
+      body: json.encode({'image_data': base64Image}),
+    );
+    return _handleResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> uploadAnalysisImageFile(
+    int analysisId, 
+    String filePath, 
+    List<int> fileBytes
+  ) async {
+    // Создаем multipart запрос
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/images/analysis/$analysisId/image-file'),
+    );
+
+    // Добавляем заголовки
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+
+    // Добавляем файл
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        fileBytes,
+        filename: filePath.split('/').last,
+      ),
+    );
+
+    // Отправляем запрос
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    return _handleResponse(response);
+  }
+
+  static Future<void> deleteAnalysisImage(int analysisId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/images/analysis/$analysisId/image'),
+      headers: _headers,
+    );
+    _handleResponse(response);
+  }
+
   // В client.dart добавим админ-методы
 
   // Admin - Users

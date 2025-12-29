@@ -4,20 +4,39 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/analysis/bloc/analysis_result_bloc.dart';
+import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
 import 'package:client/domain/entities/product_entity.dart';
 
 class AnalysisResultScreen extends StatelessWidget {
+  final Map<String, dynamic>? resultData;
+  final bool fromHistory;
   final String? imageData;
   
   const AnalysisResultScreen({
     super.key,
-    this.imageData,
+    this.resultData,
+    this.fromHistory = false,
+    this.imageData, 
   });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => getIt<AnalysisResultBloc>()..add(AnalysisResultStarted(imageData!)),
+      create: (context) {
+        final bloc = getIt<AnalysisResultBloc>();
+        
+        // Сначала проверяем resultData (из истории)
+        if (resultData != null) {
+          bloc.add(AnalysisResultFromHistory(resultData!));
+        } 
+        // Затем проверяем imageData (из камеры/галереи)
+        else if (imageData != null && imageData!.isNotEmpty) {
+          bloc.add(AnalysisResultStarted(imageData!));
+        }
+        // Если оба null, ничего не делаем
+        
+        return bloc;
+      },
       child: const _AnalysisResultView(),
     );
   }
@@ -57,6 +76,7 @@ class _AnalysisResultView extends StatelessWidget {
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
           context.read<AnalysisResultBloc>().add(AnalysisResultBackPressed());
+          context.read<AnalysisHistoryBloc>().add(AnalysisHistoryRefreshed());
         },
       ),
       actions: [

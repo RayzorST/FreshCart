@@ -33,7 +33,7 @@ import 'package:client/features/auth/screens/login_screen.dart';
 import 'package:client/features/auth/screens/register_screen.dart';
 import 'package:client/features/main/screens/main_screen.dart';
 import 'package:client/features/main/screens/promotion_screen.dart';
-import 'package:client/features/analysis/screens/analysis_screen.dart';
+import 'package:client/features/analysis/screens/analysis_result_screen.dart';
 import 'package:client/features/analysis/screens/image_picker_screen.dart';
 import 'package:client/features/analysis/screens/analysis_history_screen.dart';
 import 'package:client/features/product/screens/product_screen.dart';
@@ -154,8 +154,7 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'camera',
           pageBuilder: (context, state) => MaterialPage(
             child: BlocProvider(
-              // ImagePickerBloc не требует зависимостей, можно оставить как есть
-              create: (context) => ImagePickerBloc(),
+              create: (context) => getIt<ImagePickerBloc>(),
               child: const ImagePickerScreen(),
             ),
           ),
@@ -164,8 +163,9 @@ class _FreshCartAppState extends State<FreshCartApp> {
           path: '/analysis/history',
           name: 'analysis-history',
           pageBuilder: (context, state) => MaterialPage(
-            child: BlocProvider(
-              create: (context) => getIt<AnalysisHistoryBloc>()..add(AnalysisHistoryStarted()),
+            key: state.pageKey,
+            child: BlocProvider.value(
+              value: context.read<AnalysisHistoryBloc>(),
               child: const AnalysisHistoryScreen(),
             ),
           ),
@@ -173,14 +173,22 @@ class _FreshCartAppState extends State<FreshCartApp> {
         GoRoute(
           path: '/analysis/result',
           name: 'analysis-result',
-          pageBuilder: (context, state) => MaterialPage(
-            child: BlocProvider(
-              create: (context) => getIt<AnalysisResultBloc>(),
-              child: AnalysisResultScreen(
-                imageData: state.extra as String?,
+          pageBuilder: (context, state) {
+            final extra = state.extra;
+            
+            return MaterialPage(
+              key: ValueKey(extra),
+              child: BlocProvider(
+                create: (context) => getIt<AnalysisResultBloc>(),
+                child: AnalysisResultScreen(
+                  imageData: extra is String ? extra : null,
+                  resultData: extra is Map<String, dynamic> 
+                      ? (extra['result'] as Map<String, dynamic>? ?? extra) 
+                      : null,
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
         GoRoute(
           path: '/product/:id',
@@ -285,6 +293,9 @@ class _FreshCartAppState extends State<FreshCartApp> {
                       ),
                       BlocProvider(
                         create: (context) => getIt<AddressesBloc>(),
+                      ),
+                      BlocProvider(
+                        create: (context) => getIt<AnalysisHistoryBloc>(), // ДОБАВЬ ЭТО
                       ),
                     ],
                   ],

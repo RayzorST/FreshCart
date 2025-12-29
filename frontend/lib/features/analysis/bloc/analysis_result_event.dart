@@ -161,3 +161,9 @@ class AnalysisResultShare extends AnalysisResultEvent {
   @override
   int get hashCode => analysisData.hashCode;
 }
+
+class AnalysisResultFromHistory extends AnalysisResultEvent {
+  final Map<String, dynamic> resultData;
+
+  const AnalysisResultFromHistory(this.resultData);
+}

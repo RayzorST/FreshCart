@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:client/domain/entities/analysis_entity.dart';
 import 'package:client/domain/entities/analysis_result_entity.dart';
 
@@ -17,4 +18,5 @@ abstract class AnalysisRepository {
   });
   Future<Either<String, void>> deleteAnalysisRecord(int analysisId);
   Future<Either<String, Map<String, dynamic>>> getAnalysisStats();
+  Future<Either<String, AnalysisResultEntity>> analyzeFoodImageFile(XFile imageFile);
 }

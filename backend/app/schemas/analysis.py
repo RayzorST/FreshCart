@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class Base64ImageRequest(BaseModel):
     image_data: str
@@ -31,7 +31,9 @@ class AnalysisHistoryBase(BaseModel):
 
 class AnalysisHistoryResponse(AnalysisHistoryBase):
     id: int
+    user_id: int
     created_at: datetime
+    image_url: Optional[str] = None
 
 class AnalysisStatsResponse(BaseModel):
     total_analyses: int

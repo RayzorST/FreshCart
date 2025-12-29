@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+# analysis.py - исправленная версия
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 import logging
 import base64
+import os
 from typing import Dict, List, Optional
 
 from app.models.database import get_db
@@ -11,6 +13,7 @@ from app.api.endpoints.auth import get_current_user
 from app.schemas.analysis import Base64ImageRequest, AnalysisResponse, AnalysisHistoryResponse
 from app.services.analysis_history_service import AnalysisHistoryService
 from app.services.tag_service import TagService
+from app.core.file_storage import save_image_base64
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,11 +21,13 @@ logger = logging.getLogger(__name__)
 @router.post("/base64", response_model=AnalysisResponse)
 async def analyze_base64_image(
     request: Base64ImageRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Анализ изображения в формате base64"""
     try:
+        # Декодируем base64 изображение
         if ',' in request.image_data:
             image_bytes = base64.b64decode(request.image_data.split(',')[1])
         else:
@@ -30,6 +35,7 @@ async def analyze_base64_image(
         
         logger.info(f"Analyzing image for user {current_user.id}, size: {len(image_bytes)} bytes")
         
+        # Анализируем изображение с помощью модели
         from app.services.food_classification_model import FoodClassificationModel
         food_model = FoodClassificationModel()
 
@@ -37,7 +43,7 @@ async def analyze_base64_image(
         
         logger.info(f"Detected dish: {dish_result['dish_name']} with confidence: {dish_result['confidence']}")
 
-        from app.services.tag_service import TagService
+        # Ищем альтернативы продуктов
         tag_service = TagService(db)
 
         basic_alternatives = []
@@ -58,13 +64,13 @@ async def analyze_base64_image(
                     "products": products
                 })
 
+        # Создаем запись в истории с новым методом
+        history_service = AnalysisHistoryService(db)
+        
         try:
-            from app.services.analysis_history_service import AnalysisHistoryService
-            history_service = AnalysisHistoryService(db)
-            
-            history_record = history_service.create_analysis_record(
+            # Используем новый метод без image_bytes
+            history_record = history_service.create_analysis_record_simple(
                 user_id=current_user.id,
-                image_bytes=image_bytes,
                 detected_dish=dish_result["dish_name"],
                 confidence=dish_result["confidence"],
                 ingredients={
@@ -76,15 +82,32 @@ async def analyze_base64_image(
                     "additional": additional_alternatives
                 }
             )
-            logger.info(f"Analysis saved to history with ID: {history_record.id}")
+            logger.info(f"Analysis record created with ID: {history_record.id}")
+            
+            # Добавляем задачу на сохранение изображения в фоне
+            background_tasks.add_task(
+                save_analysis_image_background,
+                db=db,
+                history_service=history_service,
+                image_bytes=image_bytes,
+                analysis_id=history_record.id,
+                user_id=current_user.id
+            )
+            
+            analysis_id = history_record.id
+            
         except Exception as history_error:
-            logger.warning(f"Could not save to analysis history: {history_error}")
+            logger.error(f"Could not create analysis record: {history_error}")
+            analysis_id = 0
 
+        # Генерируем рекомендации
         recommendations = _generate_recommendations(dish_result, basic_alternatives, additional_alternatives)
 
+        # Формируем ответ
         response = {
             "success": True,
             "user_id": current_user.id,
+            "analysis_id": analysis_id,
             "detected_dish": dish_result["dish_name"],
             "confidence": dish_result["confidence"],
             "message": dish_result["message"],
@@ -103,69 +126,196 @@ async def analyze_base64_image(
         raise
     except Exception as e:
         logger.error(f"Food analysis error: {e}", exc_info=True)
-        raise HTTPException(500, f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-async def analyze_base64_image_internal(
-    base64_image: str, 
-    current_user: User,
-    db: Session
-) -> Dict:
-    """Внутренняя функция анализа base64 изображения"""
+
+async def save_analysis_image_background(
+    db: Session,
+    history_service: AnalysisHistoryService,
+    image_bytes: bytes,
+    analysis_id: int,
+    user_id: int
+):
+    """Фоновая задача для сохранения изображения анализа"""
     try:
-        if ',' in base64_image:
-            image_bytes = base64.b64decode(base64_image.split(',')[1])
+        # Преобразуем в base64
+        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+        full_base64 = f"data:image/jpeg;base64,{base64_image}"
+        
+        # Сохраняем изображение через file_storage
+        from app.core.file_storage import save_image_base64
+        image_url = await save_image_base64(full_base64)
+        
+        if image_url:
+            # Обновляем запись с URL изображения
+            success = history_service.update_analysis_image(
+                analysis_id=analysis_id,
+                user_id=user_id,
+                image_url=image_url
+            )
+            
+            if success:
+                logger.info(f"Image saved for analysis {analysis_id}: {image_url}")
+            else:
+                logger.warning(f"Failed to update image URL for analysis {analysis_id}")
         else:
-            image_bytes = base64.b64decode(base64_image)
-        
-        logger.info(f"Analyzing image for user {current_user.id}, size: {len(image_bytes)} bytes")
-        
-        from app.services.food_classification_model import FoodClassificationModel
-        food_model = FoodClassificationModel()
-        
-        dish_result = food_model.detect_dish_with_ingredients(image_bytes)
-        
-        logger.info(f"Detected dish: {dish_result['dish_name']} with confidence: {dish_result['confidence']}")
+            logger.warning(f"Failed to save image for analysis {analysis_id}")
+            
+    except Exception as e:
+        logger.error(f"Failed to save analysis image: {e}")
 
-        tag_service = TagService(db)
-
-        basic_alternatives = []
-        for ingredient in dish_result["basic_ingredients"]:
-            products = tag_service.get_products_by_tag(ingredient, current_user.id, limit=5)
-            if products:
-                basic_alternatives.append({
-                    "ingredient": ingredient,
-                    "products": products
-                })
+@router.get("/my-history", response_model=List[AnalysisHistoryResponse])
+async def get_my_analysis_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получение истории анализов текущего пользователя"""
+    try:
+        history_service = AnalysisHistoryService(db)
         
-        additional_alternatives = []
-        for ingredient in dish_result["additional_ingredients"]:
-            products = tag_service.get_products_by_tag(ingredient, current_user.id, limit=3)
-            if products:
-                additional_alternatives.append({
-                    "ingredient": ingredient,
-                    "products": products
-                })
+        # Используем отдельный метод для фильтрации по уверенности
+        if min_confidence is not None:
+            history = history_service.get_user_analysis_history(
+                user_id=current_user.id,
+                offset=skip,
+                limit=limit,
+                min_confidence=min_confidence
+            )
+        else:
+            history = history_service.get_analysis_history(
+                user_id=current_user.id,
+                offset=skip,
+                limit=limit
+            )
         
-        response = {
-            "success": True,
-            "user_id": current_user.id,
-            "detected_dish": dish_result["dish_name"],
-            "confidence": dish_result["confidence"],
-            "message": dish_result["message"],
-            "basic_ingredients": dish_result["basic_ingredients"],
-            "additional_ingredients": dish_result["additional_ingredients"],
-            "basic_alternatives": basic_alternatives,
-            "additional_alternatives": additional_alternatives,
-            "recommendations": _generate_recommendations(dish_result, basic_alternatives, additional_alternatives)
-        }
+        # Преобразуем в формат ответа СОГЛАСНО СХЕМЕ
+        result = []
+        for record in history:
+            # Извлекаем базовые и дополнительные ингредиенты из JSON
+            ingredients = record.ingredients or {}
+            
+            # Формируем ответ в формате, ожидаемом схемой
+            result.append({
+                "id": record.id,
+                "user_id": record.user_id,
+                "detected_dish": record.detected_dish,
+                "confidence": record.confidence,
+                "ingredients": ingredients,  # Должен быть Dict, например {"basic": [], "additional": []}
+                "alternatives_found": record.alternatives_found or {},
+                "image_url": record.image_url,
+                "created_at": record.created_at
+            })
         
-        logger.info(f"Analysis completed. Found {len(basic_alternatives)} basic and {len(additional_alternatives)} additional alternatives")
-        
-        return response
+        return result
         
     except Exception as e:
-        logger.error(f"Analysis internal error: {e}", exc_info=True)
-        raise HTTPException(500, f"Analysis failed: {str(e)}")
+        logger.error(f"Error getting analysis history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
+
+
+@router.get("/all-history", response_model=List[AnalysisHistoryResponse])
+async def get_all_analysis_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    user_id: Optional[int] = Query(None, description="ID конкретного пользователя"),
+    min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получение истории анализов всех или конкретного пользователя"""
+    try:
+        history_service = AnalysisHistoryService(db)
+        
+        # Проверяем права администратора
+        if user_id is not None and user_id != current_user.id:
+            # Проверяем, является ли пользователь администратором
+            if current_user.role.name != "admin":
+                raise HTTPException(status_code=403, detail="Not authorized to view other users' history")
+        
+        # Используем параметры фильтрации
+        history = history_service.get_analysis_history(
+            user_id=user_id,
+            offset=skip,
+            limit=limit,
+            min_confidence=min_confidence
+        )
+        
+        # Преобразуем в формат ответа
+        result = []
+        for record in history:
+            ingredients = record.ingredients or {}
+            
+            result.append({
+                "id": record.id,
+                "user_id": record.user_id,
+                "detected_dish": record.detected_dish,
+                "confidence": record.confidence,
+                "ingredients": ingredients,  # Dict формата {"basic": [], "additional": []}
+                "alternatives_found": record.alternatives_found or {},
+                "image_url": record.image_url,
+                "created_at": record.created_at
+            })
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting all analysis history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
+
+@router.get("/history/stats")
+async def get_analysis_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Статистика по анализам"""
+    try:
+        history_service = AnalysisHistoryService(db)
+        stats = history_service.get_analysis_stats(current_user.id)
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting analysis stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+
+@router.delete("/history/{analysis_id}")
+async def delete_analysis_record(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Удаление записи анализа"""
+    try:
+        record = db.query(AnalysisHistory).filter(
+            AnalysisHistory.id == analysis_id,
+            AnalysisHistory.user_id == current_user.id
+        ).first()
+        
+        if not record:
+            raise HTTPException(status_code=404, detail="Record not found")
+        
+        # Удаляем связанное изображение если оно есть
+        if record.image_url:
+            try:
+                from app.core.file_storage import delete_image
+                delete_image(record.image_url)
+            except Exception as img_error:
+                logger.warning(f"Could not delete analysis image: {img_error}")
+        
+        # Удаляем запись из БД
+        db.delete(record)
+        db.commit()
+        
+        return {"success": True, "message": "Analysis record deleted"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting analysis record: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete record: {str(e)}")
+
 
 def _generate_recommendations(dish_result: Dict, basic_alts: List, additional_alts: List) -> List[str]:
     """Генерация рекомендаций на основе результатов анализа"""
@@ -192,88 +342,121 @@ def _generate_recommendations(dish_result: Dict, basic_alts: List, additional_al
     if additional_found > 0:
         recommendations.append(f"✨ Найдено {additional_found} дополнительных ингредиентов для улучшения блюда")
     
+    # Добавляем рекомендации на основе ингредиентов
+    if "соль" in [ing.lower() for ing in dish_result["basic_ingredients"]]:
+        recommendations.append("🧂 Для этого блюда понадобится соль")
+    
+    if "перец" in [ing.lower() for ing in dish_result["basic_ingredients"]]:
+        recommendations.append("🌶️ Не забудьте про перец для вкуса")
+    
+    if len(recommendations) < 3:
+        recommendations.append("🍽️ Приятного аппетита!")
+    
     return recommendations
 
-@router.get("/my-history", response_model=List[AnalysisHistoryResponse])
-async def get_my_analysis_history(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Получение истории анализов текущего пользователя"""
-    history_service = AnalysisHistoryService(db)
-    history = history_service.get_analysis_history(
-        user_id=current_user.id,
-        offset=skip,
-        limit=limit
-    )
-    return history
 
-@router.get("/all-history", response_model=List[AnalysisHistoryResponse])
-async def get_all_analysis_history(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    user_id: Optional[int] = Query(None, description="ID конкретного пользователя"),
+# Упрощенная версия без BackgroundTasks
+@router.post("/base64-simple", response_model=AnalysisResponse)
+async def analyze_base64_image_simple(
+    request: Base64ImageRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение истории анализов всех или конкретного пользователя"""
-    history_service = AnalysisHistoryService(db)
-    
-    history = history_service.get_analysis_history(
-        user_id=user_id,
-        offset=skip,
-        limit=limit
-    )
-    return history
-
-@router.get("/history/stats")
-async def get_analysis_stats(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Статистика по анализам"""
-    history_service = AnalysisHistoryService(db)
-    stats = history_service.get_analysis_stats(current_user.id)
-    return stats
-
-@router.delete("/history/{analysis_id}")
-async def delete_analysis_record(
-    analysis_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Удаление записи анализа"""
-    history_service = AnalysisHistoryService(db)
-    
-    record = db.query(AnalysisHistory).filter(
-        AnalysisHistory.id == analysis_id,
-        AnalysisHistory.user_id == current_user.id
-    ).first()
-    
-    if not record:
-        raise HTTPException(404, "Record not found")
-    
-    db.delete(record)
-    db.commit()
-    
-    return {"message": "Analysis record deleted"}
-
-@router.get("/history/high-confidence", response_model=List[AnalysisHistoryResponse])
-async def get_high_confidence_analysis_history(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    min_confidence: float = Query(0.7, ge=0.0, le=1.0),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Получение истории анализов с высокой уверенностью"""
-    history_service = AnalysisHistoryService(db)
-    history = history_service.get_user_analysis_history(
-        user_id=current_user.id,
-        offset=skip,
-        limit=limit,
-        min_confidence=min_confidence
-    )
-    return history
+    """Упрощенная версия анализа"""
+    try:
+        # Декодируем base64 изображение
+        if ',' in request.image_data:
+            image_bytes = base64.b64decode(request.image_data.split(',')[1])
+        else:
+            image_bytes = base64.b64decode(request.image_data)
+        
+        logger.info(f"Analyzing image for user {current_user.id}, size: {len(image_bytes)} bytes")
+        
+        # Анализируем изображение
+        from app.services.food_classification_model import FoodClassificationModel
+        food_model = FoodClassificationModel()
+        
+        dish_result = food_model.detect_dish_with_ingredients(image_bytes)
+        
+        # Ищем альтернативы продуктов
+        tag_service = TagService(db)
+        
+        basic_alternatives = []
+        for ingredient in dish_result["basic_ingredients"]:
+            products = tag_service.get_products_by_tag(ingredient, current_user.id, limit=5)
+            if products:
+                basic_alternatives.append({
+                    "ingredient": ingredient,
+                    "products": products
+                })
+        
+        additional_alternatives = []
+        for ingredient in dish_result["additional_ingredients"]:
+            products = tag_service.get_products_by_tag(ingredient, current_user.id, limit=3)
+            if products:
+                additional_alternatives.append({
+                    "ingredient": ingredient,
+                    "products": products
+                })
+        
+        # Сохраняем изображение
+        image_url = None
+        try:
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+            full_base64 = f"data:image/jpeg;base64,{base64_image}"
+            image_url = await save_image_base64(full_base64)
+        except Exception as img_error:
+            logger.warning(f"Could not save image: {img_error}")
+        
+        # Создаем запись в истории
+        history_service = AnalysisHistoryService(db)
+        analysis_id = 0
+        
+        try:
+            history_record = history_service.create_analysis_record(
+                user_id=current_user.id,
+                detected_dish=dish_result["dish_name"],
+                confidence=dish_result["confidence"],
+                ingredients={
+                    "basic": dish_result["basic_ingredients"],
+                    "additional": dish_result["additional_ingredients"]
+                },
+                alternatives_found={
+                    "basic": basic_alternatives,
+                    "additional": additional_alternatives
+                }
+            )
+            analysis_id = history_record.id
+            
+            # Если изображение было сохранено, обновляем запись
+            if image_url and history_record:
+                history_record.image_url = image_url
+                db.commit()
+                logger.info(f"Image saved for analysis {analysis_id}")
+            
+        except Exception as history_error:
+            logger.error(f"History creation error: {history_error}")
+        
+        # Генерируем рекомендации
+        recommendations = _generate_recommendations(dish_result, basic_alternatives, additional_alternatives)
+        
+        # Формируем ответ
+        response = {
+            "success": True,
+            "user_id": current_user.id,
+            "analysis_id": analysis_id,
+            "detected_dish": dish_result["dish_name"],
+            "confidence": dish_result["confidence"],
+            "message": dish_result["message"],
+            "basic_ingredients": dish_result["basic_ingredients"],
+            "additional_ingredients": dish_result["additional_ingredients"],
+            "basic_alternatives": basic_alternatives,
+            "additional_alternatives": additional_alternatives,
+            "recommendations": recommendations
+        }
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Food analysis error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")

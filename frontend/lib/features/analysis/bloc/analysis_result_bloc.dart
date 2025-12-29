@@ -24,7 +24,7 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     on<AnalysisResultAddToCart>(_onAddToCart);
     on<AnalysisResultAddAllToCart>(_onAddAllToCart);
     on<AnalysisResultBackPressed>(_onBackPressed);
-    // Новые обработчики для выбора продуктов
+    on<AnalysisResultFromHistory>(_onFromHistory);
     on<AnalysisResultProductSelected>(_onProductSelected);
     on<AnalysisResultProductDeselected>(_onProductDeselected);
   }
@@ -228,5 +228,38 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     );
 
     emit(newState);
+  }
+  
+  Future<void> _onFromHistory(
+    AnalysisResultFromHistory event,
+    Emitter<AnalysisResultState> emit,
+  ) async {
+    emit(AnalysisResultSuccess(
+      result: event.resultData,
+      hasAvailableProducts: _checkHasAvailableProducts(event.resultData), // Добавить
+      analyzedAt: DateTime.now(), // Добавить
+      selectedProducts: [],
+    ));
+  }
+
+  // Вспомогательный метод для проверки наличия продуктов
+  bool _checkHasAvailableProducts(Map<String, dynamic> resultData) {
+    try {
+      final basicAlternatives = List<dynamic>.from(resultData['basic_alternatives'] ?? []);
+      final additionalAlternatives = List<dynamic>.from(resultData['additional_alternatives'] ?? []);
+      
+      for (final alt in [...basicAlternatives, ...additionalAlternatives]) {
+        final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
+        for (final product in products) {
+          final stockQuantity = (product['stock_quantity'] ?? 1).toInt();
+          if (stockQuantity > 0) {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
   }
 }

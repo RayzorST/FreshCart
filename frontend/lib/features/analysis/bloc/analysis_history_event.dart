@@ -49,3 +49,17 @@ class AnalysisHistoryShowOptions extends AnalysisHistoryEvent {
 
   AnalysisHistoryShowOptions(this.analysis);
 }
+
+class AnalysisHistoryOpenResult extends AnalysisHistoryEvent {
+  final Map<String, dynamic> analysis;
+  final bool isMyAnalysis;
+
+  AnalysisHistoryOpenResult({
+    required this.analysis,
+    required this.isMyAnalysis,
+  });
+}
+
+class AnalysisHistoryReturnedFromResult extends AnalysisHistoryEvent {
+  AnalysisHistoryReturnedFromResult();
+}

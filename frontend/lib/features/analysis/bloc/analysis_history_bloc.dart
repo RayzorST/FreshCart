@@ -19,6 +19,8 @@ class AnalysisHistoryBloc extends Bloc<AnalysisHistoryEvent, AnalysisHistoryStat
     on<AnalysisHistoryDeleteRequested>(_onDeleteRequested);
     on<AnalysisHistoryShowDetails>(_onShowDetails);
     on<AnalysisHistoryShowOptions>(_onShowOptions);
+    on<AnalysisHistoryOpenResult>(_onOpenResult);
+    on<AnalysisHistoryReturnedFromResult>(_onReturnedFromResult);
   }
 
   Future<void> _onStarted(
@@ -106,13 +108,11 @@ class AnalysisHistoryBloc extends Bloc<AnalysisHistoryEvent, AnalysisHistoryStat
     }
   }
 
-  // Остальные методы остаются без изменений, так как они работают с UI-логикой
   Future<void> _onAddAllToCart(
     AnalysisHistoryAddAllToCart event,
     Emitter<AnalysisHistoryState> emit,
   ) async {
-    // Логика добавления в корзину остается прежней
-    // Это UI-логика, она не относится к слою данных
+
   }
 
   Future<void> _onDeleteRequested(
@@ -163,5 +163,53 @@ class AnalysisHistoryBloc extends Bloc<AnalysisHistoryEvent, AnalysisHistoryStat
     Emitter<AnalysisHistoryState> emit,
   ) async {
     emit(AnalysisHistoryShowOptionsState(event.analysis));
+  }
+
+  Future<void> _onOpenResult(
+    AnalysisHistoryOpenResult event,
+    Emitter<AnalysisHistoryState> emit,
+  ) async {
+    final resultData = {
+      'detected_dish': event.analysis['detected_dish'],
+      'confidence': event.analysis['confidence'],
+      'basic_ingredients': event.analysis['ingredients']?['basic'] ?? [],
+      'additional_ingredients': event.analysis['ingredients']?['additional'] ?? [],
+      'basic_alternatives': _convertAlternativesToResultFormat(event.analysis['alternatives_found'], 'basic'),
+      'additional_alternatives': _convertAlternativesToResultFormat(event.analysis['alternatives_found'], 'additional'),
+    };
+    
+    emit(AnalysisHistoryNavigateToResult(
+      resultData: resultData,
+      fromHistory: true,
+    ));
+  }
+
+  List<Map<String, dynamic>> _convertAlternativesToResultFormat(Map<String, dynamic> alternatives, String type) {
+    final List<Map<String, dynamic>> result = [];
+    final List<dynamic> altList = alternatives[type] ?? [];
+    
+    for (final alt in altList) {
+      if (alt is Map<String, dynamic>) {
+        result.add({
+          'ingredient': alt['ingredient'],
+          'products': alt['products'] ?? [],
+        });
+      }
+    }
+    
+    return result;
+  }
+
+  Future<void> _onReturnedFromResult(
+    AnalysisHistoryReturnedFromResult event,
+    Emitter<AnalysisHistoryState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is AnalysisHistorySuccess) {
+      emit(currentState.copyWith(
+        isLoadingMyHistory: false,
+        isLoadingAllUsers: false,
+      ));
+    }
   }
 }

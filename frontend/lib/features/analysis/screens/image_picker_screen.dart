@@ -1,7 +1,9 @@
+// lib/features/analysis/ui/image_picker_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/features/analysis/bloc/image_picker_bloc.dart';
+import 'package:client/data/repositories/analysis_repository_impl.dart';
 
 class ImagePickerScreen extends StatelessWidget {
   const ImagePickerScreen({super.key});
@@ -9,7 +11,9 @@ class ImagePickerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ImagePickerBloc()..add(ImagePickerHistoryRequested()),
+      create: (context) => ImagePickerBloc(
+        analysisRepository: AnalysisRepositoryImpl(),
+      ),
       child: const _ImagePickerView(),
     );
   }
@@ -23,10 +27,19 @@ class _ImagePickerView extends StatelessWidget {
     return BlocListener<ImagePickerBloc, ImagePickerState>(
       listener: (context, state) {
         if (state is ImagePickerCaptureSuccess) {
+          // Переходим на экран результатов с данными
           context.push(
             '/analysis/result',
-            extra: state.base64Image,
+            extra: {
+              'base64Image': state.base64Image,
+              'analysisResult': state.analysisResult,
+            },
           );
+          
+          // Сбрасываем состояние после перехода
+          Future.delayed(const Duration(milliseconds: 300), () {
+            context.read<ImagePickerBloc>().add(const ImagePickerClear());
+          });
         }
       },
       child: Scaffold(
@@ -34,7 +47,8 @@ class _ImagePickerView extends StatelessWidget {
           title: Text(
             'Анализ блюда',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
+          ),
+          centerTitle: true,
         ),
         body: Container(
           width: double.infinity,
@@ -78,7 +92,7 @@ class _ImagePickerView extends StatelessWidget {
                         const SizedBox(height: 24),
                         ElevatedButton(
                           onPressed: () {
-                            context.read<ImagePickerBloc>().add(ImagePickerHistoryRequested());
+                            context.read<ImagePickerBloc>().add(const ImagePickerClear());
                           },
                           child: const Text('Повторить'),
                         ),
@@ -172,7 +186,7 @@ class _ImagePickerContent extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 16),
           child: ElevatedButton(
             onPressed: () {
-              context.read<ImagePickerBloc>().add(ImagePickerCameraRequested());
+              context.read<ImagePickerBloc>().add(const ImagePickerCameraRequested());
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.primary,
@@ -213,7 +227,7 @@ class _ImagePickerContent extends StatelessWidget {
           height: 60,
           child: OutlinedButton(
             onPressed: () {
-              context.read<ImagePickerBloc>().add(ImagePickerGalleryRequested());
+              context.read<ImagePickerBloc>().add(const ImagePickerGalleryRequested());
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: colorScheme.primary,
@@ -256,7 +270,6 @@ class _ImagePickerContent extends StatelessWidget {
 
     return BlocBuilder<ImagePickerBloc, ImagePickerState>(
       builder: (context, state) {
-
         return Column(
           children: [
             Container(

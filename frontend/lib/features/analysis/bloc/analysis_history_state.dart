@@ -85,3 +85,13 @@ class AnalysisHistoryDeleted extends AnalysisHistoryState {
 
   const AnalysisHistoryDeleted(this.message);
 }
+
+class AnalysisHistoryNavigateToResult extends AnalysisHistoryState {
+  final Map<String, dynamic> resultData;
+  final bool fromHistory;
+
+  const AnalysisHistoryNavigateToResult({
+    required this.resultData,
+    required this.fromHistory,
+  });
+}
