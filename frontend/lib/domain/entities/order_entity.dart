@@ -8,7 +8,7 @@ class OrderEntity {
   final String status;
   final double totalAmount;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
   final List<OrderItemEntity> items;
 
   OrderEntity({
@@ -36,7 +36,9 @@ class OrderEntity {
       status: json['status'] as String,
       totalAmount: (json['total_amount'] as num).toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      updatedAt: json['updated_at'] != null ? 
+          DateTime.tryParse(json['updated_at'].toString()) : 
+          null,
       items: items,
     );
   }
@@ -50,7 +52,7 @@ class OrderEntity {
       'status': status,
       'total_amount': totalAmount,
       'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
       'items': items.map((item) => item.toJson()).toList(),
     };
   }

@@ -33,13 +33,11 @@ class ProductEntity {
 
   factory ProductEntity.fromJson(Map<String, dynamic> json) {
     try {
-      // Парсим категорию
       CategoryEntity? category;
       if (json['category'] != null && json['category'] is Map<String, dynamic>) {
         category = CategoryEntity.fromJson(json['category'] as Map<String, dynamic>);
       }
       
-      // Парсим теги
       List<TagEntity> tags = [];
       if (json['tags'] != null && json['tags'] is List) {
         final tagsList = json['tags'] as List;

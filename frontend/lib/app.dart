@@ -295,7 +295,7 @@ class _FreshCartAppState extends State<FreshCartApp> {
                         create: (context) => getIt<AddressesBloc>(),
                       ),
                       BlocProvider(
-                        create: (context) => getIt<AnalysisHistoryBloc>(), // ДОБАВЬ ЭТО
+                        create: (context) => getIt<AnalysisHistoryBloc>(),
                       ),
                     ],
                   ],

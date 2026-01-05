@@ -12,7 +12,6 @@ class TagService:
     def get_products_by_tag(self, tag_name: str, user_id: int, limit: int = 10) -> List[Dict]:
         """Поиск товаров по названию тега с учетом избранного"""
         try:
-            # Ищем тег по названию (регистронезависимо)
             tag = self.db.query(Tag).filter(
                 or_(
                     Tag.name.ilike(tag_name),
@@ -23,13 +22,11 @@ class TagService:
             if not tag:
                 return []
             
-            # Получаем продукты по этому тегу
             products = self.db.query(Product).join(ProductTag).filter(
                 ProductTag.tag_id == tag.id,
                 Product.is_active == True
             ).limit(limit).all()
             
-            # Получаем избранные товары пользователя
             favorite_product_ids = {
                 fav.product_id for fav in 
                 self.db.query(Favorite).filter(Favorite.user_id == user_id).all()
@@ -42,7 +39,8 @@ class TagService:
                     'price': float(product.price),
                     'image_url': product.image_url or '',
                     'in_favorites': product.id in favorite_product_ids,
-                    'stock_quantity': product.stock_quantity
+                    'stock_quantity': product.stock_quantity,
+                    'description': product.description
                 }
                 for product in products
             ]

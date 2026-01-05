@@ -254,7 +254,6 @@ class CustomNavigationBar extends StatelessWidget {
             ),
           ),
         ),
-        // Область SafeArea с таким же цветом
         Container(
           height: bottomPadding,
           color: Theme.of(context).colorScheme.primaryContainer,

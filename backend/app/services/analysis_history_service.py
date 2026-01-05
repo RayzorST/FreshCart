@@ -16,7 +16,7 @@ class AnalysisHistoryService:
     def create_analysis_record(
         self, 
         user_id: int,
-        image_bytes: bytes,  # Будем оставлять этот параметр, но сделаем его необязательным
+        image_bytes: bytes, 
         detected_dish: str,
         confidence: float,
         ingredients: Dict,
@@ -24,15 +24,12 @@ class AnalysisHistoryService:
     ) -> AnalysisHistory:
         """Создание записи анализа (старая версия с image_bytes)"""
         
-        # Если image_bytes не передан, создаем фиктивный хэш
         if image_bytes:
             image_hash = hashlib.sha256(image_bytes).hexdigest()
         else:
-            # Создаем хэш на основе других данных
             hash_input = f"{user_id}_{detected_dish}_{datetime.now().timestamp()}"
             image_hash = hashlib.sha256(hash_input.encode()).hexdigest()
         
-        # Проверяем нет ли недавнего такого же анализа (за последний час)
         one_hour_ago = datetime.now() - timedelta(hours=1)
         
         # ВАЖНО: если в модели нет image_hash, убираем эту проверку

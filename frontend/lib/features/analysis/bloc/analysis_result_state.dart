@@ -28,13 +28,13 @@ class AnalysisResultSuccess extends AnalysisResultState {
   final Map<String, dynamic> result;
   final bool hasAvailableProducts;
   final DateTime analyzedAt;
-  final List<SelectedProduct> selectedProducts; // Новое поле
+  final List<SelectedProduct> selectedProducts;
 
   const AnalysisResultSuccess({
     required this.result,
     required this.hasAvailableProducts,
     required this.analyzedAt,
-    this.selectedProducts = const [], // Инициализация пустым списком
+    this.selectedProducts = const [],
   });
 
   factory AnalysisResultSuccess.now({

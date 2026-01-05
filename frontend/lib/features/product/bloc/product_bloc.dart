@@ -1,6 +1,7 @@
 // [file name]: product_bloc.dart
 import 'package:bloc/bloc.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
+import 'package:client/features/main/bloc/favorites_bloc.dart';
 import 'package:client/domain/entities/product_entity.dart';
 import 'package:client/domain/repositories/cart_repository.dart';
 import 'package:client/domain/repositories/favorite_repository.dart';
@@ -13,12 +14,14 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   final CartRepository cartRepository;
   final FavoriteRepository favoriteRepository;
   final CartBloc cartBloc;
+  final FavoritesBloc favoritesBloc;
 
   ProductBloc({
     required this.product,
     required this.cartRepository,
     required this.favoriteRepository,
-    required this.cartBloc
+    required this.cartBloc,
+    required this.favoritesBloc,
   }) : super(const ProductState()) {
     on<ProductLoadFavoriteStatus>(_onLoadFavoriteStatus);
     on<ProductLoadCartQuantity>(_onLoadCartQuantity);
@@ -32,24 +35,17 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     try {
       emit(state.copyWith(isLoadingFavorite: true));
-      
-      // Используем репозиторий вместо прямого вызова ApiClient
-      final result = await favoriteRepository.isFavorite(product.id);
-      
-      result.fold(
-        (error) {
-          emit(state.copyWith(
-            isLoadingFavorite: false,
-            errorMessage: error,
-          ));
-        },
-        (isFavorite) {
-          emit(state.copyWith(
-            isFavorite: isFavorite,
-            isLoadingFavorite: false,
-          ));
-        },
+
+      final favoritesState = favoritesBloc.state;
+      final isProductInFavorites = favoritesState.favorites.any(
+        (fav) => fav.product.id == product.id
       );
+
+      emit(state.copyWith(
+        isFavorite: isProductInFavorites,
+        isLoadingFavorite: false,
+      ));
+
     } catch (e) {
       emit(state.copyWith(
         isLoadingFavorite: false,
@@ -65,7 +61,6 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     try {
       emit(state.copyWith(isLoadingCart: true));
       
-      // Получаем корзину с сервера через репозиторий
       final result = await cartRepository.getCartItems();
       
       result.fold(
@@ -103,40 +98,23 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       emit(state.copyWith(isLoadingFavorite: true));
       
       if (state.isFavorite) {
-        // Удаляем из избранного
-        final result = await favoriteRepository.removeFromFavorites(product.id);
+        favoritesBloc.add(FavoriteRemoved(product.id));
         
-        result.fold(
-          (error) {
-            emit(state.copyWith(
-              isLoadingFavorite: false,
-              errorMessage: error,
-            ));
-          },
-          (_) {
-            emit(state.copyWith(
-              isFavorite: false,
-              isLoadingFavorite: false,
-            ));
-          },
-        );
+        emit(state.copyWith(
+          isFavorite: false,
+          isLoadingFavorite: false,
+        ));
       } else {
-        final result = await favoriteRepository.addToFavorites(product.id);
+        favoritesBloc.add(FavoriteToggled(
+          productId: product.id,
+          isFavorite: true,
+          product: product,
+        ));
         
-        result.fold(
-          (error) {
-            emit(state.copyWith(
-              isLoadingFavorite: false,
-              errorMessage: error,
-            ));
-          },
-          (_) {
-            emit(state.copyWith(
-              isFavorite: true,
-              isLoadingFavorite: false,
-            ));
-          },
-        );
+        emit(state.copyWith(
+          isFavorite: true,
+          isLoadingFavorite: false,
+        ));
       }
     } catch (e) {
       emit(state.copyWith(
@@ -155,10 +133,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     try {
       emit(state.copyWith(isLoadingCart: true));
       
-      // Просто отправляем CartItemUpdated - CartBloc сам разберется
-      cartBloc.add(CartItemUpdated(product.id, event.quantity));
+      if (event.quantity == 0){
+        cartBloc.add(CartItemRemoved(product.id));
+      }
+      else{
+        cartBloc.add(CartItemUpdated(product.id, event.quantity));
+      }
       
-      // Обновляем локальное состояние
       emit(state.copyWith(
         quantity: event.quantity,
         isLoadingCart: false,

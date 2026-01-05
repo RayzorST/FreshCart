@@ -17,6 +17,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     on<CartLoaded>(_onCartLoaded);
     on<CartItemUpdated>(_onCartItemUpdated);
     on<CartItemRemoved>(_onCartItemRemoved);
+    on<OrderCreated>(_onOrderCreated);
   }
 
   @override
@@ -55,6 +56,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
             cartItems: cartItems,
             totalAmount: total,
             originalTotalAmount: originalTotal,
+            error: null,
           ));
         },
       );
@@ -81,7 +83,6 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         }
       }
       
-      // Выбираем метод на основе наличия товара
       final Either<String, CartItemEntity> result;
       
       if (existingItem == null) {
@@ -142,6 +143,44 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       );
     } catch (e) {
       emit(state.copyWith(error: 'Ошибка удаления из корзины: $e'));
+    }
+  }
+
+  Future<void> _onOrderCreated(
+    OrderCreated event,
+    Emitter<CartState> emit,
+  ) async {
+    try {
+      emit(state.copyWith(status: CartStatus.creatingOrder));
+
+      final result = await _cartRepository.createOrder(
+        shippingAddress: event.shippingAddress,
+        notes: event.notes,
+      );
+      
+      result.fold(
+        (error) {
+          emit(state.copyWith(
+            status: CartStatus.loaded,
+            error: error,
+          ));
+        },
+        (orderData) {
+          emit(state.copyWith(
+            status: CartStatus.orderCreated,
+            cartItems: const [],
+            totalAmount: 0.0,
+            originalTotalAmount: 0.0,
+            createdOrder: orderData,
+            error: null,
+          ));
+        },
+      );
+    } catch (e) {
+      emit(state.copyWith(
+        status: CartStatus.error,
+        error: 'Ошибка создания заказа: $e',
+      ));
     }
   }
 }

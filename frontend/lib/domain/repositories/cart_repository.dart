@@ -7,4 +7,5 @@ abstract class CartRepository {
   Future<Either<String, CartItemEntity>> updateCartItem(int productId, int quantity);
   Future<Either<String, void>> removeFromCart(int productId);
   Future<Either<String, void>> clearCart();
+  Future<Either<String, Map<String, dynamic>>> createOrder({required String shippingAddress, String? notes,});
 }

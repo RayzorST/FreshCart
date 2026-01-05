@@ -6,6 +6,8 @@ enum CartStatus {
   loaded,
   error,
   syncing,
+  creatingOrder,
+  orderCreated,
 }
 
 class CartState {
@@ -14,6 +16,7 @@ class CartState {
   final double totalAmount;
   final double originalTotalAmount;
   final String? error;
+  final Map<String, dynamic>? createdOrder;
 
   const CartState({
     required this.status,
@@ -21,6 +24,7 @@ class CartState {
     required this.totalAmount,
     required this.originalTotalAmount,
     this.error,
+    this.createdOrder,
   });
 
   const CartState.initial()
@@ -28,7 +32,8 @@ class CartState {
         cartItems = const [],
         totalAmount = 0.0,
         originalTotalAmount = 0.0,
-        error = null;
+        error = null,
+        createdOrder = null;
 
   CartState copyWith({
     CartStatus? status,
@@ -36,6 +41,7 @@ class CartState {
     double? totalAmount,
     double? originalTotalAmount,
     String? error,
+    Map<String, dynamic>? createdOrder,
   }) {
     return CartState(
       status: status ?? this.status,
@@ -43,6 +49,7 @@ class CartState {
       totalAmount: totalAmount ?? this.totalAmount,
       originalTotalAmount: originalTotalAmount ?? this.originalTotalAmount,
       error: error ?? this.error,
+      createdOrder: createdOrder ?? this.createdOrder,
     );
   }
 }

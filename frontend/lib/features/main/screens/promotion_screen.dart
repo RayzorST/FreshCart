@@ -37,7 +37,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
       ),
       body: BlocConsumer<PromotionsBloc, PromotionsState>(
         listener: (context, state) {
-          // Можно добавить обработку ошибок через SnackBar если нужно
+          // Можно добавить обработку ошибок через SnackBar
         },
         builder: (context, state) {
           if (state.status == PromotionsStatus.initial || 

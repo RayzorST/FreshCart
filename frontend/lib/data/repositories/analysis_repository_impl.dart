@@ -64,7 +64,6 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
       print('Файл изображения анализа $analysisId сохранен');
     } catch (e) {
       print('Ошибка сохранения файла изображения анализа: $e');
-      // Не прерываем основной поток из-за ошибки сохранения изображения
     }
   }
 
@@ -80,6 +79,7 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
         limit: limit,
         minConfidence: minConfidence,
       );
+      print(response);
       final history = (response)
           .map((json) => AnalysisEntity.fromJson(json as Map<String, dynamic>))
           .toList();

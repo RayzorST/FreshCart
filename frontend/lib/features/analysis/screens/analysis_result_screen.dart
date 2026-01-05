@@ -6,6 +6,8 @@ import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/analysis/bloc/analysis_result_bloc.dart';
 import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
 import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/core/widgets/screen_modal.dart';
+import 'package:client/features/product/screens/product_screen.dart';
 
 class AnalysisResultScreen extends StatelessWidget {
   final Map<String, dynamic>? resultData;
@@ -24,16 +26,13 @@ class AnalysisResultScreen extends StatelessWidget {
     return BlocProvider(
       create: (context) {
         final bloc = getIt<AnalysisResultBloc>();
-        
-        // Сначала проверяем resultData (из истории)
+
         if (resultData != null) {
           bloc.add(AnalysisResultFromHistory(resultData!));
         } 
-        // Затем проверяем imageData (из камеры/галереи)
         else if (imageData != null && imageData!.isNotEmpty) {
           bloc.add(AnalysisResultStarted(imageData!));
         }
-        // Если оба null, ничего не делаем
         
         return bloc;
       },
@@ -182,8 +181,7 @@ class _AnalysisResultView extends StatelessWidget {
     final confidence = (result['confidence'] ?? 0.0).toDouble();
     final basicAlternatives = List<dynamic>.from(result['basic_alternatives'] ?? []);
     final additionalAlternatives = List<dynamic>.from(result['additional_alternatives'] ?? []);
-    
-    // Проверяем, есть ли отсутствующие основные ингредиенты
+
     final missingBasicIngredients = result['basic_ingredients'] != null && 
         (result['basic_ingredients'] as List).isNotEmpty && 
         basicAlternatives.isEmpty;
@@ -233,7 +231,6 @@ class _AnalysisResultView extends StatelessWidget {
           
           const SizedBox(height: 32),
           
-          // Кнопки действий
           _buildActionButtons(context, state.hasSelectedProducts),
         ],
       ),
@@ -418,6 +415,19 @@ class _AnalysisResultView extends StatelessWidget {
     );
   }
 
+  List<Map<String, dynamic>> _sortProductsByFavorites(List<Map<String, dynamic>> products) {
+    products.sort((a, b) {
+      final aIsFavorite = a['in_favorites'] == true;
+      final bIsFavorite = b['in_favorites'] == true;
+      
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return 0;
+    });
+    
+    return products;
+  }
+
   Widget _buildIngredientCard(
     BuildContext context, 
     Map<String, dynamic> alt, 
@@ -427,8 +437,8 @@ class _AnalysisResultView extends StatelessWidget {
     }
   ) {
     final ingredient = alt['ingredient'] ?? 'Неизвестный ингредиент';
-    final products = List<Map<String, dynamic>>.from(alt['products'] ?? []);
-    
+    final products = _sortProductsByFavorites(List<Map<String, dynamic>>.from(alt['products'] ?? []));
+
     if (products.isEmpty) {
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -455,7 +465,6 @@ class _AnalysisResultView extends StatelessWidget {
       );
     }
     
-    // Находим начальную страницу для PageView (на основе выбранного товара)
     int getInitialPageIndex() {
       final selectedProduct = state.selectedProducts.firstWhere(
         (sp) => sp.ingredient == ingredient && sp.isBasic == isBasic,
@@ -475,7 +484,6 @@ class _AnalysisResultView extends StatelessWidget {
       return 0;
     }
     
-    // Создаем контроллер PageView
     final pageController = PageController(initialPage: getInitialPageIndex());
     
     return Container(
@@ -483,7 +491,6 @@ class _AnalysisResultView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Название ингредиента
           Row(
             children: [
               Text(
@@ -493,25 +500,22 @@ class _AnalysisResultView extends StatelessWidget {
                   fontSize: 16,
                 ),
               ),
+
               const Spacer(),
-              // Показываем выбранный продукт если есть
+
               _buildSelectedProductBadge(state, ingredient, isBasic),
             ],
           ),
           
           const SizedBox(height: 8),
           
-          // Галерея карточек продуктов (PageView)
           SizedBox(
             height: 140,
             child: PageView.builder(
               itemCount: products.length,
               controller: pageController,
               scrollDirection: Axis.horizontal,
-              onPageChanged: (index) {
-                // При свайпе НЕ выбираем товар, только перелистываем
-                // Ничего не делаем
-              },
+              onPageChanged: (index) {},
               itemBuilder: (context, index) {
                 return Builder(
                   builder: (context) {
@@ -530,7 +534,6 @@ class _AnalysisResultView extends StatelessWidget {
             ),
           ),
           
-          // Индикаторы страниц
           if (products.length > 1) ...[
             const SizedBox(height: 8),
             Row(
@@ -540,7 +543,6 @@ class _AnalysisResultView extends StatelessWidget {
                 (index) {
                   return GestureDetector(
                     onTap: () {
-                      // Клик по точке переключает на соответствующую страницу
                       pageController.animateToPage(
                         index,
                         duration: const Duration(milliseconds: 300),
@@ -627,7 +629,6 @@ class _AnalysisResultView extends StatelessWidget {
     final stockQuantity = product.stockQuantity ?? 0;
     final inFavorites = productMap['in_favorites'] == true;
     
-    // Проверяем, выбран ли этот продукт
     final isSelected = state.isProductSelected(productId, ingredient, isBasic);
 
     return Card(
@@ -639,166 +640,179 @@ class _AnalysisResultView extends StatelessWidget {
             ? BorderSide(color: Colors.green, width: 2)
             : BorderSide.none,
       ),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Изображение продукта
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[200],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.food_bank, size: 30, color: Colors.grey);
-                  },
+      child: GestureDetector(
+        onTap: () {
+          final screenWidth = MediaQuery.of(context).size.width;
+          if (screenWidth > 600) {
+            ScreenToModal.show(context: context, child: ProductScreen(product: product));
+          } else {
+            context.push('/product/${product.id}', extra: product);
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[200],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.food_bank, size: 30, color: Colors.grey);
+                    },
+                  ),
                 ),
               ),
-            ),
-            
-            const SizedBox(width: 12),
-            
-            // Информация о продукте
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Название продукта
-                  Text(
-                    productName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  
-                  const SizedBox(height: 4),
-                  
-                  // Цена
-                  Text(
-                    '$price ₽',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green[800],
-                      fontSize: 18,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 4),
-                  
-                  // Статус наличия
-                  if (isOutOfStock)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.red[50],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline, size: 12, color: Colors.red),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Нет в наличии',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else if (stockQuantity < 10)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.warning, size: 12, color: Colors.orange),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Осталось: $stockQuantity',
+              
+              const SizedBox(width: 12),
+              
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            productName,
                             style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.orange,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ],
+                        ),
+                        
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (inFavorites)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 8),
+                                child: Icon(Icons.favorite, color: Colors.red, size: 18),
+                              ),
+                            
+                            GestureDetector(
+                              onTap: isOutOfStock ? null : () {
+                                if (isSelected) {
+                                  context.read<AnalysisResultBloc>().add(
+                                    AnalysisResultProductDeselected(
+                                      productId: productId,
+                                      ingredient: ingredient,
+                                      isBasic: isBasic,
+                                    ),
+                                  );
+                                } else {
+                                  context.read<AnalysisResultBloc>().add(
+                                    AnalysisResultProductSelected(
+                                      productId: productId,
+                                      ingredient: ingredient,
+                                      isBasic: isBasic,
+                                      product: productMap,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: isSelected 
+                                        ? Colors.green 
+                                        : (isOutOfStock ? Colors.grey : Colors.grey[400]!),
+                                    width: 2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  color: isSelected ? Colors.green : Colors.transparent,
+                                ),
+                                child: isSelected
+                                    ? const Icon(Icons.check, size: 18, color: Colors.white)
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    Text(
+                      '$price ₽',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green[800],
+                        fontSize: 18,
                       ),
                     ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(width: 12),
-            
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (inFavorites)
-                  const Icon(Icons.favorite, color: Colors.red, size: 18),
-                
-                GestureDetector(
-                  onTap: isOutOfStock ? null : () {
-                    if (isSelected) {
-                      context.read<AnalysisResultBloc>().add(
-                        AnalysisResultProductDeselected(
-                          productId: productId,
-                          ingredient: ingredient,
-                          isBasic: isBasic,
+                    
+                    const SizedBox(height: 8),
+                    
+                    if (isOutOfStock)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                      );
-                    } else {
-                      context.read<AnalysisResultBloc>().add(
-                        AnalysisResultProductSelected(
-                          productId: productId,
-                          ingredient: ingredient,
-                          isBasic: isBasic,
-                          product: productMap,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline, size: 12, color: Colors.red),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Нет в наличии',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    }
-                  },
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: isSelected 
-                            ? Colors.green 
-                            : (isOutOfStock ? Colors.grey : Colors.grey[400]!),
-                        width: 2,
+                      )
+                    else if (stockQuantity < 10)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.warning, size: 12, color: Colors.orange),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Осталось: $stockQuantity',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                      color: isSelected ? Colors.green : Colors.transparent,
-                    ),
-                    child: isSelected
-                        ? const Icon(Icons.check, size: 18, color: Colors.white)
-                        : null,
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
-      ),
+      )
     );
   }
 

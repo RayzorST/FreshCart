@@ -1,9 +1,9 @@
-// lib/features/analysis/ui/image_picker_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/features/analysis/bloc/image_picker_bloc.dart';
 import 'package:client/data/repositories/analysis_repository_impl.dart';
+import 'package:client/domain/entities/analysis_result_entity.dart';
 
 class ImagePickerScreen extends StatelessWidget {
   const ImagePickerScreen({super.key});
@@ -27,12 +27,16 @@ class _ImagePickerView extends StatelessWidget {
     return BlocListener<ImagePickerBloc, ImagePickerState>(
       listener: (context, state) {
         if (state is ImagePickerCaptureSuccess) {
+          // Преобразуем AnalysisResultEntity в Map так же как в history
+          final analysisResult = state.analysisResult;
+          final resultData = _convertAnalysisResultToMap(analysisResult);
+          
           // Переходим на экран результатов с данными
           context.push(
             '/analysis/result',
             extra: {
-              'base64Image': state.base64Image,
-              'analysisResult': state.analysisResult,
+              'result': resultData,
+              'fromHistory': false,
             },
           );
           
@@ -48,7 +52,6 @@ class _ImagePickerView extends StatelessWidget {
             'Анализ блюда',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
-          centerTitle: true,
         ),
         body: Container(
           width: double.infinity,
@@ -108,6 +111,31 @@ class _ImagePickerView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Метод для преобразования AnalysisResultEntity в Map
+  Map<String, dynamic> _convertAnalysisResultToMap(AnalysisResultEntity analysisResult) {
+    return {
+      'detected_dish': analysisResult.detectedDish,
+      'confidence': analysisResult.confidence,
+      'basic_ingredients': analysisResult.basicIngredients,
+      'additional_ingredients': analysisResult.additionalIngredients,
+      'basic_alternatives': _convertAlternativesToMap(analysisResult.basicAlternatives),
+      'additional_alternatives': _convertAlternativesToMap(analysisResult.additionalAlternatives),
+    };
+  }
+
+  // Метод для преобразования альтернатив в формат Map
+  List<Map<String, dynamic>> _convertAlternativesToMap(List<dynamic> alternatives) {
+    return alternatives.map((alt) {
+      if (alt is Map<String, dynamic>) {
+        return alt;
+      } else {
+        // Если альтернативы уже в правильном формате, просто возвращаем их
+        // или преобразуем в Map, если это другой тип
+        return {'ingredient': alt.toString(), 'products': []};
+      }
+    }).toList();
   }
 }
 

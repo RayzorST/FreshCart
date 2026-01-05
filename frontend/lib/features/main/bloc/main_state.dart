@@ -20,7 +20,7 @@ class MainState extends Equatable {
   final String selectedCategoryId;
   final String searchQuery;
   final MainStatus productsStatus;
-  final List<ProductEntity> products; // Изменено на List<Product>
+  final List<ProductEntity> products;
   final String? productsError;
   final bool hasMoreProducts;
 
@@ -53,7 +53,7 @@ class MainState extends Equatable {
         selectedCategoryId = '0',
         searchQuery = '',
         productsStatus = MainStatus.initial,
-        products = const [], // Пустой список Product
+        products = const [],
         productsError = null,
         hasMoreProducts = false;
 
@@ -69,7 +69,7 @@ class MainState extends Equatable {
     String? selectedCategoryId,
     String? searchQuery,
     MainStatus? productsStatus,
-    List<ProductEntity>? products, // Изменено на List<Product>
+    List<ProductEntity>? products,
     String? productsError,
     bool? hasMoreProducts,
   }) {

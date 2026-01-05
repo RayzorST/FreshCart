@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:client/domain/entities/cart_item_entity.dart';
 import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/domain/entities/address_entity.dart';
 import 'package:client/features/main/screens/promotion_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,8 +9,9 @@ import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
-import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/core/widgets/screen_modal.dart';
 import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/features/profile/bloc/addresses_bloc.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -19,6 +22,10 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final TextEditingController _notesController = TextEditingController();
+  AddressEntity? _selectedAddress;
+  List<AddressEntity> _addresses = [];
+  bool _isLoadingAddresses = true;
+  StreamSubscription? _addressesSubscription;
 
   @override
   void initState() {
@@ -27,12 +34,49 @@ class _CartScreenState extends State<CartScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final bloc = context.read<CartBloc>();
       bloc.add(const CartLoaded());
+      _loadAddresses();
     });
+  }
+
+  Future<void> _loadAddresses() async {
+    try {
+      setState(() => _isLoadingAddresses = true);
+      
+      final addressesBloc = context.read<AddressesBloc>();
+      
+      addressesBloc.add(const LoadAddresses());
+      
+      _addressesSubscription = addressesBloc.stream.listen((state) {
+        if (state.status == AddressesStatus.loaded) {
+          setState(() {
+            _addresses = state.addresses;
+            if (state.addresses.isNotEmpty) {
+              final defaultAddress = state.addresses.firstWhere(
+                (address) => address.isDefault,
+                orElse: () => state.addresses.first,
+              );
+              _selectedAddress = defaultAddress;
+            }
+          });
+          setState(() => _isLoadingAddresses = false);
+        } else if (state.status == AddressesStatus.error && state.error != null) {
+          AppSnackbar.showError(context: context, message: state.error!);
+          setState(() => _isLoadingAddresses = false);
+        }
+      }, onError: (error) {
+        AppSnackbar.showError(context: context, message: 'Ошибка загрузки адресов: $error');
+        setState(() => _isLoadingAddresses = false);
+      });
+    } catch (e) {
+      AppSnackbar.showError(context: context, message: 'Ошибка загрузки адресов: $e');
+      setState(() => _isLoadingAddresses = false);
+    }
   }
 
   @override
   void dispose() {
     _notesController.dispose();
+    _addressesSubscription?.cancel();
     super.dispose();
   }
 
@@ -120,9 +164,36 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _createOrder(BuildContext context) {
-    // TODO: Обновить для работы с адресами
-    
+  void _createOrder(BuildContext context) {  
+    if (_selectedAddress == null && _addresses.isNotEmpty) {
+      AppSnackbar.showError(context: context, message: 'Пожалуйста, выберите адрес доставки');
+      return;
+    }
+
+    if (_addresses.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Нет адресов доставки'),
+          content: const Text('Чтобы оформить заказ, необходимо добавить адрес доставки.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.push('/addresses');
+              },
+              child: const Text('Добавить адрес'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -147,13 +218,30 @@ class _CartScreenState extends State<CartScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Отмена'),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Создать заказ через API
-              AppSnackbar.showSuccess(context: context, message: 'Заказ создан!');
+          BlocBuilder<CartBloc, CartState>(
+            builder: (context, state) {
+              return FilledButton(
+                onPressed: state.status == CartStatus.creatingOrder
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        final cartBloc = context.read<CartBloc>();
+                        cartBloc.add(OrderCreated(
+                          shippingAddress: _selectedAddress!.fullAddress,
+                          notes: _notesController.text.isNotEmpty 
+                              ? _notesController.text 
+                              : null,
+                        ));
+                      },
+                child: state.status == CartStatus.creatingOrder
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Создать заказ'),
+              );
             },
-            child: const Text('Создать заказ'),
           ),
         ],
       ),
@@ -168,6 +256,192 @@ class _CartScreenState extends State<CartScreen> {
     } else {
       context.push('/product/${product.id}', extra: product);
     }
+  }
+
+  Widget _buildAddressCard(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.location_on_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Адрес доставки',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            if (_isLoadingAddresses)
+              _buildLoadingAddressCard()
+            else if (_addresses.isEmpty)
+              _buildNoAddressesCard(context)
+            else
+              _buildAddressSelector(context)
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingAddressCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 12),
+          Text('Загрузка адресов...'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoAddressesCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.orange.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.location_off, color: Colors.orange[700], size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Нет адресов доставки',
+                style: TextStyle(
+                  color: Colors.orange[800],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Добавьте адрес, чтобы мы знали куда доставить ваш заказ',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressSelector(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<AddressEntity>(
+          value: _selectedAddress,
+          isExpanded: true,
+          icon: Icon(
+            Icons.arrow_drop_down,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          dropdownColor: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          items: _addresses.map((address) {
+            return DropdownMenuItem<AddressEntity>(
+              value: address,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          address.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (address.isDefault) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'по умолчанию',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      address.fullAddress,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (address) {
+            setState(() {
+              _selectedAddress = address;
+            });
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -210,6 +484,10 @@ class _CartScreenState extends State<CartScreen> {
           if (state.status == CartStatus.error && state.error != null) {
             AppSnackbar.showError(context: context, message: state.error!);
           }
+          
+          if (state.status == CartStatus.orderCreated) {
+            AppSnackbar.showSuccess(context: context, message: 'Заказ успешно создан!');
+          }
         },
         builder: (context, state) {
           return _buildBody(context, state);
@@ -219,7 +497,10 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildBody(BuildContext context, CartState state) {
-    // Показываем полную загрузку только при начальной загрузке
+    if (state.status == CartStatus.orderCreated) {
+      return _buildOrderSuccessState(context, state);
+    }
+    
     if (state.status == CartStatus.initial) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -233,6 +514,71 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     return _buildCartWithItems(context, state);
+  }
+
+  Widget _buildOrderSuccessState(BuildContext context, CartState state) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 80,
+            color: Colors.green,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Заказ успешно создан!',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 12),
+          if (state.createdOrder != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Номер заказа: ${state.createdOrder!['id'] ?? 'Н/Д'}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Статус: ${state.createdOrder!['status'] ?? 'Н/Д'}'),
+                  const SizedBox(height: 8),
+                  if (state.createdOrder!['shipping_address'] != null)
+                    Text('Адрес: ${state.createdOrder!['shipping_address']}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FilledButton(
+                onPressed: () => context.push('/orders'),
+                child: const Text('Мои заказы'),
+              ),
+              const SizedBox(width: 16),
+              OutlinedButton(
+                onPressed: () => context.push('/catalog'),
+                child: const Text('Продолжить покупки'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildErrorState(BuildContext context, String error) {
@@ -317,7 +663,6 @@ class _CartScreenState extends State<CartScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Список товаров
           Expanded(
             flex: 2,
             child: Column(
@@ -329,10 +674,16 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
           const SizedBox(width: 20),
-          // Итого
           SizedBox(
-            width: 400,
-            child: _buildOrderSummary(context, state),
+            width: 400, 
+            child: Column(
+              children: [
+                _buildAddressCard(context),
+                const SizedBox(height: 12),
+                
+                _buildOrderSummary(context, state),
+              ],
+            ),
           ),
         ],
       ),
@@ -343,6 +694,9 @@ class _CartScreenState extends State<CartScreen> {
     return ListView(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12, top: 12),
       children: [
+        _buildAddressCard(context),
+        const SizedBox(height: 12),
+
         ...state.cartItems.map((item) {
           return Column(
             children: [

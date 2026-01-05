@@ -68,4 +68,39 @@ class CartRepositoryImpl implements CartRepository {
       return Left('Ошибка очистки корзины: $e');
     }
   }
+
+  @override
+  Future<Either<String, Map<String, dynamic>>> createOrder({
+    required String shippingAddress,
+    String? notes,
+  }) async {
+    try {
+      final cartItemsResult = await getCartItems();
+      
+      return await cartItemsResult.fold(
+        (error) => Left(error),
+        (cartItems) async {
+          final items = cartItems.map((item) {
+            return {
+              'product_id': item.product.id,
+              'quantity': item.quantity,
+              'price': item.discountPrice ?? item.product.price,
+            };
+          }).toList();
+
+          final response = await ApiClient.createOrder(
+            shippingAddress,
+            notes ?? '',
+            items,
+          );
+
+          await clearCart();
+
+          return Right(response);
+        },
+      );
+    } catch (e) {
+      return Left('Ошибка создания заказа: $e');
+    }
+  }
 }

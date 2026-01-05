@@ -27,7 +27,8 @@ class ProductScreen extends StatelessWidget {
             product: product,
             cartRepository: getIt<CartRepository>(),
             favoriteRepository: getIt<FavoriteRepository>(),
-            cartBloc: context.read<CartBloc>()
+            cartBloc: context.read<CartBloc>(),
+            favoritesBloc: context.read<FavoritesBloc>(),
           ),
         ),
         // 2. Глобальный CartBloc через GetIt

@@ -8,7 +8,7 @@ import 'package:client/domain/entities/cart_item_entity.dart';
 import 'package:client/domain/entities/favorite_item_entity.dart';
 import 'package:client/features/main/bloc/cart_bloc.dart';
 import 'package:client/features/product/screens/product_screen.dart';
-import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/core/widgets/screen_modal.dart';
 import 'package:client/core/widgets/quantity_controls.dart';
 
 class FavoritesScreen extends StatefulWidget {

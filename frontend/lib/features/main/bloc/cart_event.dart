@@ -20,3 +20,13 @@ class CartItemRemoved extends CartEvent {
 
   const CartItemRemoved(this.productId);
 }
+
+class OrderCreated extends CartEvent {
+  final String shippingAddress;
+  final String? notes;
+
+  const OrderCreated({
+    required this.shippingAddress,
+    this.notes,
+  });
+}

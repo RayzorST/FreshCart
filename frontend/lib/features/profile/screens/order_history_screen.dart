@@ -205,7 +205,10 @@ class OrderHistoryScreen extends StatelessWidget {
     }
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime? date) {
+    if (date == null)
+      return "";
+      
     final months = [
       'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
       'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
@@ -334,7 +337,7 @@ class OrderHistoryScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _buildDetailRow('Статус', _getStatusText(order.status)),
               _buildDetailRow('Дата заказа', _formatDate(order.createdAt)),
-              _buildDetailRow('Дата обновления', _formatDate(order.updatedAt)),
+              if (order.updatedAt != null) _buildDetailRow('Дата обновления', _formatDate(order.updatedAt)),
               _buildDetailRow('Адрес доставки', order.shippingAddress),
               if (order.notes != null && order.notes!.isNotEmpty) 
                 _buildDetailRow('Примечание', order.notes!),

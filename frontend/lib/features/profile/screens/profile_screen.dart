@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/features/profile/bloc/profile_bloc.dart';
 import 'package:client/features/auth/bloc/auth_bloc.dart';
-import 'package:client/core/widgets/product_modal.dart';
+import 'package:client/core/widgets/screen_modal.dart';
 import 'package:client/features/profile/screens/order_history_screen.dart';
 import 'package:client/features/profile/screens/help_screen.dart';
 import 'package:client/features/profile/screens/settings_screen.dart';
