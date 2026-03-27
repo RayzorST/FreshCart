@@ -46,7 +46,7 @@ class TagService:
             ]
             
         except Exception as e:
-            print(f"Error in get_products_by_tag: {e}")
+            
             return []
 
     def get_products_by_multiple_tags(self, tag_names: List[str], user_id: int, limit: int = 5) -> List[Dict]:
@@ -103,7 +103,7 @@ class TagService:
             
         except Exception as e:
             self.db.rollback()
-            print(f"Error adding tag: {e}")
+            
             return False
 
     def search_similar_products(self, product_id: int, user_id: int, limit: int = 5) -> List[Dict]:
@@ -145,5 +145,5 @@ class TagService:
             ]
             
         except Exception as e:
-            print(f"Error in search_similar_products: {e}")
+            
             return []

@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+import logging
 
 from app.models.database import get_db
 from app.models.cart import CartItem
 from app.models.product import Product
+from app.models.analysis import UserChoice, SelectedProduct
 from app.models.user import User
 from app.schemas.cart import CartItemResponse, CartItemCreate, CartItemUpdate, CartResponse
 from app.api.endpoints.auth import get_current_user
 from app.services.promotion_service import PromotionService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/", response_model=CartResponse)
 async def get_cart(
@@ -68,7 +71,11 @@ async def add_to_cart(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Добавление товара в корзину"""
+    """
+    Добавление товара в корзину.
+    Если передан choice_metadata, автоматически создается запись выбора пользователя.
+    """
+    # Проверяем существование товара
     product = db.query(Product).filter(
         Product.id == cart_item_data.product_id,
         Product.is_active == True
@@ -80,6 +87,14 @@ async def add_to_cart(
             detail="Product not found"
         )
     
+    # Проверяем наличие товара на складе
+    if product.stock_quantity < cart_item_data.quantity:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not enough stock. Available: {product.stock_quantity}"
+        )
+    
+    # Добавляем/обновляем товар в корзине
     existing_item = db.query(CartItem).filter(
         CartItem.user_id == current_user.id,
         CartItem.product_id == cart_item_data.product_id
@@ -89,7 +104,7 @@ async def add_to_cart(
         existing_item.quantity += cart_item_data.quantity
         db.commit()
         db.refresh(existing_item)
-        return existing_item
+        cart_item = existing_item
     else:
         cart_item = CartItem(
             user_id=current_user.id,
@@ -99,7 +114,90 @@ async def add_to_cart(
         db.add(cart_item)
         db.commit()
         db.refresh(cart_item)
-        return cart_item
+    
+    logger.info(cart_item_data.choice_metadata)
+    if cart_item_data.choice_metadata:
+        try:
+            logger.info(f"🔄 SAVING: analysis_id={cart_item_data.choice_metadata.get('analysis_id')}")
+            await create_user_choice_from_cart_item(
+                db=db,
+                user_id=current_user.id,
+                cart_item=cart_item,
+                metadata=cart_item_data.choice_metadata
+            )
+            logger.info("✅ SAVE SUCCESS")
+        except Exception as e:
+            logger.error(f"❌ SAVE ERROR: {e}", exc_info=True)
+    
+    return cart_item
+
+async def create_user_choice_from_cart_item(
+    db: Session,
+    user_id: int,
+    cart_item: CartItem,
+    metadata: dict
+):
+    """
+    Создает запись выбора пользователя на основе метаданных из корзины
+    """
+    # Извлекаем данные из метаданных
+    analysis_id = metadata.get('analysis_id')
+    ingredient_type = metadata.get('ingredient_type', 'basic')
+    
+    if not analysis_id:
+        logger.warning(f"Missing analysis_id in metadata")
+        return
+    
+    # Проверяем, существует ли анализ и принадлежит ли пользователю
+    from app.models.analysis import AnalysisHistory
+    analysis = db.query(AnalysisHistory).filter(
+        AnalysisHistory.id == analysis_id,
+        AnalysisHistory.user_id == user_id
+    ).first()
+    
+    if not analysis:
+        logger.warning(f"Analysis {analysis_id} not found or not owned by user {user_id}")
+        return
+    
+    # Ищем существующий выбор для этого анализа
+    existing_choice = db.query(UserChoice).filter(
+        UserChoice.analysis_id == analysis_id,
+        UserChoice.user_id == user_id
+    ).first()
+    
+    # Если выбора нет - создаем новый
+    if not existing_choice:
+        user_choice = UserChoice(
+            analysis_id=analysis_id,
+            user_id=user_id
+        )
+        db.add(user_choice)
+        db.flush()
+        logger.info(f"Created new UserChoice id: {user_choice.id}")
+    else:
+        user_choice = existing_choice
+        logger.info(f"Using existing UserChoice id: {user_choice.id}")
+    
+    # Проверяем, не добавляли ли уже этот продукт
+    existing_selected = db.query(SelectedProduct).filter(
+        SelectedProduct.user_choice_id == user_choice.id,
+        SelectedProduct.product_id == cart_item.product_id
+    ).first()
+    
+    if not existing_selected:
+        # Создаем новую запись выбранного продукта
+        selected_product = SelectedProduct(
+            user_choice_id=user_choice.id,
+            product_id=cart_item.product_id,
+            ingredient_type=ingredient_type,
+        )
+        db.add(selected_product)
+        logger.info(f"Created SelectedProduct for product {cart_item.product_id}")
+    else:
+        logger.info(f"Product {cart_item.product_id} already selected, skipping")
+    
+    db.commit()
+    logger.info(f"Saved user choice for analysis {analysis_id}")
 
 @router.put("/{product_id}", response_model=CartItemResponse)
 async def update_cart_item(

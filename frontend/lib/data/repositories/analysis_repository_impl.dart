@@ -15,13 +15,16 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
   Future<Either<String, AnalysisResultEntity>> analyzeFoodImage(String imageData) async {
     try {
       final response = await ApiClient.analyzeFoodImage(imageData);
-      final result = AnalysisResultEntity.fromJson(response);
       
-      // После успешного анализа, сохраняем изображение
+      
       if (response.containsKey('analysis_id')) {
-        final analysisId = response['analysis_id'] as int;
-        await _saveAnalysisImage(analysisId, imageData);
+        
+      } else {
+        
+        
       }
+      
+      final result = AnalysisResultEntity.fromJson(response);
       
       return Right(result);
     } catch (e) {
@@ -29,6 +32,7 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
     }
   }
 
+  @override
   Future<Either<String, AnalysisResultEntity>> analyzeFoodImageFile(XFile imageFile) async {
     try {
       final bytes = await imageFile.readAsBytes();
@@ -52,18 +56,18 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
   Future<void> _saveAnalysisImage(int analysisId, String base64Image) async {
     try {
       await ApiClient.uploadAnalysisImageBase64(analysisId, base64Image);
-      print('Изображение анализа $analysisId сохранено');
+      
     } catch (e) {
-      print('Ошибка сохранения изображения анализа: $e');
+      
     }
   }
 
   Future<void> _saveAnalysisImageFile(int analysisId, String filePath, List<int> bytes) async {
     try {
       await ApiClient.uploadAnalysisImageFile(analysisId, filePath, bytes);
-      print('Файл изображения анализа $analysisId сохранен');
+      
     } catch (e) {
-      print('Ошибка сохранения файла изображения анализа: $e');
+      
     }
   }
 
@@ -79,7 +83,7 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
         limit: limit,
         minConfidence: minConfidence,
       );
-      print(response);
+      
       final history = (response)
           .map((json) => AnalysisEntity.fromJson(json as Map<String, dynamic>))
           .toList();
@@ -108,7 +112,7 @@ class AnalysisRepositoryImpl implements AnalysisRepository {
           .toList();
       return Right(history);
     } catch (e) {
-      print(e);
+      
       return Left('Ошибка загрузки всей истории анализов: $e');
     }
   }

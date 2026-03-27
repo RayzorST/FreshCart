@@ -37,7 +37,7 @@ class AdminScreenBloc extends Bloc<AdminScreenEvent, AdminScreenState> {
     AdminScreenSectionChanged event,
     Emitter<AdminScreenState> emit,
   ) {
-    print('Section changed to: ${event.sectionIndex}'); // Добавляем лог
+    
     
     if (state is AdminScreenLoaded) {
       emit(AdminScreenLoaded(selectedSection: event.sectionIndex));

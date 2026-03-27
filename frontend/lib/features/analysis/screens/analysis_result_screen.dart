@@ -6,19 +6,25 @@ import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/analysis/bloc/analysis_result_bloc.dart';
 import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
 import 'package:client/domain/entities/product_entity.dart';
+import 'package:client/domain/entities/analysis_entity.dart';
 import 'package:client/core/widgets/screen_modal.dart';
 import 'package:client/features/product/screens/product_screen.dart';
+import 'package:client/core/types/dish_names.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 
 class AnalysisResultScreen extends StatelessWidget {
   final Map<String, dynamic>? resultData;
   final bool fromHistory;
   final String? imageData;
+  final List<UserChoiceEntity>? previousChoices;
   
   const AnalysisResultScreen({
     super.key,
     this.resultData,
     this.fromHistory = false,
-    this.imageData, 
+    this.imageData,
+    this.previousChoices,
   });
 
   @override
@@ -36,13 +42,15 @@ class AnalysisResultScreen extends StatelessWidget {
         
         return bloc;
       },
-      child: const _AnalysisResultView(),
+      child: _AnalysisResultView(previousChoices: previousChoices),
     );
   }
 }
 
 class _AnalysisResultView extends StatelessWidget {
-  const _AnalysisResultView();
+  final List<UserChoiceEntity>? previousChoices;
+  
+  const _AnalysisResultView({this.previousChoices});
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +98,6 @@ class _AnalysisResultView extends StatelessWidget {
                 tooltip: 'Повторить анализ',
               );
             }
-            
             return const SizedBox.shrink();
           },
         ),
@@ -177,7 +184,9 @@ class _AnalysisResultView extends StatelessWidget {
 
   Widget _buildResults(BuildContext context, AnalysisResultSuccess state) {
     final result = state.result;
-    final dishName = result['detected_dish'] ?? 'Неизвестное блюдо';
+    final dishName = DishNames.getRussianName(
+      result['detected_dish']?.toString() ?? 'Неизвестное блюдо'
+    );
     final confidence = (result['confidence'] ?? 0.0).toDouble();
     final basicAlternatives = List<dynamic>.from(result['basic_alternatives'] ?? []);
     final additionalAlternatives = List<dynamic>.from(result['additional_alternatives'] ?? []);
@@ -195,9 +204,7 @@ class _AnalysisResultView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildAnalysisHeader(dishName, confidence),
-          
           const SizedBox(height: 16),
-
           if (missingBasicIngredients || missingAdditionalIngredients) 
             _buildMissingIngredientsWarning(
               context, 
@@ -206,9 +213,7 @@ class _AnalysisResultView extends StatelessWidget {
               basicAlternatives.isEmpty,
               additionalAlternatives.isEmpty,
             ),
-          
           const SizedBox(height: 16),
-
           if (basicAlternatives.isNotEmpty) 
             _buildIngredientSection(
               context, 
@@ -217,9 +222,7 @@ class _AnalysisResultView extends StatelessWidget {
               state: state,
               isBasic: true,
             ),
-          
           const SizedBox(height: 16),
-
           if (additionalAlternatives.isNotEmpty) 
             _buildIngredientSection(
               context, 
@@ -228,9 +231,7 @@ class _AnalysisResultView extends StatelessWidget {
               state: state,
               isBasic: false,
             ),
-          
           const SizedBox(height: 32),
-          
           _buildActionButtons(context, state.hasSelectedProducts),
         ],
       ),
@@ -415,6 +416,19 @@ class _AnalysisResultView extends StatelessWidget {
     );
   }
 
+  bool _isIngredientPreviouslySelected(String ingredient) {
+    if (previousChoices == null) return false;
+    
+    for (final choice in previousChoices!) {
+      for (final selected in choice.selectedProducts) {
+        if (selected.originalIngredient == ingredient) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   List<Map<String, dynamic>> _sortProductsByFavorites(List<Map<String, dynamic>> products) {
     products.sort((a, b) {
       final aIsFavorite = a['in_favorites'] == true;
@@ -438,6 +452,7 @@ class _AnalysisResultView extends StatelessWidget {
   ) {
     final ingredient = alt['ingredient'] ?? 'Неизвестный ингредиент';
     final products = _sortProductsByFavorites(List<Map<String, dynamic>>.from(alt['products'] ?? []));
+    final wasPreviouslySelected = _isIngredientPreviouslySelected(ingredient);
 
     if (products.isEmpty) {
       return Container(
@@ -445,12 +460,48 @@ class _AnalysisResultView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              ingredient,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+            Row(
+              children: [
+                Text(
+                  ingredient,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                if (wasPreviouslySelected) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.green.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 12,
+                          color: Colors.green[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Ранее выбран',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.green[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 8),
             Text(
@@ -485,6 +536,9 @@ class _AnalysisResultView extends StatelessWidget {
     }
     
     final pageController = PageController(initialPage: getInitialPageIndex());
+    ValueNotifier<int> currentPageNotifier = ValueNotifier<int>(getInitialPageIndex());
+
+    final bool isWeb = kIsWeb;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -500,71 +554,184 @@ class _AnalysisResultView extends StatelessWidget {
                   fontSize: 16,
                 ),
               ),
-
-              const Spacer(),
-
-              _buildSelectedProductBadge(state, ingredient, isBasic),
+              if (wasPreviouslySelected) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.green.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 12,
+                        color: Colors.green[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Ранее выбран',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           
-          const SizedBox(height: 8),
+          _buildSelectedProductBadge(state, ingredient, isBasic),
+          
+          if (state.isProductSelected(0, ingredient, isBasic)) 
+            const SizedBox(height: 8),
           
           SizedBox(
             height: 140,
-            child: PageView.builder(
-              itemCount: products.length,
-              controller: pageController,
-              scrollDirection: Axis.horizontal,
-              onPageChanged: (index) {},
-              itemBuilder: (context, index) {
-                return Builder(
-                  builder: (context) {
-                    return _buildProductCard(
-                      context, 
-                      products[index], 
-                      ingredient, 
-                      isBasic,
-                      state: state,
-                      productIndex: index,
-                      totalProducts: products.length,
-                    );
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(
+                dragDevices: {
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.mouse,
+                  PointerDeviceKind.trackpad,
+                  PointerDeviceKind.stylus,
+                },
+                scrollbars: false,
+              ),
+              child: PageView.builder(
+                itemCount: products.length,
+                controller: pageController,
+                scrollBehavior: const MaterialScrollBehavior().copyWith(
+                  dragDevices: {
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                    PointerDeviceKind.trackpad,
+                    PointerDeviceKind.stylus,
                   },
-                );
-              },
+                  physics: const BouncingScrollPhysics(), 
+                ),
+                scrollDirection: Axis.horizontal,
+                onPageChanged: (index) {
+                  currentPageNotifier.value = index;
+                },
+                itemBuilder: (context, index) {
+                  return Builder(
+                    builder: (context) {
+                      return _buildProductCard(
+                        context, 
+                        products[index], 
+                        ingredient, 
+                        isBasic,
+                        state: state,
+                        productIndex: index,
+                        totalProducts: products.length,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
           
           if (products.length > 1) ...[
             const SizedBox(height: 8),
+            
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                products.length,
-                (index) {
-                  return GestureDetector(
-                    onTap: () {
-                      pageController.animateToPage(
-                        index,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: pageController.hasClients && 
-                              pageController.page?.round() == index
-                            ? Theme.of(context).primaryColor 
-                            : Theme.of(context).primaryColor.withOpacity(0.3),
+              children: [       
+                ValueListenableBuilder<int>(
+                  valueListenable: currentPageNotifier,
+                  builder: (context, currentPage, child) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        products.length,
+                        (index) {
+                          if (products.length > 5 && (index < 2 || index > products.length - 3 || index == currentPage)) {
+                            if (index == 2 && currentPage > 2 && currentPage < products.length - 3) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: Text(
+                                  '...',
+                                  style: TextStyle(
+                                    color: Theme.of(context).primaryColor,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              );
+                            }
+                            
+                            if (index > 2 && index < products.length - 3 && index != currentPage) {
+                              return const SizedBox.shrink();
+                            }
+                          }
+                          
+                          return GestureDetector(
+                            onTap: () {
+                              pageController.animateToPage(
+                                index,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                            child: Container(
+                              width: currentPage == index ? 24 : 10,
+                              height: 10,
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(
+                                  currentPage == index ? 5 : 10,
+                                ),
+                                color: currentPage == index
+                                    ? Theme.of(context).primaryColor 
+                                    : Theme.of(context).primaryColor.withOpacity(0.3),
+                              ),
+                              child: currentPage == index && products.length > 5
+                                  ? Center(
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
+              ],
             ),
+            
+            if (isWeb && products.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: ValueListenableBuilder<int>(
+                  valueListenable: currentPageNotifier,
+                  builder: (context, currentPage, child) {
+                    return Text(
+                      '${currentPage + 1} / ${products.length}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
         ],
       ),
@@ -584,6 +751,7 @@ class _AnalysisResultView extends StatelessWidget {
     
     if (selectedProduct.productId != 0) {
       return Container(
+        margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.green[50],
@@ -595,7 +763,7 @@ class _AnalysisResultView extends StatelessWidget {
             const Icon(Icons.check, size: 14, color: Colors.green),
             const SizedBox(width: 4),
             Text(
-              'Выбран',
+              'Выбран сейчас',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.green[800],
@@ -628,8 +796,12 @@ class _AnalysisResultView extends StatelessWidget {
     final isOutOfStock = product.stockQuantity != null && product.stockQuantity! <= 0;
     final stockQuantity = product.stockQuantity ?? 0;
     final inFavorites = productMap['in_favorites'] == true;
-    
     final isSelected = state.isProductSelected(productId, ingredient, isBasic);
+    print(isSelected);
+    // ПРОВЕРКА: выбирал ли пользователь этот товар ранее
+    final isPreviouslySelected = previousChoices != null && 
+        previousChoices!.any((choice) => 
+            choice.selectedProducts.any((sp) => sp.productId == productId));
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -751,13 +923,39 @@ class _AnalysisResultView extends StatelessWidget {
                     
                     const SizedBox(height: 8),
                     
-                    Text(
-                      '$price ₽',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green[800],
-                        fontSize: 18,
-                      ),
+                    // СТРОКА С ЦЕНОЙ И БЕЙДЖЕМ
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '$price ₽',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green[800],
+                            fontSize: 18,
+                          ),
+                        ),
+                        
+                        if (isPreviouslySelected)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.blue.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              'Ранее выбран',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     
                     const SizedBox(height: 8),
@@ -825,7 +1023,6 @@ class _AnalysisResultView extends StatelessWidget {
             child: FilledButton.icon(
               icon: const Icon(Icons.shopping_cart_checkout),
               onPressed: () {
-
                 context.read<AnalysisResultBloc>().add(AnalysisResultAddAllToCart());
                 context.pushReplacement("/");
               },

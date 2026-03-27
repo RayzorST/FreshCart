@@ -27,6 +27,7 @@ import 'package:client/features/profile/bloc/addresses_bloc.dart';
 import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
 import 'package:client/features/analysis/bloc/analysis_result_bloc.dart';
 import 'package:client/features/analysis/bloc/image_picker_bloc.dart';
+import 'package:client/domain/entities/analysis_entity.dart';
 
 // Screens
 import 'package:client/features/auth/screens/login_screen.dart';
@@ -117,7 +118,6 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'order-history',
           pageBuilder: (context, state) => MaterialPage(
             child: BlocProvider(
-              // Используем GetIt вместо создания через конструктор
               create: (context) => getIt<OrderHistoryBloc>()..add(LoadOrders()),
               child: const OrderHistoryScreen(),
             ),
@@ -128,7 +128,6 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'addresses',
           pageBuilder: (context, state) => MaterialPage(
             child: BlocProvider(
-              // Используем GetIt вместо создания через конструктор
               create: (context) => getIt<AddressesBloc>()..add(LoadAddresses()),
               child: const AddressesScreen(),
             ),
@@ -175,16 +174,30 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'analysis-result',
           pageBuilder: (context, state) {
             final extra = state.extra;
+            print('ok');
+            
+            String? imageData;
+            Map<String, dynamic>? resultData;
+            bool fromHistory = false;
+            List<UserChoiceEntity>? previousChoices;
+            print('🔍 app.dart: previousChoices from extra = $previousChoices');
+            if (extra is String) {
+              imageData = extra;
+            } else if (extra is Map<String, dynamic>) {
+              resultData = extra['result'] as Map<String, dynamic>?;
+              fromHistory = extra['fromHistory'] ?? false;
+              previousChoices = extra['previousChoices'] as List<UserChoiceEntity>?;
+              imageData = extra['imageData'] as String?;
+            }
             
             return MaterialPage(
-              key: ValueKey(extra),
               child: BlocProvider(
                 create: (context) => getIt<AnalysisResultBloc>(),
                 child: AnalysisResultScreen(
-                  imageData: extra is String ? extra : null,
-                  resultData: extra is Map<String, dynamic> 
-                      ? (extra['result'] as Map<String, dynamic>? ?? extra) 
-                      : null,
+                  imageData: imageData,
+                  resultData: resultData,
+                  fromHistory: fromHistory,
+                  previousChoices: previousChoices,
                 ),
               ),
             );

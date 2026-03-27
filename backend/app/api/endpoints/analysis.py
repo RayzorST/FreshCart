@@ -169,45 +169,83 @@ async def get_my_analysis_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0),
+    include_choices: bool = Query(True, description="Включить выборы пользователя"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение истории анализов текущего пользователя"""
+    """
+    Получение истории анализов текущего пользователя.
+    Если include_choices=True, включает выборы пользователя для каждого анализа.
+    """
     try:
         history_service = AnalysisHistoryService(db)
         
-        # Используем отдельный метод для фильтрации по уверенности
-        if min_confidence is not None:
-            history = history_service.get_user_analysis_history(
+        # Выбираем нужный метод в зависимости от необходимости выборов
+        if include_choices:
+            history = history_service.get_user_analysis_history_with_choices(
                 user_id=current_user.id,
                 offset=skip,
                 limit=limit,
                 min_confidence=min_confidence
             )
         else:
-            history = history_service.get_analysis_history(
-                user_id=current_user.id,
-                offset=skip,
-                limit=limit
-            )
+            if min_confidence is not None:
+                history = history_service.get_user_analysis_history(
+                    user_id=current_user.id,
+                    offset=skip,
+                    limit=limit,
+                    min_confidence=min_confidence
+                )
+            else:
+                history = history_service.get_analysis_history(
+                    user_id=current_user.id,
+                    offset=skip,
+                    limit=limit
+                )
         
-        # Преобразуем в формат ответа СОГЛАСНО СХЕМЕ
+        # Формируем ответ
         result = []
         for record in history:
-            # Извлекаем базовые и дополнительные ингредиенты из JSON
-            ingredients = record.ingredients or {}
-            
-            # Формируем ответ в формате, ожидаемом схемой
-            result.append({
+            analysis_dict = {
                 "id": record.id,
                 "user_id": record.user_id,
                 "detected_dish": record.detected_dish,
                 "confidence": record.confidence,
-                "ingredients": ingredients,  # Должен быть Dict, например {"basic": [], "additional": []}
+                "ingredients": record.ingredients or {},
                 "alternatives_found": record.alternatives_found or {},
                 "image_url": record.image_url,
                 "created_at": record.created_at
-            })
+            }
+            
+            # Добавляем выборы, если они есть и запрошены
+            if include_choices and record.user_choices:
+                analysis_dict["user_choices"] = []
+                for user_choice in record.user_choices:
+                    choice_dict = {
+                        "id": user_choice.id,
+                        "created_at": user_choice.created_at,
+                        "selected_products": []
+                    }
+                    
+                    # Добавляем выбранные продукты
+                    for selected in user_choice.selected_items:
+                        product_data = {
+                            "id": selected.id,
+                            "product_id": selected.product_id,
+                            "ingredient_type": selected.ingredient_type,
+                            "created_at": selected.created_at,
+                            "product": {
+                                "id": selected.product.id,
+                                "name": selected.product.name,
+                                "price": selected.product.price,
+                                "image_url": selected.product.image_url
+                            }
+                        }
+                        choice_dict["selected_products"].append(product_data)
+                    
+                    analysis_dict["user_choices"].append(choice_dict)
+            
+            result.append(analysis_dict)
         
         return result
         
@@ -215,55 +253,154 @@ async def get_my_analysis_history(
         logger.error(f"Error getting analysis history: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
 
-
 @router.get("/all-history", response_model=List[AnalysisHistoryResponse])
 async def get_all_analysis_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     user_id: Optional[int] = Query(None, description="ID конкретного пользователя"),
     min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0),
+    include_choices: bool = Query(True, description="Включить выборы пользователя"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение истории анализов всех или конкретного пользователя"""
+    """
+    Получение истории анализов всех или конкретного пользователя (админ).
+    Если include_choices=True, включает выборы пользователя для каждого анализа.
+    """
     try:
-        history_service = AnalysisHistoryService(db)
-        
         # Проверяем права администратора
         if user_id is not None and user_id != current_user.id:
-            # Проверяем, является ли пользователь администратором
             if current_user.role.name != "admin":
                 raise HTTPException(status_code=403, detail="Not authorized to view other users' history")
         
-        # Используем параметры фильтрации
-        history = history_service.get_analysis_history(
-            user_id=user_id,
-            offset=skip,
-            limit=limit,
-            min_confidence=min_confidence
-        )
+        history_service = AnalysisHistoryService(db)
         
-        # Преобразуем в формат ответа
+        # Выбираем нужный метод
+        if include_choices:
+            history = history_service.get_analysis_history_with_choices(
+                user_id=user_id,
+                offset=skip,
+                limit=limit,
+                min_confidence=min_confidence
+            )
+        else:
+            history = history_service.get_analysis_history(
+                user_id=user_id,
+                offset=skip,
+                limit=limit,
+                min_confidence=min_confidence
+            )
+        
+        # Формируем ответ (аналогично my-history)
         result = []
         for record in history:
-            ingredients = record.ingredients or {}
-            
-            result.append({
+            analysis_dict = {
                 "id": record.id,
                 "user_id": record.user_id,
                 "detected_dish": record.detected_dish,
                 "confidence": record.confidence,
-                "ingredients": ingredients,  # Dict формата {"basic": [], "additional": []}
+                "ingredients": record.ingredients or {},
                 "alternatives_found": record.alternatives_found or {},
                 "image_url": record.image_url,
                 "created_at": record.created_at
-            })
+            }
+            
+            # Добавляем выборы, если они есть и запрошены
+            if include_choices and record.user_choices:
+                analysis_dict["user_choices"] = []
+                for user_choice in record.user_choices:
+                    choice_dict = {
+                        "id": user_choice.id,
+                        "created_at": user_choice.created_at,
+                        "selected_products": []
+                    }
+                    
+                    for selected in user_choice.selected_items:
+                        product_data = {
+                            "id": selected.id,
+                            "product_id": selected.product_id,
+                            "ingredient_type": selected.ingredient_type,
+                            "created_at": selected.created_at,
+                            "product": {
+                                "id": selected.product.id,
+                                "name": selected.product.name,
+                                "price": selected.product.price,
+                                "image_url": selected.product.image_url
+                            }
+                        }
+                        choice_dict["selected_products"].append(product_data)
+                    
+                    analysis_dict["user_choices"].append(choice_dict)
+            
+            result.append(analysis_dict)
         
         return result
         
     except Exception as e:
         logger.error(f"Error getting all analysis history: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
+    
+@router.get("/history/{analysis_id}/choices")
+async def get_analysis_choices(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получение всех выборов пользователя для конкретного анализа
+    """
+    try:
+        # Проверяем существование анализа и права доступа
+        analysis = db.query(AnalysisHistory).filter(
+            AnalysisHistory.id == analysis_id
+        ).first()
+        
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        if analysis.user_id != current_user.id and current_user.role.name != "admin":
+            raise HTTPException(status_code=403, detail="Not authorized")
+        
+        # Получаем выборы
+        choices = db.query(UserChoice).filter(
+            UserChoice.analysis_id == analysis_id,
+            UserChoice.user_id == current_user.id if current_user.role.name != "admin" else UserChoice.user_id == analysis.user_id
+        ).options(
+            joinedload(UserChoice.selected_items).joinedload(SelectedProduct.product)
+        ).order_by(UserChoice.created_at.desc()).all()
+        
+        # Форматируем результат
+        result = []
+        for choice in choices:
+            choice_dict = {
+                "id": choice.id,
+                "created_at": choice.created_at,
+                "selected_products": []
+            }
+            
+            for selected in choice.selected_items:
+                choice_dict["selected_products"].append({
+                    "id": selected.id,
+                    "product_id": selected.product_id,
+                    "ingredient_type": selected.ingredient_type,
+                    "created_at": selected.created_at,
+                    "product": {
+                        "id": selected.product.id,
+                        "name": selected.product.name,
+                        "price": selected.product.price,
+                        "image_url": selected.product.image_url
+                    }
+                })
+            
+            result.append(choice_dict)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting analysis choices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get choices: {str(e)}")
 
 @router.get("/history/stats")
 async def get_analysis_stats(

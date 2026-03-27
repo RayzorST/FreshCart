@@ -33,18 +33,28 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     AnalysisResultStarted event,
     Emitter<AnalysisResultState> emit,
   ) async {
+    
     emit(AnalysisResultLoading(message: 'Анализируем изображение...'));
     
     try {
+      
+
       final result = await _analysisRepository.analyzeFoodImage(event.imageData);
       
       result.fold(
         (error) => emit(AnalysisResultError('Ошибка анализа: $error')),
         (analysisResult) {
-          emit(AnalysisResultSuccess(
-            result: analysisResult.toJson(),
+          // СОЗДАЕМ НОВЫЙ MAP С analysis_id
+          final jsonResult = Map<String, dynamic>.from(analysisResult.toJson());
+          
+          // ПРИНУДИТЕЛЬНО ДОБАВЛЯЕМ analysis_id
+          jsonResult['analysis_id'] = analysisResult.analysisId;
+          
+          
+          
+          emit(AnalysisResultSuccess.now(
+            result: jsonResult,
             hasAvailableProducts: analysisResult.hasAvailableProducts,
-            analyzedAt: DateTime.now(),
             selectedProducts: [],
           ));
         },
@@ -78,6 +88,7 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
       final result = await _cartRepository.addToCart(
         event.productId,
         event.quantity,
+        choiceMetadata: event.choiceMetadata,
       );
 
       result.fold(
@@ -98,7 +109,7 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
       ));
     }
   }
-
+  
   Future<void> _onAddAllToCart(
     AnalysisResultAddAllToCart event,
     Emitter<AnalysisResultState> emit,
@@ -106,10 +117,15 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     final currentState = state;
     if (currentState is! AnalysisResultSuccess) return;
 
+    
+    
+    
+
+  emit(AnalysisResultLoading(message: 'Добавляем товары в корзину...'));
+
     emit(AnalysisResultLoading(message: 'Добавляем товары в корзину...'));
 
     try {
-      // Добавляем только выбранные продукты
       final selectedProducts = currentState.selectedProducts;
       
       if (selectedProducts.isEmpty) {
@@ -124,15 +140,33 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
       int skippedCount = 0;
       List<String> errors = [];
       
+      // Получаем analysis_id из результата - проверяем тип!
+      final analysisId = currentState.analysisId;
+      if (analysisId == null) {
+        
+      } else {
+        
+      }
+      
       for (final selectedProduct in selectedProducts) {
         final productData = selectedProduct.productData;
         final stockQuantity = (productData['stock_quantity'] ?? 1).toInt();
         
         if (stockQuantity > 0) {
           try {
+            // Создаем metadata для этого продукта
+            final choiceMetadata = {
+              'analysis_id': analysisId,
+              'original_ingredient': selectedProduct.ingredient,
+              'ingredient_type': selectedProduct.isBasic ? 'basic' : 'additional',
+            };
+
+            
+            
             final cartResult = await _cartRepository.addToCart(
               selectedProduct.productId,
-              1, // Количество по умолчанию
+              1,
+              choiceMetadata: choiceMetadata,
             );
             
             cartResult.fold(
@@ -169,6 +203,11 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
         addedCount: addedCount,
         skippedCount: skippedCount,
       ));
+      
+      // Если все товары добавлены, возвращаемся назад
+      if (skippedCount == 0) {
+        emit(AnalysisResultNavigateBack(shouldRefreshHistory: true));
+      }
     } catch (e) {
       emit(AnalysisResultCartAction(
         message: 'Ошибка при добавлении товаров: $e',
@@ -176,7 +215,7 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
       ));
     }
   }
-
+    
   Future<void> _onBackPressed(
     AnalysisResultBackPressed event,
     Emitter<AnalysisResultState> emit,
@@ -192,6 +231,9 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     final currentState = state;
     if (currentState is! AnalysisResultSuccess) return;
 
+    
+    
+
     // Создаем новое состояние с добавленным продуктом
     final newState = currentState.copyWithAddedProduct(
       productId: event.productId,
@@ -199,6 +241,8 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
       isBasic: event.isBasic,
       productData: event.product,
     );
+
+    
 
     emit(newState);
     
@@ -234,10 +278,10 @@ class AnalysisResultBloc extends Bloc<AnalysisResultEvent, AnalysisResultState> 
     AnalysisResultFromHistory event,
     Emitter<AnalysisResultState> emit,
   ) async {
-    emit(AnalysisResultSuccess(
+    // Тоже используем фабричный метод!
+    emit(AnalysisResultSuccess.now(
       result: event.resultData,
-      hasAvailableProducts: _checkHasAvailableProducts(event.resultData), // Добавить
-      analyzedAt: DateTime.now(), // Добавить
+      hasAvailableProducts: _checkHasAvailableProducts(event.resultData),
       selectedProducts: [],
     ));
   }

@@ -89,9 +89,11 @@ class AnalysisHistoryDeleted extends AnalysisHistoryState {
 class AnalysisHistoryNavigateToResult extends AnalysisHistoryState {
   final Map<String, dynamic> resultData;
   final bool fromHistory;
+  final List<UserChoiceEntity>? previousChoices;  // <--- ДОБАВИТЬ
 
   const AnalysisHistoryNavigateToResult({
     required this.resultData,
     required this.fromHistory,
+    this.previousChoices,
   });
 }

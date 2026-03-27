@@ -246,7 +246,7 @@ class _PromotionManagementViewState extends State<_PromotionManagementView> {
   }
 
   void _handleCreatePromotion() {
-    print('Создание акции: обработка нажатия кнопки');
+    
     
     // Проверяем состояние ProductManagementBloc
     final productBloc = context.read<ProductManagementBloc>();
@@ -298,7 +298,7 @@ class _PromotionManagementViewState extends State<_PromotionManagementView> {
   }
 
   void _handleEditPromotion(PromotionEntity promotion) {
-    print('Редактирование акции: ${promotion.id}');
+    
     
     final productBloc = context.read<ProductManagementBloc>();
     final productState = productBloc.state;

@@ -30,9 +30,9 @@ class MinIOClient:
         try:
             if not self.client.bucket_exists(self.bucket_name):
                 self.client.make_bucket(self.bucket_name)
-                print(f"Bucket '{self.bucket_name}' created successfully")
+                
         except S3Error as e:
-            print(f"Error creating bucket: {e}")
+            
             raise HTTPException(
                 status_code=500,
                 detail=f"MinIO bucket error: {str(e)}"
@@ -68,7 +68,7 @@ class MinIOClient:
             return f"/minio/{self.bucket_name}/{filename}"
             
         except Exception as e:
-            print(f"MinIO upload error: {e}")
+            
             raise HTTPException(
                 status_code=500,
                 detail=f"Error uploading image to MinIO: {str(e)}"
@@ -109,7 +109,7 @@ class MinIOClient:
             return f"/minio/{self.bucket_name}/{filename}"
             
         except Exception as e:
-            print(f"MinIO upload error: {e}")
+            
             raise HTTPException(
                 status_code=500,
                 detail=f"Error uploading image to MinIO: {str(e)}"
@@ -130,10 +130,10 @@ class MinIOClient:
             return True
             
         except S3Error as e:
-            print(f"MinIO delete error: {e}")
+            
             return False
         except Exception as e:
-            print(f"Error deleting image from MinIO: {e}")
+            
             return False
 
     def get_image_url(self, image_url: str) -> str:

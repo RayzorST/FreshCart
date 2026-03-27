@@ -9,7 +9,7 @@ class CartItemBase(BaseModel):
     quantity: int
 
 class CartItemCreate(CartItemBase):
-    pass
+    choice_metadata: Optional[dict] = None
 
 class CartItemUpdate(BaseModel):
     quantity: int
@@ -21,8 +21,10 @@ class CartItemResponse(CartItemBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    discount_price: Optional[float] = None  # ДОБАВИТЬ
+    discount_price: Optional[float] = None 
     applied_promotions: Optional[List[Dict]] = []
+    user_choice_id: Optional[int] = None
+    selected_product_id: Optional[int] = None
     
     class Config:
         from_attributes = True

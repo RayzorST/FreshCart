@@ -76,7 +76,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     } catch (e) {}
   }
 
-  // Остальные методы без изменений
   Future<void> _onUpdateNotificationSettings(
     UpdateNotificationSettings event,
     Emitter<SettingsState> emit,

@@ -1,4 +1,5 @@
 class AnalysisResultEntity {
+  final int? analysisId;
   final bool success;
   final int userId;
   final String detectedDish;
@@ -11,6 +12,7 @@ class AnalysisResultEntity {
   final List<String> recommendations;
 
   AnalysisResultEntity({
+    this.analysisId,
     required this.success,
     required this.userId,
     required this.detectedDish,
@@ -25,6 +27,7 @@ class AnalysisResultEntity {
 
   factory AnalysisResultEntity.fromJson(Map<String, dynamic> json) {
     return AnalysisResultEntity(
+      analysisId: json['analysis_id'],
       success: json['success'] ?? false,
       userId: json['user_id'] ?? 0,
       detectedDish: json['detected_dish'] ?? '',
@@ -39,7 +42,8 @@ class AnalysisResultEntity {
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final json = {
+      'analysis_id': analysisId,
       'success': success,
       'user_id': userId,
       'detected_dish': detectedDish,
@@ -51,6 +55,8 @@ class AnalysisResultEntity {
       'additional_alternatives': additionalAlternatives,
       'recommendations': recommendations,
     };
+    
+    return json;
   }
 
   bool get hasAvailableProducts {

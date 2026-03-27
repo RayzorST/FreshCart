@@ -14,6 +14,7 @@ class Base64ImageResponse(BaseModel):
 class AnalysisResponse(BaseModel):
     success: bool
     user_id: int
+    analysis_id: Optional[int] = None
     detected_dish: str
     confidence: float
     message: str
@@ -34,6 +35,7 @@ class AnalysisHistoryResponse(AnalysisHistoryBase):
     user_id: int
     created_at: datetime
     image_url: Optional[str] = None
+    user_choices: Optional[List[dict]] = None
 
 class AnalysisStatsResponse(BaseModel):
     total_analyses: int

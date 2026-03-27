@@ -21,10 +21,21 @@ class CartRepositoryImpl implements CartRepository {
   }
 
   @override
-  Future<Either<String, CartItemEntity>> addToCart(int productId, int quantity) async {
+  Future<Either<String, CartItemEntity>> addToCart(
+    int productId, 
+    int quantity,
+    {Map<String, dynamic>? choiceMetadata}
+  ) async {
     try {
-      final response = await ApiClient.addToCart(productId, quantity);
-      return Right(CartItemEntity.fromJson(response));
+      
+      final response = await ApiClient.addToCart(
+        productId, 
+        quantity,
+        choiceMetadata: choiceMetadata,
+      );
+      // Преобразуем ответ в CartItemEntity
+      final cartItem = CartItemEntity.fromJson(response);
+      return Right(cartItem);
     } catch (e) {
       return Left('Ошибка добавления в корзину: $e');
     }

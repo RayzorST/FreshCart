@@ -23,7 +23,7 @@ async def upload_product_image(
     current_user: User = Depends(get_current_user)
 ):
     """Загрузка изображения для товара в формате base64"""
-    print(f"DEBUG: Uploading base64 image for product {product_id} to MinIO")
+    
     
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -60,7 +60,7 @@ async def upload_product_image_file(
     current_user: User = Depends(get_current_user)
 ):
     """Загрузка изображения для товара через файл"""
-    print(f"DEBUG: Uploading file image for product {product_id} to MinIO")
+    
     
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -132,7 +132,7 @@ async def get_product_image(
             )
             
         except Exception as e:
-            print(f"MinIO error: {e}")
+            
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Image not found in storage"
@@ -145,7 +145,7 @@ async def get_product_image(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -207,7 +207,7 @@ async def upload_category_image_file(
     current_user: User = Depends(get_current_user)
 ):
     """Загрузка изображения для категории через файл"""
-    print(f"DEBUG: Uploading file image for category {category_id} to MinIO")
+    
     
     # Проверяем тип файла
     allowed_content_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
@@ -301,13 +301,13 @@ async def get_category_image(
             )
             
         except S3Error as e:
-            print(f"MinIO error: {e}")
+            
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Image not found in storage"
             )
         except Exception as e:
-            print(f"Error reading image: {e}")
+            
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error retrieving image"
@@ -320,7 +320,7 @@ async def get_category_image(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -390,7 +390,7 @@ async def upload_analysis_image_base64(
     current_user: User = Depends(get_current_user)
 ):
     """Загрузка изображения для анализа в формате base64"""
-    print(f"DEBUG: Uploading base64 image for analysis {analysis_id} to MinIO")
+    
     
     analysis = db.query(AnalysisHistory).filter(AnalysisHistory.id == analysis_id).first()
     if not analysis:
@@ -434,7 +434,7 @@ async def upload_analysis_image_file(
     current_user: User = Depends(get_current_user)
 ):
     """Загрузка изображения для анализа через файл"""
-    print(f"DEBUG: Uploading file image for analysis {analysis_id} to MinIO")
+    
     
     # Проверяем тип файла
     allowed_content_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
@@ -529,7 +529,7 @@ async def get_analysis_image(
             )
             
         except Exception as e:
-            print(f"MinIO error: {e}")
+            
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Image not found in storage"
@@ -542,7 +542,7 @@ async def get_analysis_image(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"

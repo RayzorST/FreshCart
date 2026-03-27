@@ -3,9 +3,26 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/profile/bloc/addresses_bloc.dart';
 import 'package:client/domain/entities/address_entity.dart';
+import 'package:client/core/di/di.dart';
 
 class AddressesScreen extends StatelessWidget {
   const AddressesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) {
+        final bloc = getIt<AddressesBloc>();
+        bloc.add(const LoadAddresses());
+        return bloc;
+      },
+      child: const _AddressesScreen(),
+    );
+  }
+}
+
+class _AddressesScreen extends StatelessWidget {
+  const _AddressesScreen();
 
   @override
   Widget build(BuildContext context) {
@@ -18,52 +35,59 @@ class AddressesScreen extends StatelessWidget {
               ),
         ),
       ),
-      body: BlocConsumer<AddressesBloc, AddressesState>(
-        listener: (context, state) {
-          if (state.status == AddressesStatus.error) {
-            AppSnackbar.showError(context: context, message: state.error!);
-          }
-          if (state.status == AddressesStatus.saved) {
-            AppSnackbar.showSuccess(context: context, message: 'Адрес сохранен');
-          }
-        },
-        builder: (context, state) {
-          if (state.status == AddressesStatus.initial ||
-              state.status == AddressesStatus.loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: _AddressesContent(),
+    );
+  }
+}
 
-          if (state.status == AddressesStatus.error) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => context.read<AddressesBloc>().add(const LoadAddresses()),
-                    child: const Text('Повторить'),
-                  ),
-                ],
-              ),
-            );
-          }
+class _AddressesContent extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<AddressesBloc, AddressesState>(
+      listener: (context, state) {
+        if (state.status == AddressesStatus.error) {
+          AppSnackbar.showError(context: context, message: state.error!);
+        }
+        if (state.status == AddressesStatus.saved) {
+          AppSnackbar.showSuccess(context: context, message: 'Адрес сохранен');
+        }
+      },
+      builder: (context, state) {
+        if (state.status == AddressesStatus.initial ||
+            state.status == AddressesStatus.loading) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (state.addresses.isNotEmpty) ...[
-                ...state.addresses.map((address) => 
-                  _buildAddressCard(context, address)),
+        if (state.status == AddressesStatus.error) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.grey),
                 const SizedBox(height: 16),
+                Text('Ошибка загрузки', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<AddressesBloc>().add(const LoadAddresses()),
+                  child: const Text('Повторить'),
+                ),
               ],
-              _buildAddAddressCard(context),
-            ],
+            ),
           );
-        },
-      ),
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (state.addresses.isNotEmpty) ...[
+              ...state.addresses.map((address) => 
+                _buildAddressCard(context, address)),
+              const SizedBox(height: 16),
+            ],
+            _buildAddAddressCard(context),
+          ],
+        );
+      },
     );
   }
 

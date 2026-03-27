@@ -53,10 +53,12 @@ class AnalysisHistoryShowOptions extends AnalysisHistoryEvent {
 class AnalysisHistoryOpenResult extends AnalysisHistoryEvent {
   final Map<String, dynamic> analysis;
   final bool isMyAnalysis;
+  final List<UserChoiceEntity>? previousChoices;  // <--- ДОБАВИТЬ
 
   AnalysisHistoryOpenResult({
     required this.analysis,
     required this.isMyAnalysis,
+    this.previousChoices,
   });
 }
 

@@ -1,7 +1,7 @@
 # app/services/analysis_history_service.py
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Dict, Optional
-from app.models.analysis import AnalysisHistory
+from app.models.analysis import AnalysisHistory, UserChoice, SelectedProduct
 from sqlalchemy import func, and_
 from datetime import datetime, timedelta
 import hashlib
@@ -201,3 +201,53 @@ class AnalysisHistoryService:
             {"dish_name": dish, "analysis_count": count}
             for dish, count in popular_dishes
         ]
+    
+    def get_analysis_history_with_choices(
+        self, 
+        user_id: Optional[int] = None,
+        offset: int = 0, 
+        limit: int = 20, 
+        min_confidence: float = None
+    ) -> List[AnalysisHistory]:
+        """
+        Получение истории анализов с выборами пользователя
+        """
+        query = self.db.query(AnalysisHistory)
+        
+        if user_id is not None:
+            query = query.filter(AnalysisHistory.user_id == user_id)
+        
+        if min_confidence is not None:
+            query = query.filter(AnalysisHistory.confidence >= min_confidence)
+        
+        # Загружаем связанные выборы и продукты
+        query = query.options(
+            joinedload(AnalysisHistory.user_choices)
+            .joinedload(UserChoice.selected_items)
+            .joinedload(SelectedProduct.product)
+        )
+        
+        return query.order_by(AnalysisHistory.created_at.desc()).offset(offset).limit(limit).all()
+    
+    def get_user_analysis_history_with_choices(
+        self,
+        user_id: int,
+        offset: int = 0,
+        limit: int = 20,
+        min_confidence: float = None
+    ) -> List[AnalysisHistory]:
+        """
+        Получение истории анализов конкретного пользователя с выборами
+        """
+        query = self.db.query(AnalysisHistory).filter(
+            AnalysisHistory.user_id == user_id
+        ).options(
+            joinedload(AnalysisHistory.user_choices)
+            .joinedload(UserChoice.selected_items)
+            .joinedload(SelectedProduct.product)
+        )
+        
+        if min_confidence is not None:
+            query = query.filter(AnalysisHistory.confidence >= min_confidence)
+        
+        return query.order_by(AnalysisHistory.created_at.desc()).offset(offset).limit(limit).all()

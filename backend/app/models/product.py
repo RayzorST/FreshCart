@@ -44,6 +44,8 @@ class Product(Base):
     # Связь через ассоциативный класс
     tags = relationship("Tag", secondary="product_tags", back_populates="products")
     product_tags = relationship("ProductTag", back_populates="product")
+    
+    selected_by_users = relationship("SelectedProduct", back_populates="product")
 
 class ProductTag(Base):
     __tablename__ = "product_tags"

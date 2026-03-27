@@ -8,6 +8,7 @@ import 'package:client/features/profile/screens/order_history_screen.dart';
 import 'package:client/features/profile/screens/help_screen.dart';
 import 'package:client/features/profile/screens/settings_screen.dart';
 import 'package:client/features/profile/screens/addresses_screen.dart';
+import 'package:client/features/analysis/screens/analysis_history_screen.dart';
 import 'package:client/domain/entities/user_entity.dart';
 import 'package:client/domain/entities/order_entity.dart';
 
@@ -109,7 +110,7 @@ class _NarrowProfileLayout extends StatelessWidget {
               _buildSectionCard(
                 context,
                 title: 'Мои блюда',
-                subtitle: '0 заказов',
+                subtitle: 'Анализ питания',
                 icon: Icons.fastfood,
                 onTap: () => context.push('/analysis/history'),
               ),
@@ -441,7 +442,7 @@ class _WideProfileLayout extends StatelessWidget {
 
           const SizedBox(height: 32),
 
-          Row(
+          Column(
             children: [
               Expanded(
                 child: _buildStatCard(
@@ -462,15 +463,17 @@ class _WideProfileLayout extends StatelessWidget {
                   color: Colors.green,
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatCard(
+                  context,
+                  title: 'С нами',
+                  value: _getMemberSince(),
+                  icon: Icons.calendar_today,
+                  color: Colors.orange,
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          _buildStatCard(
-            context,
-            title: 'С нами',
-            value: _getMemberSince(),
-            icon: Icons.calendar_today,
-            color: Colors.orange,
           ),
           
           const SizedBox(height: 32),
@@ -597,7 +600,7 @@ class _WideProfileLayout extends StatelessWidget {
               subtitle: 'Анализ питания',
               icon: Icons.restaurant,
               color: Colors.green,
-              onTap: () => context.push('/analysis/history'),
+              onTap: () => ScreenToModal.show(context: context, child: AnalysisHistoryScreen()),
             ),
             _buildActionCard(
               context,

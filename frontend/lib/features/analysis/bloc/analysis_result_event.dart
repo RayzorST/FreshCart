@@ -38,10 +38,12 @@ class AnalysisResultRetried extends AnalysisResultEvent {
 class AnalysisResultAddToCart extends AnalysisResultEvent {
   final int productId;
   final int quantity;
+  final Map<String, dynamic>? choiceMetadata;
 
   const AnalysisResultAddToCart({
     required this.productId,
     this.quantity = 1,
+    this.choiceMetadata,
   });
 
   @override
@@ -49,11 +51,12 @@ class AnalysisResultAddToCart extends AnalysisResultEvent {
     if (identical(this, other)) return true;
     return other is AnalysisResultAddToCart &&
         other.productId == productId &&
-        other.quantity == quantity;
+        other.quantity == quantity &&
+        other.choiceMetadata == choiceMetadata;
   }
 
   @override
-  int get hashCode => productId.hashCode ^ quantity.hashCode;
+  int get hashCode => productId.hashCode ^ quantity.hashCode ^ choiceMetadata.hashCode;
 }
 
 // Новые события для управления выбором продуктов

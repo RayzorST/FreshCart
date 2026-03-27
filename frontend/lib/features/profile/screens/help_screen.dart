@@ -64,7 +64,6 @@ class HelpScreen extends StatelessWidget {
   void _showFaqDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierColor: Colors.grey.withOpacity(0.2),
       builder: (context) => AlertDialog(
         title: const Text('Часто задаваемые вопросы'),
         content: SingleChildScrollView(
@@ -130,7 +129,6 @@ class HelpScreen extends StatelessWidget {
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierColor: Colors.grey.withOpacity(0.2),
       builder: (context) => AlertDialog(
         title: const Text('О приложении'),
         content: Column(
@@ -174,7 +172,6 @@ class HelpScreen extends StatelessWidget {
   void _showPrivacyPolicyDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierColor: Colors.grey.withOpacity(0.2),
       builder: (context) => AlertDialog(
         title: const Text('Политика конфиденциальности'),
         content: SingleChildScrollView(

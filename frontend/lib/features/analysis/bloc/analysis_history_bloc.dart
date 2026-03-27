@@ -1,8 +1,10 @@
-// lib/presentation/bloc/analysis_history/analysis_history_bloc.dart
+// lib/features/analysis/bloc/analysis_history_bloc.dart
+
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:client/domain/repositories/analysis_repository.dart';
 import 'package:injectable/injectable.dart';
+import 'package:client/domain/entities/analysis_entity.dart';
 
 part 'analysis_history_event.dart';
 part 'analysis_history_state.dart';
@@ -112,7 +114,7 @@ class AnalysisHistoryBloc extends Bloc<AnalysisHistoryEvent, AnalysisHistoryStat
     AnalysisHistoryAddAllToCart event,
     Emitter<AnalysisHistoryState> emit,
   ) async {
-
+    // TODO: реализовать добавление всех товаров в корзину из истории
   }
 
   Future<void> _onDeleteRequested(
@@ -181,6 +183,7 @@ class AnalysisHistoryBloc extends Bloc<AnalysisHistoryEvent, AnalysisHistoryStat
     emit(AnalysisHistoryNavigateToResult(
       resultData: resultData,
       fromHistory: true,
+      previousChoices: event.previousChoices,  // <--- ПЕРЕДАЕМ
     ));
   }
 

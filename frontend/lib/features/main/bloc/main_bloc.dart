@@ -43,7 +43,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     
     try {
       final result = await _promotionRepository.getActivePromotions();
-      print(result);
+      
       result.fold(
         (error) {
           emit(state.copyWith(

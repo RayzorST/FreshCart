@@ -146,14 +146,14 @@ class ApiClient {
     
     final uri = Uri.parse('$baseUrl/products/search').replace(queryParameters: params);
     
-    print('🔍 Search URL: $uri'); 
+    
     
     final response = await http.get(
       uri,
       headers: _headers,
     );
     
-    print('📡 Search response status: ${response.statusCode}');
+    
     
     return _handleResponse(response);
   }
@@ -237,19 +237,49 @@ class ApiClient {
       );
       return _handleResponse(response);
     } catch (e) {
-      print('Error calculating discounts: $e');
+      
       throw e;
     }
   }
 
-  static Future<Map<String, dynamic>> addToCart(int productId, int quantity) async {
+  static Future<Map<String, dynamic>> addToCart(
+    int productId, 
+    int quantity, 
+    {Map<String, dynamic>? choiceMetadata}
+  ) async {
+    final body = <String, dynamic>{
+      'product_id': productId,
+      'quantity': quantity,
+    };
+    
+    // Добавляем метаданные выбора, если они есть
+    if (choiceMetadata != null && choiceMetadata.isNotEmpty) {
+      // Создаем копию metadata с правильными типами
+      
+      final cleanedMetadata = <String, dynamic>{};
+      
+      for (final entry in choiceMetadata.entries) {
+        final key = entry.key;
+        var value = entry.value;
+        
+        // Преобразуем analysis_id в int если это строка
+        if (key == 'analysis_id' && value is String) {
+          value = int.tryParse(value) ?? value;
+        }
+        
+        cleanedMetadata[key] = value;
+      }
+      
+      body['choice_metadata'] = cleanedMetadata;
+    }
+    else{
+      
+    }
+    
     final response = await http.post(
       Uri.parse('$baseUrl/cart/'),
       headers: _headers,
-      body: json.encode({
-        'product_id': productId,
-        'quantity': quantity,
-      }),
+      body: json.encode(body),
     );
     return _handleResponse(response);
   }
@@ -548,7 +578,7 @@ class ApiClient {
       final profile = await getProfile();
       return profile['role']?['name'] == 'admin';
     } catch (e) {
-      print('Error checking admin status: $e');
+      
       return false;
     }
   }

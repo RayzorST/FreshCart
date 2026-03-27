@@ -29,12 +29,14 @@ class AnalysisResultSuccess extends AnalysisResultState {
   final bool hasAvailableProducts;
   final DateTime analyzedAt;
   final List<SelectedProduct> selectedProducts;
+  final int? analysisId;
 
   const AnalysisResultSuccess({
     required this.result,
     required this.hasAvailableProducts,
     required this.analyzedAt,
     this.selectedProducts = const [],
+    this.analysisId,
   });
 
   factory AnalysisResultSuccess.now({
@@ -42,13 +44,31 @@ class AnalysisResultSuccess extends AnalysisResultState {
     required bool hasAvailableProducts,
     List<SelectedProduct>? selectedProducts,
   }) {
+    // Логируем входящий result
+    
+    
+    
+    
+    int? analysisId;
+    final idValue = result['analysis_id'];
+    if (idValue is int) {
+      analysisId = idValue;
+    } else if (idValue is String) {
+      analysisId = int.tryParse(idValue);
+    }
+    
+    
+
     return AnalysisResultSuccess(
       result: result,
       hasAvailableProducts: hasAvailableProducts,
       analyzedAt: DateTime.now(),
       selectedProducts: selectedProducts ?? const [],
+      analysisId: analysisId,
     );
   }
+
+  int? get id => analysisId;
 
   // Новый метод для проверки выбранных продуктов
   bool get hasSelectedProducts => selectedProducts.isNotEmpty;
@@ -69,6 +89,8 @@ class AnalysisResultSuccess extends AnalysisResultState {
     required bool isBasic,
     required Map<String, dynamic> productData,
   }) {
+    
+    
     final newProduct = SelectedProduct(
       productId: productId,
       ingredient: ingredient,
@@ -76,17 +98,21 @@ class AnalysisResultSuccess extends AnalysisResultState {
       productData: productData,
     );
 
-    // Удаляем предыдущий выбор для этого ингредиента (если есть)
     final filteredProducts = selectedProducts.where((sp) => 
       !(sp.ingredient == ingredient && sp.isBasic == isBasic)
     ).toList();
 
-    return AnalysisResultSuccess(
+    final newState = AnalysisResultSuccess(
       result: result,
       hasAvailableProducts: hasAvailableProducts,
       analyzedAt: analyzedAt,
       selectedProducts: [...filteredProducts, newProduct],
+      analysisId: analysisId,
     );
+    
+    
+    
+    return newState;
   }
 
   // Новый метод для удаления выбранного продукта
@@ -106,6 +132,7 @@ class AnalysisResultSuccess extends AnalysisResultState {
       hasAvailableProducts: hasAvailableProducts,
       analyzedAt: analyzedAt,
       selectedProducts: filteredProducts,
+      analysisId: analysisId,  // Сохраняем analysisId
     );
   }
 

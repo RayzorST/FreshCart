@@ -18,7 +18,7 @@ class SettingsScreen extends StatelessWidget {
               ),
         ),
       ),
-      body: BlocBuilder<SettingsBloc, SettingsState>( 
+      body: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
           if (state is SettingsInitial || state is SettingsLoading) {
             return const Center(child: CircularProgressIndicator());
@@ -104,7 +104,7 @@ class _SettingsContent extends StatelessWidget {
           context,
           title: 'Редактировать профиль',
           icon: Icons.person_outline,
-          onTap: () => _navigateToEditProfile(context),
+          onTap: () => _showEditProfileDialog(context),
         ),
         _buildActionItem(
           context,
@@ -178,10 +178,10 @@ class _SettingsContent extends StatelessWidget {
     );
   }
 
-  void _navigateToEditProfile(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+  void _showEditProfileDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const EditProfileDialog(),
     );
   }
 
@@ -193,14 +193,14 @@ class _SettingsContent extends StatelessWidget {
   }
 }
 
-class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key});
+class EditProfileDialog extends StatefulWidget {
+  const EditProfileDialog({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  State<EditProfileDialog> createState() => _EditProfileDialogState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileDialogState extends State<EditProfileDialog> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -226,7 +226,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       if (mounted) {
         AppSnackbar.showError(context: context, message: 'Ошибка загрузки профиля');
-        setState(() => _isLoading = false);
+        Navigator.pop(context);
       }
     }
   }
@@ -260,48 +260,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Редактировать профиль'),
-        actions: [
-          IconButton(
-            icon: _isSaving 
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save),
-            onPressed: _isSaving ? null : _saveProfile,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Form(
+    return AlertDialog(
+      title: const Text('Редактировать профиль'),
+      content: SingleChildScrollView(
+        child: _isLoading
+            ? const SizedBox(
+                height: 100,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : Form(
                 key: _formKey,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.grey[300],
-                      child: const Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: () {
-                        // TODO: Добавить загрузку фото
-                      },
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Изменить фото'),
-                    ),
-                    const SizedBox(height: 24),
                     TextFormField(
                       controller: _firstNameController,
                       decoration: const InputDecoration(
@@ -340,24 +311,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isSaving ? null : _saveProfile,
-                        child: _isSaving 
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Сохранить изменения'),
-                      ),
-                    ),
                   ],
                 ),
               ),
-            ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving || _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Отмена'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving || _isLoading ? null : _saveProfile,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Сохранить'),
+        ),
+      ],
     );
   }
 }

@@ -167,7 +167,7 @@ class PromotionService:
         # Если нет ограничений - все товары подходят
         else:
             applicable_items = items.copy()
-            print("No category/product restrictions - all items applicable")
+            
         
         # Фильтруем по минимальному количеству
         filtered_items = []
@@ -222,14 +222,14 @@ class PromotionService:
         """Применяет акцию 'подарок'"""
         if not promotion.gift_product_id:
             return False
-        print(f"products {products}")
-        print(f"promotion gift {promotion.gift_product_id}")
+        
+        
         gift_product = products.get(promotion.gift_product_id)
         if not gift_product:
             return False
         
         for item in items:
-            print(item)
+            
             if item['quantity'] >= promotion.min_quantity:
                 # Добавляем информацию о подарке
                 item['applied_promotions'].append({

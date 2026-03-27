@@ -42,7 +42,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         (user) {
           ordersResult.fold(
             (ordersError) {
-              // Если заказы не загрузились, все равно показываем профиль
               emit(state.copyWith(
                 status: ProfileStatus.loaded,
                 user: user,
@@ -89,7 +88,6 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
             status: ProfileStatus.updated,
             user: updatedUser,
           ));
-          // Перезагружаем профиль для обновления заказов
           add(LoadProfile());
         },
       );

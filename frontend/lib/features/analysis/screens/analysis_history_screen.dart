@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:client/core/widgets/app_snackbar.dart';
 import 'package:client/features/analysis/bloc/analysis_history_bloc.dart';
+import 'package:client/core/widgets/screen_modal.dart';
+import 'package:client/features/analysis/screens/analysis_result_screen.dart';
 
 class AnalysisHistoryScreen extends StatelessWidget {
   const AnalysisHistoryScreen({super.key});
@@ -24,7 +26,7 @@ class _AnalysisHistoryView extends StatefulWidget {
 class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with AutomaticKeepAliveClientMixin {
   
   @override
-  bool get wantKeepAlive => true; // Это сохраняет состояние экрана
+  bool get wantKeepAlive => true;
 
   final List<String> _sectionTitles = [
     'Мои анализы',
@@ -60,11 +62,13 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
           AppSnackbar.showInfo(context: context, message: state.message);
         }
         else if (state is AnalysisHistoryNavigateToResult) {
+          print(state.previousChoices);
           context.push(
             '/analysis/result',
             extra: {
               'result': state.resultData,
               'fromHistory': state.fromHistory,
+              'previousChoices': state.previousChoices,
             },
           );
 
@@ -257,11 +261,16 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
     final dishName = analysis['detected_dish'] ?? 'Неизвестное блюдо';
     final confidence = (analysis['confidence'] ?? 0.0).toDouble();
     final date = DateTime.parse(analysis['created_at']);
-    final ingredients = analysis['ingredients'] ?? {};
-    final basicIngredients = List<String>.from(ingredients['basic'] ?? []);
-    final additionalIngredients = List<String>.from(ingredients['additional'] ?? []);
+    
+    // ИСПРАВЛЕНО: получаем ингредиенты из alternatives_found
+    final alternatives = analysis['alternatives_found'] ?? {};
+    final basicIngredients = List<Map<String, dynamic>>.from(alternatives['basic'] ?? []);
+    final additionalIngredients = List<Map<String, dynamic>>.from(alternatives['additional'] ?? []);
+    
     final imageUrl = '${ApiClient.baseUrl}/images/analysis/${analysis['id']}/image';
     final userName = analysis['user_name'] ?? 'Пользователь';
+    
+    // ИСПРАВЛЕНО: считаем общее количество ингредиентов из alternatives_found
     final totalIngredients = basicIngredients.length + additionalIngredients.length;
 
     return Card(
@@ -272,12 +281,40 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
       ),
       child: InkWell(
         onTap: () {
-          context.read<AnalysisHistoryBloc>().add(
-            AnalysisHistoryOpenResult(
-              analysis: analysis,
-              isMyAnalysis: isMyAnalysis,
-            ),
-          );
+          if (ScreenToModal.isModalOpen) {
+            ScreenToModal.closeCurrentModal(context);
+            
+            Future.delayed(const Duration(milliseconds: 200), () {
+              ScreenToModal.show(
+                context: context,
+                child: AnalysisResultScreen(
+                  resultData: {
+                    'detected_dish': analysis['detected_dish'],
+                    'confidence': analysis['confidence'],
+                    'basic_ingredients': analysis['ingredients']?['basic'] ?? [],
+                    'additional_ingredients': analysis['ingredients']?['additional'] ?? [],
+                    'basic_alternatives': _convertAlternativesToResultFormat(
+                      analysis['alternatives_found'], 
+                      'basic'
+                    ),
+                    'additional_alternatives': _convertAlternativesToResultFormat(
+                      analysis['alternatives_found'], 
+                      'additional'
+                    ),
+                  },
+                  fromHistory: true,
+                ),
+                height: 0.95,
+              );
+            });
+          } else {
+            context.read<AnalysisHistoryBloc>().add(
+              AnalysisHistoryOpenResult(
+                analysis: analysis,
+                isMyAnalysis: isMyAnalysis,
+              ),
+            );
+          }
         },
         onLongPress: isMyAnalysis ? () {
           _showAnalysisOptions(context, analysis);
@@ -288,29 +325,67 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Изображение анализа
-              _buildAnalysisImage(context, imageUrl, dishName),
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: colorScheme.surfaceVariant,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: imageUrl.isNotEmpty
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildImagePlaceholder(dishName, colorScheme);
+                          },
+                        )
+                      : _buildImagePlaceholder(dishName, colorScheme),
+                ),
+              ),
               
               const SizedBox(width: 16),
-              
-              // Основная информация
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Название и информация о пользователе
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          dishName,
-                          style: textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                dishName,
+                                style: textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (ScreenToModal.isModalOpen)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Icon(Icons.open_in_new, size: 16, color: Colors.grey),
+                              ),
+                          ],
                         ),
                         
                         if (!isMyAnalysis) ...[
@@ -325,8 +400,7 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
                         ],
                         
                         const SizedBox(height: 8),
-                        
-                        // Информация об ингредиентах и дате
+
                         Row(
                           children: [
                             Icon(
@@ -360,51 +434,48 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
                         ),
                       ],
                     ),
-                    
-                    // Индикатор уверенности
-                    _buildConfidenceBar(confidence, colorScheme),
+
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: LinearProgressIndicator(
+                                value: confidence,
+                                backgroundColor: colorScheme.surfaceVariant,
+                                color: _getConfidenceColor(confidence, colorScheme),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${(confidence * 100).toInt()}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _getConfidenceColor(confidence, colorScheme),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _getConfidenceText(confidence),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildAnalysisImage(BuildContext context, String? imageUrl, String dishName) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: colorScheme.surfaceVariant,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: imageUrl != null && imageUrl.isNotEmpty
-            ? Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return _buildImagePlaceholder(dishName, colorScheme);
-                },
-              )
-            : _buildImagePlaceholder(dishName, colorScheme),
       ),
     );
   }
@@ -431,44 +502,6 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildConfidenceBar(double confidence, ColorScheme colorScheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: LinearProgressIndicator(
-                value: confidence,
-                backgroundColor: colorScheme.surfaceVariant,
-                color: _getConfidenceColor(confidence, colorScheme),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${(confidence * 100).toInt()}%',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: _getConfidenceColor(confidence, colorScheme),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _getConfidenceText(confidence),
-          style: TextStyle(
-            fontSize: 11,
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 
@@ -569,7 +602,6 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
   }
 
   void _navigateToAnalysisResult(BuildContext context, Map<String, dynamic> analysis, bool isMyAnalysis) {
-    // Преобразуем данные анализа в формат для AnalysisResultScreen
     final resultData = {
       'detected_dish': analysis['detected_dish'],
       'confidence': analysis['confidence'],
@@ -579,7 +611,6 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
       'additional_alternatives': _convertAlternativesToResultFormat(analysis['alternatives_found'], 'additional'),
     };
     
-    // Переход на страницу результата анализа
     context.push(
       '/analysis/result',
       extra: {
@@ -632,7 +663,36 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
               title: const Text('Просмотреть детали'),
               onTap: () {
                 Navigator.pop(context);
-                _navigateToAnalysisResult(context, analysis, true);
+                
+                if (ScreenToModal.isModalOpen) {
+                  ScreenToModal.closeCurrentModal(context);
+                  
+                  Future.delayed(const Duration(milliseconds: 200), () {
+                    ScreenToModal.show(
+                      context: context,
+                      child: AnalysisResultScreen(
+                        resultData: {
+                          'detected_dish': analysis['detected_dish'],
+                          'confidence': analysis['confidence'],
+                          'basic_ingredients': analysis['ingredients']?['basic'] ?? [],
+                          'additional_ingredients': analysis['ingredients']?['additional'] ?? [],
+                          'basic_alternatives': _convertAlternativesToResultFormat(
+                            analysis['alternatives_found'], 
+                            'basic'
+                          ),
+                          'additional_alternatives': _convertAlternativesToResultFormat(
+                            analysis['alternatives_found'], 
+                            'additional'
+                          ),
+                        },
+                        fromHistory: true,
+                      ),
+                      height: 0.95,
+                    );
+                  });
+                } else {
+                  _navigateToAnalysisResult(context, analysis, true);
+                }
               },
             ),
             if (_hasAvailableProducts(analysis['alternatives_found'] ?? {}))
@@ -664,7 +724,7 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
         ),
       ),
     );
-  }
+}
 
   bool _hasAvailableProducts(Map<String, dynamic> alternatives) {
     final basicAlts = List<dynamic>.from(alternatives['basic'] ?? []);
