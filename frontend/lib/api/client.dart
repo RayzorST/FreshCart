@@ -14,6 +14,8 @@ class ApiClient {
     _token = null;
   }
 
+  static String? get token => _token;
+
   static Map<String, String> get _headers {
     final headers = {
       'Content-Type': 'application/json',

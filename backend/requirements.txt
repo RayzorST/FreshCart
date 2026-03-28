@@ -16,3 +16,4 @@ redis
 transformers 
 pillow
 torch
+PyJWT

@@ -10,6 +10,7 @@ from app.models.product import Product
 from app.models.user import User
 from app.schemas.order import OrderResponse, OrderCreate, OrderUpdate
 from app.api.endpoints.auth import get_current_user, get_current_admin
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -218,9 +219,19 @@ async def update_order_status(
             detail="Invalid status"
         )
     
+    old_status = order.status
     order.status = new_status
     order.updated_at = datetime.utcnow()
     db.commit()
+    
+    # Создаем уведомление для пользователя
+    notification_service = NotificationService(db)
+    notification_service.create_order_status_notification(
+        user_id=order.user_id,
+        order_id=order.id,
+        old_status=old_status,
+        new_status=new_status
+    )
     
     return {"message": f"Order status updated to {new_status}"}
 

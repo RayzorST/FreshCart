@@ -8,7 +8,20 @@ from app.core.config import settings
 from app.models.database import engine, Base, SessionLocal
 from app.models.user import Role
 from app.services.rabbitmq_consumer import message_consumer
-from app.api.endpoints import auth, products, orders, cart, addresses, images, favorites, promotions, analysis, admin
+from app.api.endpoints import (
+    auth, 
+    products, 
+    orders, 
+    cart, 
+    addresses, 
+    images, 
+    favorites, 
+    promotions, 
+    analysis, 
+    admin, 
+    websocket, 
+    notifications
+    )
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,6 +78,8 @@ app.include_router(images.router, prefix="/images", tags=["images"])
 app.include_router(favorites.router, prefix="/favorites", tags=["favorites"])
 app.include_router(promotions.router, prefix="/promotions", tags=["promotions"])
 app.include_router(analysis.router, prefix="/ai", tags=["ai"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
+app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
 
 
 

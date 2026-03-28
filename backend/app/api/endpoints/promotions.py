@@ -4,10 +4,11 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.models.database import get_db
-from app.models.user import User
+from app.models.user import User, UserSettings
 from app.models.product import Product
 from app.models.promotions import Promotion, PromotionType, PromotionCategory, PromotionProduct
 from app.schemas.promotions import PromotionCreate, PromotionUpdate, PromotionResponse
+from app.services.notification_service import NotificationService
 from app.api.endpoints.auth import get_current_user, get_current_admin
 import logging
 
@@ -169,6 +170,10 @@ async def get_all_promotions_admin(
     promotions = query.order_by(Promotion.created_at.desc()).offset(skip).limit(limit).all()
     return promotions
 
+# Обновим promotions.py, добавим импорты и уведомления
+from app.services.notification_service import NotificationService
+from app.models.user import User
+
 @router.post("/admin/promotions", response_model=PromotionResponse)
 async def create_promotion_admin(
     promotion_data: PromotionCreate,
@@ -208,6 +213,24 @@ async def create_promotion_admin(
                 db.add(promotion_product)
         
         db.commit()
+        
+        # Создаем уведомления для всех активных пользователей
+        notification_service = NotificationService(db)
+        
+        # Получаем всех пользователей, которые подписаны на уведомления о акциях
+        users = db.query(User).filter(User.is_active == True).all()
+        
+        for user in users:
+            # Проверяем настройки пользователя
+            user_settings = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+            if user_settings and user_settings.promo_notifications:
+                notification_service.create_promotion_notification(
+                    user_id=user.id,
+                    promotion_id=promotion.id,
+                    promotion_name=promotion.name,
+                    promotion_description=promotion.description or ""
+                )
+        
         return promotion
         
     except Exception as e:

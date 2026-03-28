@@ -1,8 +1,11 @@
+// lib/features/auth/bloc/auth_bloc.dart
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:injectable/injectable.dart';
 import 'package:client/domain/repositories/auth_repository.dart';
 import 'package:client/domain/entities/user_entity.dart';
+import 'package:client/services/websocket_service.dart';
+import 'package:client/services/local_notification_service.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -23,6 +26,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     
+    // Инициализируем локальные уведомления
+    await LocalNotificationService.initialize();
+    
     final isLoggedIn = await _authRepository.isLoggedIn();
     
     if (isLoggedIn) {
@@ -34,6 +40,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             emit(AuthUnauthenticated());
           },
           (user) {
+            // Подключаем WebSocket
+            WebSocketService.instance.connect();
             emit(AuthAuthenticated(user: user));
           },
         );
@@ -49,6 +57,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LoggedIn event,
     Emitter<AuthState> emit,
   ) async {
+    // Подключаем WebSocket
+    WebSocketService.instance.connect();
     emit(AuthAuthenticated(user: event.user));
   }
 
@@ -56,6 +66,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LoggedOut event,
     Emitter<AuthState> emit,
   ) async {
+    WebSocketService.instance.disconnect();
     await _authRepository.clearToken();
     emit(AuthUnauthenticated());
   }

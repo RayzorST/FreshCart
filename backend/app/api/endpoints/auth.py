@@ -1,7 +1,10 @@
+import jwt
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from app.core.security import (
     verify_password, 
@@ -14,6 +17,7 @@ from app.models.database import get_db
 from app.models.user import User, UserSettings, Role
 from app.schemas.user import UserCreate, UserResponse, Token, UserLogin, UserUpdate, ChangePassword, NotificationSettings, NotificationSettingsResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -37,6 +41,39 @@ async def get_current_user(
             detail="User not found",
         )
     return user
+
+async def get_current_user_ws(
+    token: str,
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Get current user from WebSocket token"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            logger.warning(f"No user_id in token")
+            return None
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            logger.warning(f"User {user_id} not found")
+            return None
+        
+        if not user.is_active:
+            logger.warning(f"User {user_id} is inactive")
+            return None
+        
+        logger.info(f"WebSocket authenticated for user {user.id}")
+        return user
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token expired")
+        return None
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"Invalid token: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"WebSocket auth error: {e}")
+        return None
 
 async def get_current_admin(
     current_user: User = Depends(get_current_user)

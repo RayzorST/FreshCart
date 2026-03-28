@@ -30,6 +30,7 @@ class User(Base):
     role = relationship("Role", back_populates="users")
     analysis_history = relationship("AnalysisHistory", back_populates="user")
     user_choices = relationship("UserChoice", back_populates="user")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
     def verify_password(self, password: str) -> bool:
         return verify_password(password, self.password_hash)
