@@ -174,7 +174,6 @@ class _FreshCartAppState extends State<FreshCartApp> {
           name: 'analysis-result',
           pageBuilder: (context, state) {
             final extra = state.extra;
-            print('ok');
             
             String? imageData;
             Map<String, dynamic>? resultData;

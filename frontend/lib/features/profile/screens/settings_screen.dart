@@ -14,7 +14,7 @@ class SettingsScreen extends StatelessWidget {
         title: Text(
           'Настройки',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary
               ),
         ),
       ),

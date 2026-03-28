@@ -31,7 +31,8 @@ class _AddressesScreen extends StatelessWidget {
         title: Text(
           'Мои адреса',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold, 
+                color: Theme.of(context).colorScheme.onSecondary
               ),
         ),
       ),

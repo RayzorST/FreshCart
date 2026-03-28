@@ -30,7 +30,7 @@ class _OrderHistoryScreen extends StatelessWidget {
         title: Text(
           'Мои заказы',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary
               ),
         ),
       ),

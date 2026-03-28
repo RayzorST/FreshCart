@@ -62,7 +62,6 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
           AppSnackbar.showInfo(context: context, message: state.message);
         }
         else if (state is AnalysisHistoryNavigateToResult) {
-          print(state.previousChoices);
           context.push(
             '/analysis/result',
             extra: {
@@ -113,7 +112,7 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
               appBar: AppBar(
                 title: Text(
                   'История анализов блюд', 
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary),
                 )
               ),
               body: Center(child: CircularProgressIndicator()),
@@ -124,7 +123,7 @@ class _AnalysisHistoryViewState extends State<_AnalysisHistoryView> with Automat
             appBar: AppBar(
               title: Text(
                 'История анализов блюд',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary),
               ),
             ),
             body: Column(

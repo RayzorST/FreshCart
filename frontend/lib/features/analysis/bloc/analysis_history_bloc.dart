@@ -171,6 +171,15 @@ class AnalysisHistoryBloc extends Bloc<AnalysisHistoryEvent, AnalysisHistoryStat
     AnalysisHistoryOpenResult event,
     Emitter<AnalysisHistoryState> emit,
   ) async {
+    final userChoices = event.analysis['user_choices'] as List<dynamic>?;
+    List<UserChoiceEntity>? previousChoices;
+
+    if (userChoices != null && userChoices.isNotEmpty) {
+      previousChoices = userChoices
+          .map((choice) => UserChoiceEntity.fromJson(choice as Map<String, dynamic>))
+          .toList();
+    }
+
     final resultData = {
       'detected_dish': event.analysis['detected_dish'],
       'confidence': event.analysis['confidence'],
@@ -178,12 +187,13 @@ class AnalysisHistoryBloc extends Bloc<AnalysisHistoryEvent, AnalysisHistoryStat
       'additional_ingredients': event.analysis['ingredients']?['additional'] ?? [],
       'basic_alternatives': _convertAlternativesToResultFormat(event.analysis['alternatives_found'], 'basic'),
       'additional_alternatives': _convertAlternativesToResultFormat(event.analysis['alternatives_found'], 'additional'),
+      'analysis_id': event.analysis['id'], // Добавляем analysis_id
     };
     
     emit(AnalysisHistoryNavigateToResult(
       resultData: resultData,
       fromHistory: true,
-      previousChoices: event.previousChoices,  // <--- ПЕРЕДАЕМ
+      previousChoices: previousChoices,  // <--- ПЕРЕДАЕМ
     ));
   }
 

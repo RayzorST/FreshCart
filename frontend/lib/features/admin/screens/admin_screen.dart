@@ -103,7 +103,7 @@ class _AdminScreenViewState extends State<_AdminScreenView> {
           appBar: AppBar(
             title: Text(
               'Админ панель',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary),
             ),
           ),
           body: Column(

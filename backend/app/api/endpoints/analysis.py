@@ -1,6 +1,6 @@
 # analysis.py - исправленная версия
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 import logging
 import base64
 import os
@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 from app.models.database import get_db
 from app.models.user import User
-from app.models.analysis import AnalysisHistory
+from app.models.analysis import AnalysisHistory, UserChoice, SelectedProduct
 from app.api.endpoints.auth import get_current_user
 from app.schemas.analysis import Base64ImageRequest, AnalysisResponse, AnalysisHistoryResponse
 from app.services.analysis_history_service import AnalysisHistoryService

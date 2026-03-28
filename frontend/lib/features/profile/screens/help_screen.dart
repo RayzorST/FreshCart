@@ -9,7 +9,7 @@ class HelpScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Помощь и поддержка',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold,),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary)
         ),
       ),
       body: ListView(

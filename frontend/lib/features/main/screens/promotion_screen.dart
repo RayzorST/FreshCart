@@ -31,7 +31,7 @@ class _PromotionScreenState extends State<PromotionScreen> {
       appBar: AppBar(
         title: Text(
           'Детали акции',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary),
         ),
         centerTitle: true,
       ),

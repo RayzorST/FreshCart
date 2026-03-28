@@ -77,7 +77,7 @@ class _AnalysisResultView extends StatelessWidget {
     return AppBar(
       title: Text(
         'Результат анализа', 
-        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary),
       ),
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
@@ -490,7 +490,7 @@ class _AnalysisResultView extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Ранее выбран',
+                          'Выбор пользователя',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
@@ -575,7 +575,7 @@ class _AnalysisResultView extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Ранее выбран',
+                        'Выбор пользователя',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
@@ -749,31 +749,6 @@ class _AnalysisResultView extends StatelessWidget {
       ),
     );
     
-    if (selectedProduct.productId != 0) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.green[50],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check, size: 14, color: Colors.green),
-            const SizedBox(width: 4),
-            Text(
-              'Выбран сейчас',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.green[800],
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
     return const SizedBox.shrink();
   }
 
@@ -797,8 +772,6 @@ class _AnalysisResultView extends StatelessWidget {
     final stockQuantity = product.stockQuantity ?? 0;
     final inFavorites = productMap['in_favorites'] == true;
     final isSelected = state.isProductSelected(productId, ingredient, isBasic);
-    print(isSelected);
-    // ПРОВЕРКА: выбирал ли пользователь этот товар ранее
     final isPreviouslySelected = previousChoices != null && 
         previousChoices!.any((choice) => 
             choice.selectedProducts.any((sp) => sp.productId == productId));
@@ -940,18 +913,18 @@ class _AnalysisResultView extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
+                              color: Colors.green.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.blue.withOpacity(0.3),
+                                color: Colors.green.withOpacity(0.3),
                               ),
                             ),
                             child: Text(
-                              'Ранее выбран',
+                              'Выбор пользователя',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.blue[700],
+                                color: Colors.green[700],
                               ),
                             ),
                           ),

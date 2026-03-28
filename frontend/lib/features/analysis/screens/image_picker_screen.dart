@@ -61,7 +61,7 @@ class _ImagePickerView extends StatelessWidget {
         appBar: isWideScreen ? null : AppBar(
           title: Text(
             'Анализ блюда',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSecondary),
           ),
         ),
         body: _buildBody(context, isWideScreen),
