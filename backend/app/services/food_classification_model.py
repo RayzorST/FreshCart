@@ -529,3 +529,5 @@ class FoodClassificationModel:
                 return ingredients
         
         return mapping["default"]
+    
+food_model = FoodClassificationModel()

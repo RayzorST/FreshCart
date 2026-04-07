@@ -36,8 +36,7 @@ async def analyze_base64_image(
         logger.info(f"Analyzing image for user {current_user.id}, size: {len(image_bytes)} bytes")
         
         # Анализируем изображение с помощью модели
-        from app.services.food_classification_model import FoodClassificationModel
-        food_model = FoodClassificationModel()
+        from app.services.food_classification_model import food_model
 
         dish_result = food_model.detect_dish_with_ingredients(image_bytes)
         
